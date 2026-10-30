@@ -13,8 +13,8 @@ study of [OpenKeeper](https://github.com/tonihele/OpenKeeper) (a Java re-impleme
 | `docs/04-port-plan.md` | Stack choices (browser vs Linux-native), legal notes, milestone list, which Java files to read for each milestone |
 | `web/index.html`, `web/game.js` | **Playable prototype**: the headless-style simulation plus a 2D canvas view, no copyrighted assets |
 | `web/render3d.js` | **3D view** (three.js). Isometric camera, your prop sprites as billboards, pixel-art floor/wall textures generated in code, stand-in shapes for units. Only reads the sim state |
-| `web/assets/sprites/` | Your hand-made prop art as transparent PNGs (Heart, Portal, Hero Gate, door, traps, cage, rack, bed, bookshelf, treasure pile, wall), plus `manifest.json` |
-| `tools/process_art.py` | Cuts the flat background out of the original JPGs: `python3 tools/process_art.py <folder-of-jpgs>` re-generates `web/assets/sprites/` |
+| `web/assets/sprites/` | Your hand-made art as transparent PNGs: 12 props (Heart, Portal, Hero Gate, door, traps, cage, rack, bed, bookshelf, treasure pile, wall) and 40 characters, plus `manifest.json` |
+| `tools/process_art.py` | Cuts the flat background (and the painted ground shadow of characters) out of the original JPGs: `python3 tools/process_art.py <folder> [--set units --max 320]` re-generates `web/assets/sprites/` |
 | `web/vendor/` | three.js 0.160.0 (MIT) kept in the repo so nothing loads from a CDN |
 
 ## Run the prototype
@@ -28,11 +28,18 @@ python3 -m http.server -d web 8000     # then open http://localhost:8000   (?see
 **3D controls:** `W A S D`/arrows pan along the screen axes, mouse wheel zooms, middle-drag pans. Clicking picks the wall top or floor under the cursor.
 The camera is isometric (45°, narrow field of view) to match the sprite art; `?cam=top` gives the earlier steep top-down perspective.
 
-**Art status:** props use your sprites; floors, walls and effects are drawn in code; creatures, imps and heroes are still
-placeholder shapes (with an x-ray silhouette when they stand behind a wall) until the character sprites are added. The
-2D fallback view (`?view=2d`) does not use the sprites. The `wall` sprite is processed but not used yet: walls are textured
+**Art status:** props and characters use your sprites (billboards with a soft ground shadow, mirrored to face the way they
+walk, and a faint x-ray silhouette when a wall hides them); floors, walls and effects are drawn in code. The 2D fallback view
+(`?view=2d`) does not use the sprites.
+
+**Roster (from the character art):** your creatures come through the portal weighted by kind: Goblin, Troll, Warlock (the
+best researcher), Dark Elf (fast archer), Bile Demon (slow tank), Vampire (strong caster), Salamander (fire fighter) and
+Spider (fast biter); Skeletons rise from starved prisoners and imps dig. At **level 3** a creature's sprite changes to its elite
+form (e.g. the runic Troll, the green-flame Goblin). Heroes: Knight, Archer, Mage, Thief (fast), Royal Guard (tank), Monk (heals
+wounded allies) and the **Prince**, who leads the final wave and never flees. Art not used yet: king, giant, dwarf, stone knight,
+fairy (heroes); reaper, dark angel, mistress, assassin, rogue, wasp, firefly, fire knight, black knight (keepers); chicken. The `wall` sprite is processed but not used yet: walls are textured
 blocks so they can be dug away tile by tile. To tune where a sprite sits on its tile, edit the `SPR` table at the top of
-`web/render3d.js` (`w` = width in tiles, `ay` = how far up the image the ground contact point is).
+`web/render3d.js` (`w` = width in tiles, `ay` = how far up the image the ground contact point is); character heights are in the `USIZE` table.
 
 Tag earth with **Dig** (left-drag; right-drag untags). Imps dig, mine gold, claim floor and haul gold to a
 **Treasury**. Dig east to the purple portal and claim it; creatures arrive and need a **Lair**, get angry without
@@ -53,13 +60,13 @@ seams, room building, lair assignment, mood/anger, sleep and payday, free-imp sp
   **Door** (100g, 400 hp), they stop and smash it while your units pass freely and imps repair it. **Gas Traps** (150g,
   poison cloud) and **Lightning Traps** (200g, burst + stun) are hidden from heroes, fire when stepped on, hold a few
   charges, and imps re-arm them for gold. With the same 8 creatures and 3 lair tiles, one door plus three traps in the
-  tunnel to the Hero Gate turned a lost game into a win in my bot test (9 heroes killed, Heart untouched).
+  tunnel to the Hero Gate turned a lost game into a win in my bot test (7 heroes killed, Heart untouched).
 * **Mana and spells** (hotkeys `1`–`5`, click to cast; mana comes from your claimed floor, about 5.7/s at the start,
   1000 max, and every spell has a cooldown): **⚡ Lightning** (120 – 70 damage to the hero under the cursor, 35 chained to
   two nearby ones, with a stun), **✚ Heal** (80 – +60 hp to creatures and imps in range), **» Speed** (90 – creatures move
   and recharge 1.6× faster for 12 s), **⚑ Call to Arms** (150 – creatures drop everything and gather at a flag for 25 s),
   **✦ Create Imp** (100 – on claimed floor). A failed cast costs nothing. In my bot test the same weak defence that
-  lost without spells won with them (8 heroes killed, no creature lost, mana nearly spent).
+  lost without spells won with them (11 heroes killed, Heart at 1570/2500, mana nearly spent).
 * **Knock-out, Prison and Torture Chamber:** a unit that loses its last hit points to an enemy attacker is knocked out
   instead of killed (traps and spells, which have no attacker, still kill). Imps rush to carry your own fallen creatures
   to a lair (or the Heart) to recover, and knocked-out heroes to a **Prison** (100g/tile, one prisoner per tile). Anyone

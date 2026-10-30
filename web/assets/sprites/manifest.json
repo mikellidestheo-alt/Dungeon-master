@@ -58,5 +58,205 @@
   "w": 512,
   "h": 435,
   "source": "Wooden_iron_dungeon_door_8e6518dd.jpg"
+ },
+ "black_knight": {
+  "w": 276,
+  "h": 320,
+  "source": "Armored_knight_pixel_art_sprite_f8834d4a.jpg"
+ },
+ "bile": {
+  "w": 320,
+  "h": 263,
+  "source": "Bile_Demon_game_sprite_0737d804.jpg"
+ },
+ "chicken": {
+  "w": 250,
+  "h": 320,
+  "source": "Chicken_game_sprite_isolated_d2e1cdd8.jpg"
+ },
+ "dark_angel": {
+  "w": 320,
+  "h": 243,
+  "source": "Dark_Angel_game_sprite_1152a639.jpg"
+ },
+ "darkelf_elite": {
+  "w": 250,
+  "h": 320,
+  "source": "Dark_Elf_archer_standing_a319d3c4.jpg"
+ },
+ "darkelf": {
+  "w": 252,
+  "h": 320,
+  "source": "Dark_Elf_archer_unit_46bc53c1.jpg"
+ },
+ "dwarf": {
+  "w": 320,
+  "h": 308,
+  "source": "Dwarf_digging_and_combat_hero_7e5fac84.jpg"
+ },
+ "archer": {
+  "w": 255,
+  "h": 320,
+  "source": "Elven_Archer_hero_unit_878cb43d.jpg"
+ },
+ "fairy": {
+  "w": 320,
+  "h": 314,
+  "source": "Fairy_flying_magic_researcher_hero_6c10f9b6.jpg"
+ },
+ "giant": {
+  "w": 320,
+  "h": 255,
+  "source": "Giant_hero_tank_sprite_105869df.jpg"
+ },
+ "goblin": {
+  "w": 281,
+  "h": 320,
+  "source": "Goblin_infantry_sprite_b5885c20.jpg"
+ },
+ "imp": {
+  "w": 320,
+  "h": 302,
+  "source": "Imp_sprite_on_plain_background_214cba19.jpg"
+ },
+ "knight": {
+  "w": 316,
+  "h": 320,
+  "source": "Knight_warrior_hero_unit_067eb3c5.jpg"
+ },
+ "monk": {
+  "w": 316,
+  "h": 320,
+  "source": "Monk_healer_game_sprite_6491a38f.jpg"
+ },
+ "reaper": {
+  "w": 320,
+  "h": 269,
+  "source": "Pixelated_Reaper_holding_scythe_7bbbab31.jpg"
+ },
+ "assassin": {
+  "w": 292,
+  "h": 320,
+  "source": "Pixelated_assassin_sprite_isolat#U2026_b090c374.jpg"
+ },
+ "wasp": {
+  "w": 320,
+  "h": 296,
+  "source": "Pixelated_creature_flying_34910def.jpg"
+ },
+ "dark_angel_elite": {
+  "w": 320,
+  "h": 246,
+  "source": "Pixelated_dark_angel_sprite_440f7bcd.jpg"
+ },
+ "firefly": {
+  "w": 320,
+  "h": 290,
+  "source": "Pixelated_firefly_game_sprite_c72fb7de.jpg"
+ },
+ "bile_elite": {
+  "w": 320,
+  "h": 271,
+  "source": "Pixelated_game_sprite_of_Bloz_864e2dcb.jpg"
+ },
+ "king": {
+  "w": 320,
+  "h": 306,
+  "source": "Pixelated_game_sprite_standing_1fb95fe3.jpg"
+ },
+ "goblin_elite": {
+  "w": 320,
+  "h": 241,
+  "source": "Pixelated_goblin_game_sprite_81d4aa07.jpg"
+ },
+ "fire_knight": {
+  "w": 320,
+  "h": 317,
+  "source": "Pixelated_knight_with_fiery_armor_b86d2425.jpg"
+ },
+ "rogue": {
+  "w": 311,
+  "h": 320,
+  "source": "Pixelated_rogue_assassin_game_sp#U2026_65e43e6d.jpg"
+ },
+ "salamander_elite": {
+  "w": 320,
+  "h": 274,
+  "source": "Pixelated_salamander_game_sprite_8193225b.jpg"
+ },
+ "salamander": {
+  "w": 320,
+  "h": 236,
+  "source": "Pixelated_salamander_lizard_warr#U2026_0051a239.jpg"
+ },
+ "skeleton_knight": {
+  "w": 297,
+  "h": 320,
+  "source": "Pixelated_skeleton_sprite_isolated_5296990a.jpg"
+ },
+ "spider": {
+  "w": 320,
+  "h": 266,
+  "source": "Pixelated_spider_creature_game_s#U2026_2edd17e5.jpg"
+ },
+ "mistress": {
+  "w": 168,
+  "h": 320,
+  "source": "Pixelated_warrior_on_plain_backg#U2026_78779c55.jpg"
+ },
+ "prince": {
+  "w": 296,
+  "h": 320,
+  "source": "Prince_boss_hero_knight_sprite_7d0391ac.jpg"
+ },
+ "guard": {
+  "w": 280,
+  "h": 320,
+  "source": "Royal_guard_hero_unit_defense_957bdbf6.jpg"
+ },
+ "skeleton": {
+  "w": 261,
+  "h": 320,
+  "source": "Skeleton_warrior_pixel_art_sprite_57fda581.jpg"
+ },
+ "stone_knight": {
+  "w": 320,
+  "h": 228,
+  "source": "Stone_Knight_guardian_sprite_61907885.jpg"
+ },
+ "thief": {
+  "w": 280,
+  "h": 320,
+  "source": "Thief_stealth_hero_unit_8913069b.jpg"
+ },
+ "troll": {
+  "w": 304,
+  "h": 320,
+  "source": "Troll_craftsman_sprite_isolated_373d31e5.jpg"
+ },
+ "troll_elite": {
+  "w": 320,
+  "h": 283,
+  "source": "Troll_craftsman_with_glowing_runes_f7d3a19d.jpg"
+ },
+ "vampire_elite": {
+  "w": 318,
+  "h": 320,
+  "source": "Vampire_casting_crimson_magic_671ee9bd.jpg"
+ },
+ "vampire": {
+  "w": 320,
+  "h": 274,
+  "source": "Vampire_spellcaster_game_sprite_eee0fbc0.jpg"
+ },
+ "warlock": {
+  "w": 259,
+  "h": 320,
+  "source": "Warlock_spellcaster_game_sprite_4e8c82ae.jpg"
+ },
+ "mage": {
+  "w": 309,
+  "h": 320,
+  "source": "Wizard_game_sprite_isolated_6d1d1761.jpg"
  }
 }

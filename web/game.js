@@ -201,7 +201,7 @@ class Mover {
 
 class Imp extends Mover {                        // CreatureState.IDLE -> findStuffToDo -> WORK
   constructor(x, y) { super(x, y, 3.2); this.state = 'idle'; this.task = null; this.gold = 0; this.think = 0; this.dest = null;
-    Object.assign(this, { hp: 40, maxHp: 40, team: 'k', dead: false, flash: 0, held: false, scare: 0, isImp: true, carry: null, carryType: null }); }
+    Object.assign(this, { hp: 40, maxHp: 40, team: 'k', dead: false, flash: 0, held: false, scare: 0, isImp: true, carry: null, carryType: null, sprite: 'imp' }); }
   drop() {
     if (this.task) this.task.who.delete(this); this.task = null; this.state = 'idle'; this.path = null;
     if (this.carry) {                                                     // put the body down where we stand
@@ -305,10 +305,22 @@ function capacity() { let c = 2000;                 // the Heart itself holds a 
 
 /* combat stats mirror Creature.Attributes: hp, melee damage / recharge ("MELEE_RECHARGE_TIME_SECONDS"), range, speed */
 const KINDS = [
-  { name: 'Goblin',  color: '#6fbf4f', pay: 60,  hp: 80,  dmg: 8,  range: 1.2, cdMax: 1.0, ranged: 0, research: 0.7 },
-  { name: 'Troll',   color: '#b08850', pay: 90,  hp: 170, dmg: 12, range: 1.2, cdMax: 1.2, ranged: 0, research: 0.4 },
-  { name: 'Warlock', color: '#a070e0', pay: 120, hp: 65,  dmg: 14, range: 5,   cdMax: 1.6, ranged: 1, research: 1.6 },
+  { name: 'Goblin',  color: '#6fbf4f', pay: 60,  hp: 80,  dmg: 8,  range: 1.2, cdMax: 1.0, ranged: 0, research: 0.7, weight: 3,   sprite: 'goblin', elite: 'goblin_elite' },
+  { name: 'Troll',   color: '#b08850', pay: 90,  hp: 170, dmg: 12, range: 1.2, cdMax: 1.2, ranged: 0, research: 0.4, weight: 2,   sprite: 'troll', elite: 'troll_elite' },
+  { name: 'Warlock', color: '#a070e0', pay: 120, hp: 65,  dmg: 14, range: 5,   cdMax: 1.6, ranged: 1, research: 1.6, weight: 2,   sprite: 'warlock' },
+  // added with the character art; elite = the sprite shown from level 3. Appended so the first three keep their positions.
+  { name: 'Dark Elf',   color: '#7a5aa0', pay: 110, hp: 60,  dmg: 10, range: 6,   cdMax: 1.1, ranged: 1, research: 0.5, weight: 1.5, speed: 1.9, sprite: 'darkelf', elite: 'darkelf_elite' },
+  { name: 'Bile Demon', color: '#6a8a3a', pay: 150, hp: 260, dmg: 15, range: 1.3, cdMax: 1.5, ranged: 0, research: 0.2, weight: 1,   speed: 1.1, sprite: 'bile', elite: 'bile_elite' },
+  { name: 'Vampire',    color: '#a02040', pay: 160, hp: 90,  dmg: 18, range: 4.5, cdMax: 1.7, ranged: 1, research: 1.0, weight: 1,   speed: 1.5, sprite: 'vampire', elite: 'vampire_elite' },
+  { name: 'Salamander', color: '#e07a30', pay: 130, hp: 130, dmg: 14, range: 1.2, cdMax: 1.1, ranged: 0, research: 0.3, weight: 1,   speed: 1.6, sprite: 'salamander', elite: 'salamander_elite' },
+  { name: 'Spider',     color: '#4a3a5a', pay: 100, hp: 75,  dmg: 9,  range: 1.2, cdMax: 0.8, ranged: 0, research: 0.3, weight: 1,   speed: 2.2, sprite: 'spider' },
 ];
+function pickKind() {                              // portal arrivals, weighted so the common kinds show up more
+  let r = rand() * KINDS.reduce((s, k) => s + k.weight, 0);
+  for (const k of KINDS) { r -= k.weight; if (r <= 0) return k; }
+  return KINDS[0];
+}
+const spriteOf = (u) => (u.level >= 3 && u.elite) ? u.elite : u.sprite;      // level-ups swap in the elite art
 class Creature extends Mover {                    // CreatureMoodSystem / CreatureSleepSystem: reduced to one lair + payday
   constructor(x, y, kind) { super(x, y, 1.6); Object.assign(this, kind); this.energy = 100 + (rand() * 0 | 0); this.anger = 0; this.lair = null; this.state = 'idle'; this.wait = 1;
     this.id = ++Creature.n; this.energy = 70 + rand() * 30;
@@ -459,9 +471,14 @@ function updateShots(dt) {
 
 /* ---- heroes: they arrive from the Hero Gate once a tunnel links it to your dungeon (TriggerAction CREATE_HERO_PARTY analogue) ---- */
 const HEROES = [
-  { name: 'Knight', letter: 'K', color: '#e8e8f0', hp: 150, dmg: 11, range: 1.2, cdMax: 1.1, ranged: 0, speed: 1.7 },
-  { name: 'Archer', letter: 'A', color: '#9fe08f', hp: 70,  dmg: 9,  range: 6,   cdMax: 1.2, ranged: 1, speed: 1.9 },
-  { name: 'Mage',   letter: 'M', color: '#8fb8ff', hp: 60,  dmg: 16, range: 5,   cdMax: 1.8, ranged: 1, speed: 1.6 },
+  { name: 'Knight', letter: 'K', color: '#e8e8f0', hp: 150, dmg: 11, range: 1.2, cdMax: 1.1, ranged: 0, speed: 1.7, sprite: 'knight' },
+  { name: 'Archer', letter: 'A', color: '#9fe08f', hp: 70,  dmg: 9,  range: 6,   cdMax: 1.2, ranged: 1, speed: 1.9, sprite: 'archer' },
+  { name: 'Mage',   letter: 'M', color: '#8fb8ff', hp: 60,  dmg: 16, range: 5,   cdMax: 1.8, ranged: 1, speed: 1.6, sprite: 'mage' },
+  { name: 'Thief',  letter: 'T', color: '#5a6578', hp: 55,  dmg: 9,  range: 1.2, cdMax: 0.8, ranged: 0, speed: 2.4, sprite: 'thief' },
+  { name: 'Guard',  letter: 'G', color: '#4a6ac0', hp: 230, dmg: 9,  range: 1.2, cdMax: 1.3, ranged: 0, speed: 1.4, sprite: 'guard' },
+  { name: 'Monk',   letter: 'H', color: '#c8a060', hp: 70,  dmg: 5,  range: 4.5, cdMax: 1.4, ranged: 1, speed: 1.7, sprite: 'monk', heals: true },   // heals wounded allies
+  { name: 'Prince', letter: 'P', color: '#e8c050', hp: 360, dmg: 16, range: 1.2, cdMax: 1.0, ranged: 0, speed: 1.6, sprite: 'prince', fearless: true, boss: true },   // leads the last wave
+  // art on hand but not used yet: king, giant, dwarf, stone_knight, fairy (heroes); reaper, dark_angel, mistress, assassin, rogue, wasp, firefly, fire_knight, black_knight (keepers); chicken (hatchery)
 ];
 class Hero extends Mover {
   constructor(x, y, kind, scale, party) { super(x, y, kind.speed); Object.assign(this, kind);
@@ -472,6 +489,11 @@ class Hero extends Mover {
     if (this.dead) return; this.flash = Math.max(0, this.flash - dt);
     if (this.unconscious) { if (!this.carriedBy) { this.uTime -= dt; if (this.uTime <= 0) { say('A hero ' + this.name + ' bled out.'); kill(this, null); } } return; }
     if (this.stun > 0) { this.stun -= dt; this.cd = Math.max(0, this.cd - dt); return; }                 // lightning-trap stun
+    if (this.heals) {                                                                               // the Monk patches up wounded allies
+      this.healCd = Math.max(0, (this.healCd || 0) - dt);
+      const ally = this.healCd <= 0 && G.heroes.find(h => h !== this && !h.dead && !h.unconscious && h.hp < h.maxHp * 0.7 && dist(this, h) <= 5 && los(this.x, this.y, h.x, h.y));
+      if (ally) { ally.hp = Math.min(ally.maxHp, ally.hp + 22); this.healCd = 2.5; G.fx.push({ x: ally.x, y: ally.y - 0.4, txt: '+22', life: 0.7, color: '#8fffa0' }); G.fx.push({ x: ally.x, y: ally.y, ring: true, r: 0.9, color: '#8fffa0', life: 0.5, max: 0.5 }); }
+    }
     if (fightBrain(this, dt)) return;
     if (dist(this, heartTarget) <= this.range + 1.5 && los(this.x, this.y, heartTarget.x, heartTarget.y)) {   // the objective: KILL_PLAYER
       this.path = null; this.face = Math.atan2(heartTarget.y - this.y, heartTarget.x - this.x); if (this.cd <= 0) strike(this, heartTarget); return;
@@ -485,12 +507,14 @@ class Hero extends Mover {
 }
 function spawnWave() {
   const n = G.wave, size = 2 + n, scale = 1 + 0.12 * n, party = [];
-  for (let i = 0; i < size; i++) {
-    const kind = HEROES[i === 0 ? 0 : (i + n) % 3];
+  const kinds = []; if (n === VAR.WAVES - 1) kinds.push(HEROES[6]);                       // the Prince leads the final wave
+  for (let i = 0; i < size; i++) kinds.push(HEROES[i === 0 ? 0 : (i + n) % 6]);
+  for (let i = 0; i < kinds.length; i++) {
+    const kind = kinds[i];
     const h = new Hero(G.gate.x - 1 + (i % 3), G.gate.y - 1 + ((i / 3) | 0), kind, scale, party); party.push(h); G.heroes.push(h);
   }
   G.wave++; G.nextWave = G.wave < VAR.WAVES ? G.time + VAR.WAVE_INTERVAL : Infinity;
-  say('⚔ Wave ' + G.wave + '/' + VAR.WAVES + ': ' + size + ' heroes pour out of the Hero Gate!');
+  say('⚔ Wave ' + G.wave + '/' + VAR.WAVES + ': ' + kinds.length + ' heroes pour out of the Hero Gate' + (kinds[0].boss ? ', led by the Prince!' : '!'));
 }
 function heroLogic(dt) {
   if (!G.gateOpen) {
@@ -589,7 +613,7 @@ function unlockAll() { for (const id in RESEARCH) G.research.done[id] = true; G.
  * to a Lair / Prison, prisoners lose health (PRISON_MODIFY_CREATURE_HEALTH_PER_SECOND) and the Torture Chamber converts
  * them after Attributes.tortureTimeToConvert. Traps and spells (no attacker) still kill outright. */
 const KO_SECONDS = 60, PRISON_DRAIN = 0.5, TORTURE_DRAIN = 0.25, TORTURE_SECONDS = 30, CONVERT_CHANCE = 0.7;
-const SKELETON = { name: 'Skeleton', color: '#d8d8c8', pay: 0, hp: 70, dmg: 8, range: 1.2, cdMax: 1.1, ranged: 0, noLair: true };   // rises from starved prisoners
+const SKELETON = { name: 'Skeleton', sprite: 'skeleton', elite: 'skeleton_knight', color: '#d8d8c8', pay: 0, hp: 70, dmg: 8, range: 1.2, cdMax: 1.1, ranged: 0, noLair: true };   // rises from starved prisoners
 function canKnockOut(t, src) { return !t.isImp && !t.door && !t.heart && !!src && !!src.team && !!t.team && src.team !== t.team; }
 function knockOut(t, src) {
   t.unconscious = true; t.uTime = KO_SECONDS; t.hp = 0; t.state = 'ko'; t.path = null; t.flash = 0.15;
@@ -635,7 +659,7 @@ function release(b, how) {
   G.prisoners = G.prisoners.filter(p => p !== b); if (b.cell) b.cell.occ = null; b.dead = true; b.imprisoned = false;
   const tx = Math.floor(b.x), ty = Math.floor(b.y);
   if (how === 'convert') {
-    const c = new Creature(tx, ty, { name: 'Ex-' + b.name, color: b.color, pay: 70, hp: b.maxHp, dmg: b.dmg, range: b.range, cdMax: b.cdMax, ranged: b.ranged, research: b.name === 'Mage' ? 1.2 : 0.4 });
+    const c = new Creature(tx, ty, { name: 'Ex-' + b.name, sprite: b.sprite, tint: true, color: b.color, pay: 70, hp: b.maxHp, dmg: b.dmg, range: b.range, cdMax: b.cdMax, ranged: b.ranged, research: b.name === 'Mage' ? 1.2 : 0.4 });
     G.creatures.push(c); G.fx.push({ x: c.x, y: c.y, ring: true, r: 1.2, color: '#c080ff', life: 0.8, max: 0.8 });
     say('The ' + b.name + ' breaks and joins your dungeon as ' + c.name + '!');
   } else if (how === 'starve') {
@@ -723,7 +747,7 @@ function step(dt) {
   // portal spawning (CreatureSpawnSystem), only once claimed
   G.nextSpawn -= dt;
   if (G.portalOwned && G.nextSpawn <= 0 && G.creatures.length < VAR.CREATURES_SUPPORTED_BY_FIRST_PORTAL) {
-    G.nextSpawn = 25; const k = KINDS[(rand() * KINDS.length) | 0]; G.creatures.push(new Creature(G.portal.x, G.portal.y, k)); say('A ' + k.name + ' enters through the portal.');
+    G.nextSpawn = 25; const k = pickKind(); G.creatures.push(new Creature(G.portal.x, G.portal.y, k)); say('A ' + k.name + ' enters through the portal.');
   }
   G.creatures = G.creatures.filter(c => c.dead ? false : c.update(dt) !== 'leave');
   for (const h of G.heroes) h.update(dt);
@@ -921,4 +945,4 @@ function frame(now) {
 }
 requestAnimationFrame(frame);
 window.__ui = { get mouse() { return mouse; }, get tool() { return tool; }, inputDown, inputMove, inputUp };
-window.__game = { RESEARCH, isAvail, unlockAll, addResearch, SKELETON, freeSlot, updateJail, knockOut, KO_SECONDS, TORTURE_SECONDS, SPELLS, SPELL_ORDER, castSpell, TRAPS, DOOR, placeThings, removeThings, doorAt, trapAt, HERO_LAND, W, H, G, HEROES, KINDS, spawnWave, Creature, Imp, Hero, hurt, los, T, TERRAIN, step, tagRect, build, scanTasks, findPath, capacity, goldReleased, damageTile, perApplication, VAR };
+window.__game = { spriteOf, pickKind, RESEARCH, isAvail, unlockAll, addResearch, SKELETON, freeSlot, updateJail, knockOut, KO_SECONDS, TORTURE_SECONDS, SPELLS, SPELL_ORDER, castSpell, TRAPS, DOOR, placeThings, removeThings, doorAt, trapAt, HERO_LAND, W, H, G, HEROES, KINDS, spawnWave, Creature, Imp, Hero, hurt, los, T, TERRAIN, step, tagRect, build, scanTasks, findPath, capacity, goldReleased, damageTile, perApplication, VAR };

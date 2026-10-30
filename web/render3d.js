@@ -92,15 +92,27 @@ function start() {
     bed:       { w: 1.2, ay: 0.45 }, rack:     { w: 1.45, ay: 0.20 }, door:      { w: 1.4, ay: 0.04 },
     trap_gas:  { w: 1.5, ay: 0.36 }, trap_bolt: { w: 1.5, ay: 0.36 },
   };
+  /* Sprites are flat quads facing the camera, so the lower part of a tall sprite lies "in front of" the floor tile it stands on and gets
+   * clipped by it. This offsets a sprite's depth towards the camera (by `uBias` world units) without moving it on screen. */
+  function biased(mat) {
+    mat.onBeforeCompile = (shader) => {
+      shader.uniforms.uBias = mat.userData.uBias = { value: mat.userData.bias || 0 };
+      shader.vertexShader = shader.vertexShader.replace('void main() {', 'uniform float uBias;\nvoid main() {')
+        .replace('gl_Position = projectionMatrix * mvPosition;', 'gl_Position = projectionMatrix * mvPosition;\n\tvec4 cb = projectionMatrix * vec4( mvPosition.xy, mvPosition.z + uBias, 1.0 );\n\tgl_Position.z = cb.z / cb.w * gl_Position.w;');
+    };
+    mat.customProgramCacheKey = () => 'spritebias'; return mat;
+  }
+  const setBias = (mat, v) => { mat.userData.bias = v; if (mat.userData.uBias) mat.userData.uBias.value = v; };
   const loader = new THREE.TextureLoader(), TEXS = {};
   for (const k in SPR) TEXS[k] = loader.load('assets/sprites/' + k + '.png', t => { t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 4; });
   function makeSprite(name, parent = scene) {
-    const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: TEXS[name], transparent: true, alphaTest: 0.3, depthWrite: true }));
+    const s = new THREE.Sprite(biased(new THREE.SpriteMaterial({ map: TEXS[name], transparent: true, alphaTest: 0.3, depthWrite: true })));
     s.center.set(0.5, SPR[name].ay); s.visible = false; s.userData.name = name; parent.add(s); return s;
   }
   function placeSprite(s, x, y, z, k = 1) {                      // x,z ground position, y lift; k scales the width
     const im = TEXS[s.userData.name].image; if (!im) { s.visible = false; return; }
-    const w = SPR[s.userData.name].w * k; s.scale.set(w, w * im.height / im.width, 1); s.position.set(x, y, z); s.visible = true;
+    const w = SPR[s.userData.name].w * k, h = w * im.height / im.width; s.scale.set(w, h, 1); s.position.set(x, y, z); s.visible = true;
+    setBias(s.material, Math.max(0, SPR[s.userData.name].ay) * h * 1.3 + 0.2);
   }
   const disposeSprite = (s) => { s.parent && s.parent.remove(s); s.material.dispose(); };
 
@@ -176,8 +188,21 @@ function start() {
   /* landmarks: Heart, Portal (yours), Hero Gate (theirs) */
   const heartSpr = makeSprite('heart'), portalSpr = makeSprite('portal'), gateSpr = makeSprite('hero_gate');
 
-  /* ------------------------------------------------------------------ units (stand-in shapes; x-ray silhouette when hidden behind walls) */
+  /* ------------------------------------------------------------------ units: character sprites as billboards */
+  /* screen height of each character in tiles-diamond units (a floor tile's diamond is about 1.3 wide). Default 1.2. */
+  const USIZE = { imp: .9, goblin: 1.0, goblin_elite: 1.15, troll: 1.45, troll_elite: 1.55, warlock: 1.25, darkelf: 1.3, darkelf_elite: 1.35, bile: 1.5, bile_elite: 1.6,
+    vampire: 1.35, vampire_elite: 1.4, salamander: 1.0, salamander_elite: 1.15, spider: .95, skeleton: 1.2, skeleton_knight: 1.3,
+    knight: 1.3, archer: 1.2, mage: 1.3, thief: 1.15, guard: 1.4, monk: 1.05, prince: 1.6 };
+  const { KINDS, HEROES, SKELETON, spriteOf } = window.__game;
+  for (const k of [...KINDS, ...HEROES, SKELETON, { sprite: 'imp' }]) for (const n of [k.sprite, k.elite]) if (n && !TEXS[n]) TEXS[n] = loader.load('assets/sprites/' + n + '.png', t => { t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 4; });
+  const flipped = {};                                                                // mirrored copy of a sprite, built once the image has loaded
+  function flipTex(name) {
+    if (flipped[name]) return flipped[name]; const im = TEXS[name] && TEXS[name].image; if (!im) return null;
+    const c = document.createElement('canvas'); c.width = im.width; c.height = im.height; const g = c.getContext('2d'); g.translate(im.width, 0); g.scale(-1, 1); g.drawImage(im, 0, 0);
+    const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 4; return (flipped[name] = t);
+  }
   const unitMeshes = new Map();
+  const shadowGeo = new THREE.CircleGeometry(.5, 20); shadowGeo.rotateX(-Math.PI / 2);
   const barBg = new THREE.SpriteMaterial({ color: 0x000000, transparent: true, opacity: .75, depthTest: false });
   const barKeeper = new THREE.SpriteMaterial({ color: 0x5fd070, depthTest: false }), barHero = new THREE.SpriteMaterial({ color: 0x5aa0ff, depthTest: false });
   function makeBar(u) {
@@ -186,38 +211,49 @@ function start() {
     bg.scale.set(.5, .07, 1); fg.scale.set(.5, .07, 1); g.add(bg, fg); g.userData.fg = fg; g.visible = false; return g;
   }
   function makeUnit(u) {
-    const g = new THREE.Group(); let body, mat;
-    if (u.isImp) { mat = new THREE.MeshLambertMaterial({ color: 0xd04040 }); body = new THREE.Mesh(new THREE.ConeGeometry(.15, .5, 8), mat); body.position.y = .25; }
-    else if (u.team === 'h') {
-      mat = new THREE.MeshLambertMaterial({ color: new THREE.Color(u.color) }); body = new THREE.Mesh(new THREE.CylinderGeometry(.15, .19, .6, 10), mat); body.position.y = .3;
-      const ring = new THREE.Mesh(new THREE.TorusGeometry(.26, .035, 6, 16), new THREE.MeshBasicMaterial({ color: 0x4a90ff })); ring.rotation.x = Math.PI / 2; ring.position.y = .04; g.add(ring);
-      if (u.ranged) { const bow = new THREE.Mesh(new THREE.BoxGeometry(.04, .4, .04), new THREE.MeshLambertMaterial({ color: 0x8a6a3a })); bow.position.set(.2, .35, 0); g.add(bow); }
-    } else {
-      mat = new THREE.MeshLambertMaterial({ color: new THREE.Color(u.color) });
-      const sz = u.name === 'Troll' ? .46 : .34; body = new THREE.Mesh(new THREE.BoxGeometry(sz, sz * 1.5, sz), mat); body.position.y = sz * .75;
-    }
-    const ghost = new THREE.Mesh(body.geometry, new THREE.MeshBasicMaterial({ color: mat.color, transparent: true, opacity: .4, depthFunc: THREE.GreaterDepth, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 }));
-    ghost.position.copy(body.position); ghost.renderOrder = 6; g.add(ghost);                   // only shows where something is in front of the unit
-    const nose = new THREE.Mesh(new THREE.BoxGeometry(.08, .08, .2), new THREE.MeshLambertMaterial({ color: 0xffffff })); nose.position.set(.2, .38, 0); g.add(nose);   // faces +x
-    g.add(body); const bar = makeBar(u); bar.position.y = .95; g.add(bar); g.userData = { body, mat, ghost, bar, base: mat.color.clone() };
+    const g = new THREE.Group(), name = spriteOf(u) || 'imp';
+    const mat = biased(new THREE.SpriteMaterial({ map: TEXS[name], transparent: true, alphaTest: 0.35, depthWrite: true }));
+    const spr = new THREE.Sprite(mat); spr.center.set(0.5, 0); spr.visible = false; g.add(spr);
+    // x-ray: a tinted copy that only draws where something (a wall) is in front of the unit
+    const gmat = biased(new THREE.SpriteMaterial({ map: TEXS[name], transparent: true, alphaTest: 0.35, opacity: .42, depthWrite: false, depthFunc: THREE.GreaterDepth, color: u.team === 'h' ? 0x6aa0ff : 0x7affa0 }));
+    const ghost = new THREE.Sprite(gmat); ghost.center.set(0.5, 0); ghost.renderOrder = 6; ghost.visible = false; g.add(ghost);
+    const shadow = new THREE.Mesh(shadowGeo, new THREE.MeshBasicMaterial({ color: 0x000000, transparent: true, opacity: .38, depthWrite: false })); shadow.position.y = .015; shadow.renderOrder = 1; g.add(shadow);
+    if (u.team === 'h') { const ring = new THREE.Mesh(new THREE.TorusGeometry(.3, .035, 6, 20), new THREE.MeshBasicMaterial({ color: 0x4a90ff })); ring.rotation.x = Math.PI / 2; ring.position.y = .03; g.add(ring); g.userData.ring = ring; }   // heroes carry a blue ring
+    const bar = makeBar(u); g.add(bar); g.userData = Object.assign(g.userData, { spr, ghost, shadow, bar, name, flip: false, fx: 1 });
     scene.add(g); return g;
   }
   function syncUnits() {
-    const all = [...G.imps, ...G.creatures, ...G.heroes, ...G.prisoners], seen = new Set(), mouse = UI.mouse;
+    const all = [...G.imps, ...G.creatures, ...G.heroes, ...G.prisoners], seen = new Set(), mouse = UI.mouse, r = screenRight();
     for (const u of all) {
       seen.add(u); let g = unitMeshes.get(u); if (!g) { g = makeUnit(u); unitMeshes.set(u, g); }
-      const d = g.userData, held = u.held && mouse.fx !== undefined;
-      const bob = u.path || u.state === 'work' ? Math.abs(Math.sin(G.time * 9 + u.x * 3)) * .06 : 0;
-      const lying = u.unconscious || u.imprisoned;                                  // knocked-out and jailed units lie flat; carried ones are held up
-      g.position.set(held ? mouse.fx : u.x, (held ? 1.4 : 0) + bob + (lying ? (u.carriedBy ? .62 : .14) : 0), held ? mouse.fy : u.y); g.rotation.set(0, -(u.face || 0), lying ? Math.PI / 2 : 0);
-      g.scale.setScalar(u.state === 'sleep' ? .8 : 1);
-      if (d.mat.emissive) d.mat.emissive.set(u.haste > 0 ? 0x2850ff : u.state === 'research' ? 0x7a5a10 : 0x000000);
-      if (u.flash > 0) d.mat.color.set(0xffffff); else if (u.isImp && u.state === 'flee') d.mat.color.set(0xff9060); else d.mat.color.copy(d.base);
-      d.ghost.material.color.copy(d.mat.color);
-      if (u.isImp && u.state === 'work') g.scale.setScalar(1 + Math.sin(G.time * 18) * .08);
-      const showBar = u.hp < u.maxHp; d.bar.visible = showBar; if (showBar) { const r = Math.max(0.001, u.hp / u.maxHp); d.bar.userData.fg.scale.x = .5 * r; }
+      const d = g.userData, held = u.held && mouse.fx !== undefined, name = spriteOf(u) || 'imp';
+      const lying = u.unconscious || u.imprisoned, moving = !!u.path || u.state === 'work';
+      // which way to face on screen: mirror when walking or fighting towards the left
+      const sx = Math.cos(u.face || 0) * r.x + Math.sin(u.face || 0) * r.z; if (sx < -0.25) d.flip = true; else if (sx > 0.25) d.flip = false;
+      const tex = d.flip ? (flipTex(name) || TEXS[name]) : TEXS[name];
+      if (d.spr.material.map !== tex) { d.spr.material.map = tex; d.ghost.material.map = tex; d.spr.material.needsUpdate = true; d.ghost.material.needsUpdate = true; }
+      const im = TEXS[name].image; if (!im) { d.spr.visible = d.ghost.visible = false; continue; }
+      const hgt = (USIZE[name] || 1.2) * (u.state === 'sleep' ? .88 : 1), wid = hgt * im.width / im.height;
+      const hop = moving && !lying ? Math.abs(Math.sin(G.time * 9 + u.x * 3)) * .09 : 0;
+      const lunge = u.cdMax && u.cd > u.cdMax - 0.16 ? 1.1 : 1;                       // a short squash-and-stretch when it strikes
+      const wob = u.isImp && u.state === 'work' ? 1 + Math.sin(G.time * 18) * .07 : 1;
+      g.position.set(held ? mouse.fx : u.x, held ? 1.4 : 0, held ? mouse.fy : u.y);
+      const sc = lunge * wob; d.spr.scale.set(wid * sc, hgt / sc, 1); d.ghost.scale.copy(d.spr.scale);
+      if (lying) { d.spr.center.set(0.5, 0.5); d.spr.material.rotation = d.ghost.material.rotation = (d.flip ? -1 : 1) * Math.PI / 2; d.spr.position.y = d.ghost.position.y = (u.carriedBy ? .75 : .22) + wid * .12; }
+      else { d.spr.center.set(0.5, 0); d.spr.material.rotation = d.ghost.material.rotation = 0; d.spr.position.y = d.ghost.position.y = hop; }
+      d.ghost.center.copy(d.spr.center);
+      setBias(d.spr.material, .25 + (lying ? wid * .5 : 0)); setBias(d.ghost.material, .75 + (lying ? wid * .5 : 0));
+      d.spr.visible = d.ghost.visible = true;
+      // tint: flash white on hit, orange when an imp flees, blue under Speed, gold while studying, purple for converts, dim while asleep
+      const c = d.spr.material.color;
+      if (u.flash > 0) c.setScalar(2.4); else if (u.isImp && u.state === 'flee') c.setRGB(1.4, .85, .7);
+      else if (u.haste > 0) c.setRGB(.7, .9, 1.9); else if (u.state === 'research') c.setRGB(1.3, 1.15, .75);
+      else if (u.tint) c.setRGB(1.1, .75, 1.35); else if (u.state === 'sleep') c.setRGB(.6, .6, .85); else c.setScalar(1);
+      d.shadow.scale.set(Math.max(.5, wid * .75), Math.max(.5, wid * .75) * .85, Math.max(.5, wid * .75)); d.shadow.visible = !lying && !held;
+      if (d.ring) { d.ring.position.y = d.spr.position.y * 0 + .03; d.ring.scale.setScalar(Math.max(.7, wid * .75)); d.ring.visible = !lying; }
+      d.bar.position.y = lying ? .6 : hgt + .1 + hop; const showBar = u.hp < u.maxHp; d.bar.visible = showBar; if (showBar) d.bar.userData.fg.scale.x = .5 * Math.max(0.001, u.hp / u.maxHp);
     }
-    for (const [u, g] of unitMeshes) if (!seen.has(u)) { scene.remove(g); g.traverse(o => { if (o.isMesh) { if (o !== g.userData.ghost) o.geometry.dispose(); if (o.material.dispose) o.material.dispose(); } }); unitMeshes.delete(u); }
+    for (const [u, g] of unitMeshes) if (!seen.has(u)) { scene.remove(g); g.traverse(o => { if (o.isMesh) { if (o.geometry !== shadowGeo) o.geometry.dispose(); o.material.dispose(); } else if (o.isSprite && o.material.dispose && o.material !== barBg && o.material !== barKeeper && o.material !== barHero) o.material.dispose(); }); unitMeshes.delete(u); }
   }
 
   /* doors & traps: sprites keyed by sim object */
