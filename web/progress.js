@@ -1,15 +1,16 @@
 'use strict';
 /* Saved progress and the star rules, shared by the chapter menu (menu.html) and the game (index.html -> game.js).
  * Everything lives in one localStorage key, `dm.save.v1`:
- *   { v: 1, levels: { <levelId>: { stars, bestTime, bestKills, bestHeart, wins, defeats } } }
+ *   { v: 1, levels: { <levelId>: { stars, bestTime, bestKills, bestHeart, wins, defeats } },
+ *     endless: { <difficulty>: { best, runs } } }       best = most waves survived in the sandbox's endless mode
  * If storage is blocked (private window, quota) progress is kept in memory for the page's life and nothing throws.
  * The star rules are plain data on a level (`stars: { heart, par }`), see docs/06-levels.md. This file never touches the simulation. */
 window.Progress = (function () {
   const KEY = 'dm.save.v1';
   let mem = null;
-  const blank = () => ({ v: 1, levels: {} });
+  const blank = () => ({ v: 1, levels: {}, endless: {} });
   function load() {
-    try { const j = JSON.parse(localStorage.getItem(KEY)); if (j && j.v === 1 && j.levels && typeof j.levels === 'object') return j; } catch (e) { /* storage blocked or corrupt: fall through */ }
+    try { const j = JSON.parse(localStorage.getItem(KEY)); if (j && j.v === 1 && j.levels && typeof j.levels === 'object') { j.endless = j.endless || {}; return j; } } catch (e) { /* storage blocked or corrupt: fall through */ }
     return mem || blank();
   }
   function save(d) { mem = d; try { localStorage.setItem(KEY, JSON.stringify(d)); } catch (e) { /* in-memory only */ } }
@@ -43,6 +44,12 @@ window.Progress = (function () {
     save(d); return { first: !prev || !prev.wins, newBest: !prev || !prev.wins || betterStars || faster, prev };
   }
 
+  /* Endless mode: the score is the number of waves survived; the best is kept per difficulty preset. Returns { newBest, prev }. */
+  function recordEndless(diff, waves) {
+    const d = load(), e = d.endless[diff] || (d.endless[diff] = { best: 0, runs: 0 }), prev = e.best;
+    e.runs++; const newBest = waves > e.best; if (newBest) e.best = waves; save(d); return { newBest, prev };
+  }
+  const endlessBest = (diff) => (load().endless[diff] || { best: 0 }).best;
   const level = (id) => load().levels[id] || null;
   const won = (id) => { const e = level(id); return !!(e && e.wins > 0); };
   /* Chapters unlock in order: the first always, then each one once the one before it has been won. */
@@ -51,5 +58,5 @@ window.Progress = (function () {
   const totalStars = (order) => order.reduce((n, id) => n + ((level(id) || {}).stars || 0), 0);
   function reset() { mem = null; try { localStorage.removeItem(KEY); } catch (e) { /* nothing to remove */ } }
 
-  return { KEY, stars, record, level, won, unlocked, next, totalStars, reset, fmtTime, pct };
+  return { KEY, stars, record, recordEndless, endlessBest, level, won, unlocked, next, totalStars, reset, fmtTime, pct };
 })();

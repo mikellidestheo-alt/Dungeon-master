@@ -48,6 +48,8 @@
   .foot { margin-top: 22px; text-align: center; font: 400 14px var(--prose); color: var(--dim); }
   .link { background: none; border: 0; padding: 0; font: inherit; color: var(--dim); text-decoration: underline; cursor: pointer; }
   .link:hover { color: var(--gold); }
+  .sbx { display: inline-block; margin-top: 4px; padding: 9px 22px; font: 600 14px var(--head); letter-spacing: .08em; color: #e9d6a6; text-decoration: none; background: linear-gradient(180deg, #3b2e20, #221911); border: 1px solid var(--bronze); border-radius: 3px; box-shadow: inset 0 1px 0 #ffffff1c, 0 1px 3px #000b; }
+  .sbx:hover { border-color: var(--gold); color: #fff3cf; } .sbx:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
   @media (prefers-reduced-motion: no-preference) { .chap { transition: border-color .12s, box-shadow .12s; } }
 </style>
 </head>
@@ -60,7 +62,8 @@
     <div class="plate"><ul id="list" aria-label="Chapters"></ul></div>
     <section class="plate" id="detail" aria-live="polite"></section>
   </div>
-  <div class="foot">Progress is saved in this browser. <button class="link" id="reset">Erase saved progress</button></div>
+  <div class="foot"><a class="sbx" id="sandbox" href="sandbox.html">Sandbox &amp; Endless Mode ▸</a></div>
+  <div class="foot" style="margin-top:8px">Progress is saved in this browser. <button class="link" id="reset">Erase saved progress</button></div>
 </main>
 <script src="levels.js"></script>
 <script src="progress.js"></script>

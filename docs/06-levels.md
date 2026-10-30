@@ -33,6 +33,7 @@ keeper. Winning means beating every wave; losing means the Dungeon Heart falls.
   },
 
   waves: {
+    endless: false,              // true = no plan: generated waves that never stop (see "The sandbox and endless mode")
     prep: 75,                    // seconds from linking the Hero Gate to the first wave
     interval: 110,               // seconds between waves
     scale: 0.12,                 // each wave's heroes are this much stronger than the last (1 + scale * waveNumber)
@@ -111,6 +112,35 @@ what each one asked, "First victory!" / "New best!", then **Next chapter** (when
 Stars and the best time only ever improve; a defeat adds to `defeats`. If storage is blocked the game keeps progress in memory and never
 throws. `?nosave=1` skips saving (bots and experiments). The menu's "Erase saved progress" removes the key.
 
+## The sandbox and endless mode
+
+`sandbox.html` (linked from the chapter menu) builds a level from a few options instead of a hand-written one. It opens
+`index.html?level=sandbox&...` and `makeSandbox(params)` at the end of `levels.js` turns the URL into an ordinary level object, so it
+goes through `validateLevel` like any other. It always plays on the `classic` map; the seed picks the dungeon.
+
+| param | meaning | range / default |
+|---|---|---|
+| `diff` | difficulty preset: `easy` (Apprentice), `normal` (Keeper), `hard` (Overlord), `brutal` (Dungeon Master) | `normal` |
+| `waves` | how many waves to beat (fixed mode) | 3-15, 8 |
+| `endless=1` | endless mode instead of `waves` | off |
+| `gold`, `mana` | starting resources | 200-5000 (1500), 0-1000 (300) |
+| `unlocks=all` | everything researched from the start | `none` |
+| `seed` | map and random seed | 7 |
+
+Out-of-range numbers are clamped and unknown words fall back to the defaults. The presets live in `window.DIFFICULTY` as plain data
+(`heroMult`, `scale`, `prep`, `interval`, `minInterval`, `heartHp`); each is strictly harder than the one before it.
+
+**The waves** come from `window.sandboxParty(n)`, a pure function: the same `n` always gives the same party. Waves 1-2 are Knights and
+Archers, a new hero type joins every wave or two, parties grow from 2 to 9 (the Hero Gate's pad), at most two healers, and **every 5th wave
+is led by a boss: the Prince on waves 5, 15, 25 ..., the King on 10, 20, 30 ...**
+
+**Endless mode** is `waves: { endless: true, minInterval }` with no `plan`: heroes are generated wave after wave, strength grows by
+`scale` per wave (times `heroMult`), and the gap between waves shrinks by 1.5 s per wave down to `minInterval`. It has no objectives and is
+never won; it ends when the Heart falls ("Overrun") or when you press **Retire** in the HUD ("Retired", banks your score). The score is
+**waves survived**: waves whose heroes are all beaten (the wave you are fighting when you die does not count). The best score is kept per
+difficulty preset in the save (`endless: { <diff>: { best, runs } }`) and listed on the sandbox page. A fixed sandbox saves nothing and
+shows no stars; both end screens offer Retry (same options, same seed) and a Sandbox button.
+
 ## Briefing
 
 `index.html?level=<id>&brief=1` opens the level behind a **briefing card**: name, `briefing` text and the list of goals, with the game
@@ -166,10 +196,10 @@ Put each marker inside a cavern at least 3x3 wide so the room pad fits. Several 
 3. `node tools/test_levels.js` runs the format's checks. It validates every level in the file, pins `classic` to the original level
    and plays `tiny` from start to victory. `node tools/test_objectives.js` covers objectives, the guide, the briefing and gate-less levels
    (it plays `lesson`, a no-Portal, no-Gate level won by objectives, from start to victory). `node tools/test_campaign.js` covers the star
-   rules, saves, the menu, and the Victory / Defeat screens.
+   rules, saves, the menu, and the Victory / Defeat screens. `node tools/test_sandbox.js` covers the wave generator, the sandbox options,
+   endless mode and the sandbox page.
 
 ## What a level cannot express yet (planned)
 
 - **More than one working Hero Gate**: the rooms are built for each `X`, but heroes still spawn only at the first.
-- **Pre-placed creatures, doors and traps, per-level terrain tweaks, endless waves**: not in the format yet.
-- **A sandbox menu and endless mode** (the sandbox will pick waves, difficulty, resources, unlocks and seed, and save its own best).
+- **Pre-placed creatures, doors and traps, per-level terrain tweaks**: not in the format yet.

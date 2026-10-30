@@ -116,3 +116,53 @@ window.LEVELS = {
     rules: { heartHp: 2000 },
   },
 };
+
+/* ---------------------------------------------------------------------------------------------------------------------------------
+ * The sandbox: a level made from a few options instead of written by hand (sandbox.html builds the URL, docs/06-levels.md explains it).
+ *   index.html?level=sandbox&diff=normal&waves=8&gold=1500&mana=300&unlocks=none&seed=7        a fixed number of waves
+ *   index.html?level=sandbox&diff=hard&endless=1                                               endless: waves never stop
+ * It plays on the classic map (random blobs, so every seed is a different dungeon).
+ * ------------------------------------------------------------------------------------------------------------------------------- */
+// Difficulty presets: all data. heroMult scales every hero, scale adds strength per wave, prep is the time from linking the Hero Gate to
+// wave 1, interval the gap between waves (endless shortens it by 1.5 s a wave, down to minInterval).
+window.DIFFICULTY = {
+  easy:   { name: 'Apprentice', blurb: 'Weaker heroes, a long head start.',            heroMult: 0.7,  scale: 0.10, prep: 150, interval: 120, minInterval: 80, heartHp: 3000 },
+  normal: { name: 'Keeper',     blurb: 'The way the game was meant to be played.',     heroMult: 1.0,  scale: 0.12, prep: 100, interval: 100, minInterval: 65, heartHp: 2500 },
+  hard:   { name: 'Overlord',   blurb: 'Tougher heroes, less time to prepare.',        heroMult: 1.25, scale: 0.14, prep: 75,  interval: 90,  minInterval: 55, heartHp: 2200 },
+  brutal: { name: 'Dungeon Master', blurb: 'Heroes hit hard and hardly wait.',         heroMult: 1.5,  scale: 0.16, prep: 60,  interval: 80,  minInterval: 50, heartHp: 2000 },
+};
+window.SANDBOX_LIMITS = { waves: [3, 15, 8], gold: [200, 5000, 1500], mana: [0, 1000, 300] };      // [min, max, default]
+
+/* The party for wave n (1, 2, 3, ...). Pure: the same n always gives the same party, so a seeded run stays reproducible and endless mode
+ * needs no stored plan. Early waves are Knights and Archers; a new hero type joins every wave or two; the party grows to 9 (the
+ * Hero Gate's pad); every 5th wave is led by a boss, the Prince on waves 5, 15, 25 ... and the King on 10, 20, 30 ... */
+window.sandboxParty = function (n) {
+  const POOL = ['Knight', 'Archer', 'Thief', 'Mage', 'Guard', 'Monk', 'Dwarf', 'Fairy', 'Giant', 'Stone Knight'], LEADERS = ['Knight', 'Guard', 'Dwarf', 'Giant', 'Stone Knight'];
+  const avail = Math.min(POOL.length, 2 + Math.floor((n - 1) * 0.7)), size = Math.min(9, 2 + Math.floor((n - 1) * 0.8));
+  const leaders = LEADERS.filter(k => POOL.indexOf(k) < avail), boss = n % 5 === 0 ? (n % 10 === 5 ? 'Prince' : 'King') : null;
+  const party = [boss || leaders[(n - 1) % leaders.length]];
+  for (let j = 1; j < size; j++) party.push(POOL[(2 * n + j) % avail]);      // consecutive slots of the pool, so each type turns up once per cycle
+  return party;
+};
+
+/* Builds the sandbox level from URLSearchParams (or a plain object). Out-of-range numbers are clamped, unknown words fall back to the defaults. */
+window.makeSandbox = function (params) {
+  const get = (k) => params && (typeof params.get === 'function' ? params.get(k) : params[k]), L = window.SANDBOX_LIMITS;
+  const num = (k) => { const lim = L[k], v = parseInt(get(k), 10); return Number.isFinite(v) ? Math.max(lim[0], Math.min(lim[1], v)) : lim[2]; };
+  const diff = window.DIFFICULTY[get('diff')] ? get('diff') : 'normal', D = window.DIFFICULTY[diff], endless = get('endless') === '1', n = num('waves');
+  const base = JSON.parse(JSON.stringify(window.LEVELS.classic)), seed = parseInt(get('seed'), 10);
+  const lv = {
+    id: 'sandbox', name: endless ? 'Endless Siege' : 'Sandbox', seed: Number.isFinite(seed) ? seed : 7, sandbox: { diff, endless },
+    tagline: 'Your own rules.', terrain: base.terrain, heart: base.heart, portal: base.portal, gates: base.gates,
+    briefing: (endless ? 'Heroes will keep coming, stronger and in greater numbers, with a boss every fifth wave (the Prince, then the King). How many waves can your dungeon survive?'
+      : 'Survive ' + n + ' waves of heroes.') + ' Difficulty: ' + D.name + '. Dig east to the Portal, build your dungeon, and link a tunnel to the Hero Gate in the south when you are ready.',
+    start: { gold: num('gold'), mana: num('mana'), imps: 3, unlock: get('unlocks') === 'all' ? 'all' : 'none', research: 'prison', pretag: base.start.pretag,
+      welcome: endless ? 'Endless Siege (' + D.name + '). Build, then open the Hero Gate.' : 'Sandbox (' + D.name + ', ' + n + ' waves).' },
+    waves: { prep: D.prep, interval: D.interval, scale: D.scale, heroMult: D.heroMult, plan: [] },
+    rules: { heartHp: D.heartHp },
+  };
+  if (endless) { lv.waves.endless = true; lv.waves.minInterval = D.minInterval; lv.objectives = []; }
+  else for (let i = 1; i <= n; i++) lv.waves.plan.push(window.sandboxParty(i));
+  return lv;
+};
+if (new URLSearchParams(location.search).get('level') === 'sandbox') window.LEVELS.sandbox = window.makeSandbox(new URLSearchParams(location.search));

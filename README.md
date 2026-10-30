@@ -14,6 +14,7 @@ study of [OpenKeeper](https://github.com/tonihele/OpenKeeper) (a Java re-impleme
 | `docs/05-audio.md` | The sound system: event-to-voice table, music layers and the mood function, distance model, how to swap in recordings, testing |
 | `docs/04-port-plan.md` | Stack choices (browser vs Linux-native), legal notes, milestone list, which Java files to read for each milestone |
 | `web/levels.js` | **The levels**, as plain data: `classic` (the original level, reproduced exactly) and `tiny` (a hand-drawn text-grid map used by the tests) |
+| `web/sandbox.html` | The sandbox page: waves, difficulty, resources, unlocks and seed, or the Endless Siege. See `docs/06-levels.md` |
 | `web/menu.html`, `web/progress.js` | The chapter menu (the front door), saved progress in localStorage and the three-star rules. See `docs/06-levels.md` |
 | `web/index.html`, `web/game.js` | **Playable prototype**: the headless-style simulation plus a 2D canvas view, no copyrighted assets |
 | `web/audio.js` | **Sound and music**, all synthesised with WebAudio (no audio files): 48 effect voices driven by game events, quieter and panned by distance from the camera, plus a procedural dark-ambient score that builds with the invasion. HUD mute/volume. See `docs/05-audio.md` |
@@ -23,6 +24,7 @@ study of [OpenKeeper](https://github.com/tonihele/OpenKeeper) (a Java re-impleme
 | `web/assets/audio/` | Optional: `sounds.json` maps effect ids to your own recordings, which then replace the synthesised ones. Ships empty; its media files are git-ignored |
 | `tools/test_levels.js` | Headless Chromium checks for the level format and loader: `node tools/test_levels.js` |
 | `tools/test_audio.js` | Headless Chromium checks for the sound system: `node tools/test_audio.js` |
+| `tools/test_sandbox.js` | Headless Chromium checks for the sandbox, the wave generator and endless mode: `node tools/test_sandbox.js` |
 | `tools/test_campaign.js` | Headless Chromium checks for the chapter menu, saved progress, stars and the Victory / Defeat screens: `node tools/test_campaign.js` |
 | `tools/test_objectives.js` | Headless Chromium checks for objectives, the tutorial guide, briefings and gate-less levels: `node tools/test_objectives.js` |
 | `tools/process_art.py` | Cuts the flat background (and the painted ground shadow of characters) out of the original JPGs: `python3 tools/process_art.py <folder> [--set units --max 320]` re-generates `web/assets/sprites/` |

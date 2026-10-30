@@ -66,7 +66,7 @@ const TERRAIN = [
 function rng(seed) { return function () { seed |= 0; seed = seed + 0x6D2B79F5 | 0; let t = Math.imul(seed ^ seed >>> 15, 1 | seed);
   t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
 const WV = LV.waves || {};
-Object.assign(VAR, { HEART_HEALTH: LV.rules.heartHp, WAVES: (WV.plan || []).length, FIRST_WAVE_DELAY: WV.prep === undefined ? 75 : WV.prep, WAVE_INTERVAL: WV.interval || 110 });   // the level sets the invasion's pace
+Object.assign(VAR, { HEART_HEALTH: LV.rules.heartHp, WAVES: WV.endless ? Infinity : (WV.plan || []).length, FIRST_WAVE_DELAY: WV.prep === undefined ? 75 : WV.prep, WAVE_INTERVAL: WV.interval || 110 });   // the level sets the invasion's pace
 const qs = new URLSearchParams(location.search);
 const rand = rng(parseInt(qs.get('seed') || LV.seed || '7', 10));
 
@@ -127,10 +127,10 @@ function validateLevel(lv) {
   need(lv.terrain.grid || (lv.terrain.size && lv.terrain.generate), 'terrain needs a grid, or size + generate');
   const [w, h] = levelSize(lv), pos = levelPos(lv), inside = (p, m) => need(p && p[0] >= 2 && p[1] >= 2 && p[0] <= w - 3 && p[1] <= h - 3, m + ' must lie inside the map with room for its 3x3 pad');
   if (lv.terrain.grid) need(lv.terrain.grid.every(r => r.length === w), 'every grid row must be as long as the first');
-  const plan = (lv.waves && lv.waves.plan) || [], objs = lv.objectives || [], gates = pos.gates || [];
+  const plan = (lv.waves && lv.waves.plan) || [], endless = !!(lv.waves && lv.waves.endless), objs = lv.objectives || [], gates = pos.gates || [];
   inside(pos.heart, 'the Heart'); if (pos.portal) inside(pos.portal, 'the Portal'); gates.forEach((g, i) => inside(g, 'Hero Gate ' + (i + 1)));
-  need(plan.length || objs.some(o => !o.optional), 'the level needs a way to win: a non-empty waves.plan or some objectives');
-  need(!plan.length || gates.length, 'waves need at least one Hero Gate for the heroes to arrive from');
+  need(plan.length || endless || objs.some(o => !o.optional), 'the level needs a way to win: a non-empty waves.plan or some objectives');
+  need(!(plan.length || endless) || gates.length, 'waves need at least one Hero Gate for the heroes to arrive from');
   plan.forEach((wv, i) => wv.forEach(nm => need(HEROES.some(k => k.name === nm), 'wave ' + (i + 1) + ': no hero called ' + nm)));
   need(!lv.waves || (lv.waves.prep >= 0 && lv.waves.interval > 0), 'waves.prep and waves.interval'); need(lv.start && typeof lv.start.gold === 'number', 'start.gold'); need(lv.rules && lv.rules.heartHp > 0, 'rules.heartHp');
   if (lv.stars) { need(lv.stars.heart === undefined || (lv.stars.heart > 0 && lv.stars.heart <= 1), 'stars.heart must be between 0 and 1'); need(lv.stars.par === undefined || lv.stars.par > 0, 'stars.par must be positive seconds'); }
@@ -615,6 +615,9 @@ const HEROES = [
 ];
 // the invasion is scripted so the new types debut in a sensible order (wave 1 .. 5)
 const WAVE_PLAN = WV.plan || [];                                                  // one list of hero names per wave, from the level
+const waveNames = (n) => WV.endless ? window.sandboxParty(n + 1) : WAVE_PLAN[Math.min(n, WAVE_PLAN.length - 1)];            // n = waves already spawned; endless mode generates the next party (levels.js)
+const waveInterval = (n) => WV.endless ? Math.max(WV.minInterval || 55, VAR.WAVE_INTERVAL - 1.5 * n) : VAR.WAVE_INTERVAL;     // the gap after wave n+1 spawns: endless waves arrive faster and faster, 1.5 s per wave, down to a floor
+const waveText = () => VAR.WAVES === Infinity ? 'Wave ' + G.wave : 'Wave ' + G.wave + '/' + VAR.WAVES;
 class Hero extends Mover {
   constructor(x, y, kind, scale, party) { super(x, y, kind.speed); Object.assign(this, kind);
     this.hp = this.maxHp = Math.round(kind.hp * scale); this.dmg = kind.dmg * scale; this.team = 'h'; this.cd = 0; this.sight = 7;
@@ -642,14 +645,14 @@ class Hero extends Mover {
 }
 function spawnWave() {
   const n = G.wave, scale = (1 + LV.waves.scale * n) * (LV.waves.heroMult || 1), party = [];
-  const kinds = WAVE_PLAN[Math.min(n, WAVE_PLAN.length - 1)].map(nm => HEROES.find(h => h.name === nm));
+  const kinds = waveNames(n).map(nm => HEROES.find(h => h.name === nm));
   for (let i = 0; i < kinds.length; i++) {
     const kind = kinds[i];
     const h = new Hero(G.gate.x - 1 + (i % 3), G.gate.y - 1 + ((i / 3) | 0), kind, scale, party); party.push(h); G.heroes.push(h);
   }
   if (window.Sound) Sound.stinger(kinds[0].boss ? 'boss' : 'wave');
-  G.wave++; G.nextWave = G.wave < VAR.WAVES ? G.time + VAR.WAVE_INTERVAL : Infinity;
-  say('⚔ Wave ' + G.wave + '/' + VAR.WAVES + ': ' + kinds.length + ' heroes pour out of the Hero Gate' + (kinds[0].boss ? ', led by the ' + kinds[0].name + '!' : '!'));
+  G.wave++; G.nextWave = G.wave < VAR.WAVES ? G.time + waveInterval(n) : Infinity;
+  say('⚔ ' + waveText() + ': ' + kinds.length + ' heroes pour out of the Hero Gate' + (kinds[0].boss ? ', led by the ' + kinds[0].name + '!' : '!'));
 }
 function heroLogic(dt) {
   if (!G.gate) return;
@@ -686,7 +689,7 @@ const COND = {
   prisoners: { params: ['n'], f: (c) => [G.prisoners.length, c.n], label: (c) => 'Hold ' + c.n + ' prisoner' + (c.n > 1 ? 's' : '') },
   spells:    { params: ['n'], f: (c) => [G.stats.spells, c.n], label: (c) => 'Cast ' + c.n + ' spell' + (c.n > 1 ? 's' : '') },
 };
-const OBJECTIVES = LV.objectives || [{ type: 'survive' }];
+const OBJECTIVES = LV.objectives || [{ type: 'survive' }];      // endless levels set [] and are never won: they end in defeat or when you retire
 const GUIDE = qs.get('guide') === '0' ? [] : (LV.guide || []);
 const condState = (c) => { const [v, goal] = COND[c.type].f(c); return { v: Math.min(v, goal), goal, done: v >= goal }; };
 const objText = (o) => o.text || COND[o.type].label(o);
@@ -695,18 +698,23 @@ function updateObjectives() {
     if (G.objDone[i]) return; const st = G.objProg[i] = condState(o);
     if (st.done) { G.objDone[i] = true; if (!o.quiet) { say('✔ ' + objText(o)); sfx('levelup'); } }
   });
-  if (!G.over && OBJECTIVES.every((o, i) => o.optional || G.objDone[i])) {
+  if (!G.over && !WV.endless && OBJECTIVES.every((o, i) => o.optional || G.objDone[i])) {
     say(LV.victory || (VAR.WAVES ? 'All invaders are defeated — the dungeon is yours!' : 'Well done, Keeper — the dungeon is yours!')); finishGame('victory');
   }
   while (G.guideStep < GUIDE.length && GUIDE[G.guideStep].when && condState(GUIDE[G.guideStep].when).done) G.guideStep++;     // steps with a condition move on by themselves
 }
 /* The end of a run: freezes the result, judges the stars, and saves it (progress.js). `?nosave=1` skips saving (bots, experiments). */
-function finishGame(outcome) {
-  G.over = outcome; G.overAt = G.time;
+const SB = LV.sandbox || null;                       // the sandbox's options ({ diff, endless }) when this is the generated sandbox level
+const wavesSurvived = () => Math.max(0, G.wave - (G.heroes.length ? 1 : 0));       // waves whose heroes are all beaten: the wave you are fighting does not count yet
+function finishGame(outcome) {                         // 'victory', 'defeat', or 'retired' (endless: you stopped and banked the score; G.over is then 'defeat')
+  G.over = outcome === 'victory' ? 'victory' : 'defeat'; G.overAt = G.time;
   const bonus = OBJECTIVES.map((o, i) => o.optional ? i : -1).filter(i => i >= 0), r = { outcome, time: Math.round(G.time), kills: G.kills, heart: Math.max(0, G.heartHp) / VAR.HEART_HEALTH,
     bonusTotal: bonus.length, bonusDone: bonus.filter(i => G.objDone[i]).length };
-  if (outcome === 'victory') { const st = Progress.stars(LV.stars, r); r.stars = st.earned; r.starList = st.list; }
-  G.result = r; G.record = qs.get('nosave') === '1' ? null : Progress.record(LV.id, r);
+  const save = qs.get('nosave') !== '1';
+  if (WV.endless) { r.waves = wavesSurvived(); G.record = save ? Progress.recordEndless(SB.diff, r.waves) : null; }                       // endless: the score is waves survived, best per difficulty
+  else if (SB) G.record = null;                          // a custom sandbox has no chapter to unlock and no stars to earn
+  else { if (outcome === 'victory') { const st = Progress.stars(LV.stars, r); r.stars = st.earned; r.starList = st.list; } G.record = save ? Progress.record(LV.id, r) : null; }
+  G.result = r;
 }
 const guideNow = () => G.guideStep < GUIDE.length ? GUIDE[G.guideStep] : null;
 function guideTarget() {                                  // the map area the current step points at: { x0, y0, x1, y1 } in tiles, or null
@@ -1133,7 +1141,7 @@ function renderHud() {
   for (const id of SPELL_ORDER) $('b_' + id).style.opacity = G.mana >= SPELLS[id].cost && !(G.spellCd[id] > 0) ? 1 : 0.45;
   for (const id in RESEARCH) { const b = $('b_' + id); if (!isAvail(id)) { b.style.opacity = 0.3; b.title = 'Locked — research it in a Library'; } else { b.title = ''; if (!SPELLS[id]) b.style.opacity = ''; } }
   renderResearch(); renderObjectives(); renderGuide(); renderEnd();
-  $('hHeart').textContent = Math.ceil(G.heartHp); $('hHeroes').textContent = G.heroes.length; $('hWave').textContent = VAR.WAVES ? G.wave + '/' + VAR.WAVES : '—';
+  $('hHeart').textContent = Math.ceil(G.heartHp); $('hHeroes').textContent = G.heroes.length; $('hWave').textContent = !VAR.WAVES ? '—' : VAR.WAVES === Infinity ? G.wave + ' / ∞' : G.wave + '/' + VAR.WAVES;
   $('hNext').textContent = !VAR.WAVES ? '—' : !G.gateOpen ? 'tunnel to Gate' : G.nextWave === Infinity ? '—' : Math.max(0, Math.ceil(G.nextWave - G.time)) + 's';
   let dig = 0, claim = 0, busy = 0, upkeep = 0; for (const t of G.tasks.values()) { if (t.type === 'DIG') dig++; else if (t.type === 'CLAIM') claim++; else upkeep++; if (t.who.size) busy++; }
   const mood = G.creatures.map(c => c.name + ' #' + c.id + ' Lv' + c.level + ' ' + Math.ceil(c.hp) + '/' + c.maxHp + 'hp: ' + c.mood + (c.lair || c.noLair ? '' : ' (no bed)')).join('<br>');
@@ -1165,7 +1173,7 @@ function renderResearch() {
 /* Objectives panel, tutorial guide and briefing: three overlays inside #stage (see index.html). They only rewrite the DOM when the text changes. */
 let objHtml = '', guideHtml = '', guideTool = null;
 function renderObjectives() {
-  const html = OBJECTIVES.map((o, i) => { const st = G.objDone[i] ? { done: true, goal: 1, v: 1 } : (G.objProg[i] || { v: 0, goal: 1 });
+  const html = WV.endless ? '<li><span class="tick">◇</span>Survive as many waves as you can</li><li><span class="tick">⚔</span>Waves survived <em>' + wavesSurvived() + '</em> · best <em>' + Progress.endlessBest(SB.diff) + '</em></li><li class="opt"><span class="tick">♛</span>A boss leads every 5th wave</li>' : OBJECTIVES.map((o, i) => { const st = G.objDone[i] ? { done: true, goal: 1, v: 1 } : (G.objProg[i] || { v: 0, goal: 1 });
     return '<li class="' + (st.done ? 'done' : '') + (o.optional ? ' opt' : '') + '"><span class="tick">' + (st.done ? '✔' : '◇') + '</span>' + objText(o) + (o.optional ? ' <i>(bonus)</i>' : '') + (!st.done && st.goal > 1 ? ' <em>' + Math.floor(st.v) + '/' + st.goal + '</em>' : '') + '</li>'; }).join('');
   if (html !== objHtml) { objHtml = html; $('objList').innerHTML = html; }
 }
@@ -1184,22 +1192,26 @@ const goLevel = (id) => { location.href = 'index.html?level=' + encodeURICompone
 let endShown = false;
 function renderEnd() {
   if (!G.over || endShown) return; endShown = true;
-  const r = G.result, win = r.outcome === 'victory', nextId = Progress.next(CAMPAIGN, LV.id), rec = G.record;
-  $('endTitle').textContent = win ? 'Victory' : 'Defeat'; $('endTitle').className = win ? 'win' : 'lose';
-  $('endLine').textContent = win ? (LV.name || LV.id) + ' is yours.' : 'Your Dungeon Heart has been destroyed.';
-  $('endStats').innerHTML = '<span>Time <b>' + Progress.fmtTime(r.time) + '</b></span><span>Heroes slain <b>' + r.kills + '</b></span><span>Heart <b>' + Math.round(r.heart * 100) + '%</b></span>';
-  $('endStars').innerHTML = win ? r.starList.map(s => '<li class="' + (s.ok ? 'got' : '') + '"><span class="star">' + (s.ok ? '★' : '☆') + '</span>' + s.text + '</li>').join('') : '';
-  $('endBest').textContent = !win || !rec ? '' : rec.newBest ? (rec.first ? 'First victory!' : 'New best!') : 'Best: ' + Progress.level(LV.id).stars + ' of 3 stars, ' + Progress.fmtTime(Progress.level(LV.id).bestTime);
+  const r = G.result, win = r.outcome === 'victory', retired = r.outcome === 'retired', nextId = Progress.next(CAMPAIGN, LV.id), rec = G.record, endless = !!WV.endless;
+  $('endTitle').textContent = win ? 'Victory' : retired ? 'Retired' : endless ? 'Overrun' : 'Defeat'; $('endTitle').className = win ? 'win' : 'lose';
+  $('endLine').textContent = win ? (LV.name || LV.id) + ' is yours.' : retired ? 'You left the Heart to its fate and banked your score.' : 'Your Dungeon Heart has been destroyed.';
+  $('endStats').innerHTML = (endless ? '<span>Waves survived <b>' + r.waves + '</b></span>' : '') + '<span>Time <b>' + Progress.fmtTime(r.time) + '</b></span><span>Heroes slain <b>' + r.kills + '</b></span>' + (endless ? '' : '<span>Heart <b>' + Math.round(r.heart * 100) + '%</b></span>');
+  $('endStars').innerHTML = win && r.starList ? r.starList.map(s => '<li class="' + (s.ok ? 'got' : '') + '"><span class="star">' + (s.ok ? '★' : '☆') + '</span>' + s.text + '</li>').join('') : '';
+  $('endBest').textContent = endless ? (rec ? (rec.newBest ? 'New best for ' + window.DIFFICULTY[SB.diff].name + '!' : 'Best for ' + window.DIFFICULTY[SB.diff].name + ': ' + Progress.endlessBest(SB.diff) + ' waves') : '')
+    : !win || !rec ? '' : rec.newBest ? (rec.first ? 'First victory!' : 'New best!') : 'Best: ' + Progress.level(LV.id).stars + ' of 3 stars, ' + Progress.fmtTime(Progress.level(LV.id).bestTime);
   $('endNext').style.display = win && nextId && LEVEL_TABLE[nextId] ? '' : 'none'; $('endNext').onclick = () => goLevel(nextId);
-  $('endRetry').onclick = () => { location.href = 'index.html?level=' + encodeURIComponent(LV.id) + '&brief=1' + keepParams() + (qs.get('seed') ? '&seed=' + qs.get('seed') : ''); };
-  $('endMenu').onclick = () => { location.href = 'menu.html'; };
+  $('endRetry').onclick = () => { const p = new URLSearchParams(location.search); p.set('brief', '1'); location.href = 'index.html?' + p; };            // same level, same options, same seed
+  $('endMenu').textContent = SB ? 'Sandbox' : 'Chapters'; $('endMenu').onclick = () => { location.href = SB ? 'sandbox.html' : 'menu.html'; };
   $('endscreen').style.display = 'flex'; (win && nextId ? $('endNext') : $('endRetry')).focus();
 }
-$('bMenu').onclick = () => { location.href = 'menu.html'; };
+$('bRetire').style.display = WV.endless ? '' : 'none';
+$('bRetire').onclick = () => { if (!G.over && confirm('Retire now and bank ' + wavesSurvived() + ' waves?')) finishGame('retired'); };
+$('bMenu').onclick = () => { location.href = SB ? 'sandbox.html' : 'menu.html'; };
+$('bMenu').textContent = SB ? '☰ Sandbox' : '☰ Chapters';
 function showBriefing(onBegin) {                          // the chapter screen: name, briefing, what you must do. Pauses the game until "Begin".
   const el = $('briefing'), was = G.speed || 1; G.speed = 0; refreshButtons();
   $('briefTitle').textContent = LV.name || LV.id; $('briefText').textContent = LV.briefing || LV.start.welcome || '';
-  $('briefGoals').innerHTML = OBJECTIVES.map(o => '<li>' + objText(o) + (o.optional ? ' <i>(bonus)</i>' : '') + '</li>').join('');
+  $('briefGoals').innerHTML = WV.endless ? '<li>Survive as many waves as you can</li><li>A boss leads every 5th wave</li>' : OBJECTIVES.map(o => '<li>' + objText(o) + (o.optional ? ' <i>(bonus)</i>' : '') + '</li>').join('');
   el.style.display = 'flex';
   $('briefGo').onclick = () => { el.style.display = 'none'; G.speed = was; refreshButtons(); if (onBegin) onBegin(); };
 }
