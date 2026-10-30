@@ -892,6 +892,8 @@ function step(dt) {
 const cv = document.getElementById('cv'), ctx = cv.getContext('2d');
 const MODE_2D = qs.get('view') === '2d';
 cv.width = W * TS; cv.height = H * TS;
+const FONT_UNIT = '700 8px Cinzel, Georgia, serif', FONT_NUM = '700 9px Cinzel, Georgia, serif', FONT_BANNER = '900 40px "Cinzel Decorative", Cinzel, Georgia, serif', FONT_SUB = 'italic 18px "EB Garamond", Georgia, serif';     // the 2D view draws text on a canvas, so the page's fonts are named here too
+if (document.fonts) for (const f of ['700 9px Cinzel', '900 40px "Cinzel Decorative"', 'italic 18px "EB Garamond"']) document.fonts.load(f);
 const hash = (x, y) => { let h = x * 374761393 + y * 668265263; h = (h ^ (h >> 13)) * 1274126177; return ((h ^ (h >> 16)) >>> 0) / 4294967295; };
 const COL = { [T.ROCK]: '#1c1a1a', [T.EARTH]: '#6a4a2c', [T.GOLD]: '#6a4a2c', [T.GEM]: '#4a3a4a', [T.PATH]: '#3b3128' };
 const ROOMCOL = { [T.TREASURY]: '#7a6420', [T.LAIR]: '#4a3a6a', [T.HEART]: '#8a2a2a', [T.PORTAL]: '#5a2a7a', [T.GATE]: '#6a3a2a', [T.PRISON]: '#4a5560', [T.TORTURE]: '#5a2020', [T.LIBRARY]: '#3a4a6a', [T.HATCHERY]: '#6a5a30', [T.TEMPLE]: '#5a4a7a' };
@@ -950,7 +952,7 @@ function draw() {
     if (c.state === 'fight' || c.state === 'flee') { ctx.strokeStyle = c.state === 'flee' ? '#ffb030' : '#ff4040'; ctx.strokeRect(px - 6.5, py - 6.5, 13, 13); }
     if (c.haste > 0) { ctx.strokeStyle = '#6aa0ff'; ctx.strokeRect(px - 7.5, py - 7.5, 15, 15); }
     for (let l = 1; l < c.level; l++) { ctx.fillStyle = '#ffe070'; ctx.fillRect(px - 5 + (l - 1) * 3, py + 6, 2, 2); }
-    bar(px, py, c); ctx.fillStyle = '#000'; ctx.font = 'bold 8px sans-serif'; ctx.textAlign = 'center'; ctx.fillText(c.name[0], px, py + 3);
+    bar(px, py, c); ctx.fillStyle = '#000'; ctx.font = FONT_UNIT; ctx.textAlign = 'center'; ctx.fillText(c.name[0], px, py + 3);
     if (c.unconscious) { ctx.fillStyle = 'rgba(0,0,0,.55)'; ctx.fillRect(px - 5, py - 5, 10, 10); ctx.fillStyle = '#fff'; ctx.fillText('x', px, py + 3); }
     if (c.state === 'research') { ctx.fillStyle = '#ffd860'; ctx.fillRect(px - 3, py - 11, 6, 4); ctx.fillStyle = '#7a5a10'; ctx.fillRect(px, py - 11, 1, 4); }
     if (c.state === 'sleep') { ctx.fillStyle = '#9cf'; ctx.fillText('z', px + 7, py - 5); }
@@ -958,16 +960,16 @@ function draw() {
   for (const c of G.chickens) { const px = c.x * TS, py = c.y * TS; ctx.fillStyle = '#f4eadc'; ctx.beginPath(); ctx.arc(px, py, 3.2, 0, 7); ctx.fill(); ctx.fillStyle = '#e04040'; ctx.fillRect(px + 1, py - 4.5, 2, 2); }
   for (const h of G.heroes.concat(G.prisoners)) { const px = h.x * TS, py = h.y * TS;
     ctx.fillStyle = h.flash > 0 ? '#fff' : h.color; ctx.beginPath(); ctx.arc(px, py, 5.5, 0, 7); ctx.fill(); ctx.strokeStyle = h.state === 'flee' ? '#ffb030' : '#4a90ff'; ctx.lineWidth = 2; ctx.stroke(); ctx.lineWidth = 1;
-    ctx.fillStyle = '#000'; ctx.font = 'bold 8px sans-serif'; ctx.textAlign = 'center'; ctx.fillText(h.letter, px, py + 3); bar(px, py, h);
+    ctx.fillStyle = '#000'; ctx.font = FONT_UNIT; ctx.textAlign = 'center'; ctx.fillText(h.letter, px, py + 3); bar(px, py, h);
     if (h.unconscious || h.imprisoned) { ctx.fillStyle = 'rgba(0,0,0,.5)'; ctx.beginPath(); ctx.arc(px, py, 5.5, 0, 7); ctx.fill(); ctx.fillStyle = '#fff'; ctx.fillText('x', px, py + 3); if (h.status === 'torture') { ctx.strokeStyle = '#ff7050'; ctx.strokeRect(px - 8, py - 8, 16, 16); } } }
   for (const s of G.shots) { ctx.fillStyle = s.color; ctx.beginPath(); ctx.arc(s.x * TS, s.y * TS, 2.2, 0, 7); ctx.fill(); }
-  ctx.font = 'bold 9px sans-serif'; ctx.textAlign = 'center';
+  ctx.font = FONT_NUM; ctx.textAlign = 'center';
   for (const f of G.fx) if (!f.splat && !f.bolt && !f.ring) { ctx.globalAlpha = Math.min(1, f.life * 2); ctx.fillStyle = f.color; ctx.fillText(f.txt, f.x * TS, (f.y - (0.7 - f.life) * 0.8) * TS); ctx.globalAlpha = 1; }
   { const hp = G.heartHp / VAR.HEART_HEALTH, bx = (G.heart.x - 1) * TS, by = (G.heart.y + 2) * TS + 2;     // Heart health
     ctx.fillStyle = 'rgba(0,0,0,.7)'; ctx.fillRect(bx, by, TS * 3, 4); ctx.fillStyle = hp > .5 ? '#e05050' : '#ff9030'; ctx.fillRect(bx, by, TS * 3 * hp, 4); }
   if (G.over) { ctx.fillStyle = 'rgba(0,0,0,.65)'; ctx.fillRect(0, 0, cv.width, cv.height); ctx.textAlign = 'center';
-    ctx.fillStyle = G.over === 'victory' ? '#f0c040' : '#e0624f'; ctx.font = 'bold 44px sans-serif'; ctx.fillText(G.over === 'victory' ? 'VICTORY' : 'DEFEAT', cv.width / 2, cv.height / 2 - 6);
-    ctx.fillStyle = '#e8dcc8'; ctx.font = '16px sans-serif'; ctx.fillText(G.kills + ' heroes slain · ' + Math.floor(G.time) + 's · reload to play again', cv.width / 2, cv.height / 2 + 24); }
+    ctx.fillStyle = G.over === 'victory' ? '#f0c040' : '#e0624f'; ctx.font = FONT_BANNER; ctx.shadowColor = G.over === 'victory' ? '#f2a93a' : '#c0392b'; ctx.shadowBlur = 18; ctx.fillText(G.over === 'victory' ? 'VICTORY' : 'DEFEAT', cv.width / 2, cv.height / 2 - 6); ctx.shadowBlur = 0;
+    ctx.fillStyle = '#e8dcc8'; ctx.font = FONT_SUB; ctx.fillText(G.kills + ' heroes slain · ' + Math.floor(G.time) + 's · reload to play again', cv.width / 2, cv.height / 2 + 24); }
   if (mouse.down && tool !== 'hand') {                        // drag preview
     const x0 = Math.min(mouse.sx, mouse.x), x1 = Math.max(mouse.sx, mouse.x), y0 = Math.min(mouse.sy, mouse.y), y1 = Math.max(mouse.sy, mouse.y);
     ctx.fillStyle = mouse.down === 3 ? 'rgba(255,80,80,.25)' : 'rgba(255,230,120,.25)'; ctx.fillRect(x0 * TS, y0 * TS, (x1 - x0 + 1) * TS, (y1 - y0 + 1) * TS);
@@ -982,7 +984,10 @@ const TOOLS = [ ['dig', 'Dig (tag)'], ['hand', '✋ Hand'], ['treasury', 'Treasu
   ['door', 'Door ' + DOOR.cost + 'g'], ['gas', 'Gas Trap ' + TRAPS.gas.cost + 'g'], ['bolt', 'Lightning Trap ' + TRAPS.bolt.cost + 'g'],
   ...SPELL_ORDER.map((id, i) => [id, SPELLS[id].icon + ' ' + SPELLS[id].name + ' ' + SPELLS[id].cost + ' [' + (i + 1) + ']']),
   ['sp1', '⏸ Pause'], ['sp2', '1×'], ['sp3', '3×'], ['sp4', '8×'] ];
-for (const [id, label] of TOOLS) { const b = document.createElement('button'); b.textContent = label; b.id = 'b_' + id; b.onclick = () => {
+const TOOL_GROUP = (id) => id.startsWith('sp') ? 'speed' : SPELLS[id] ? 'spell' : ['door', 'gas', 'bolt'].includes(id) ? 'trap' : ['dig', 'hand'].includes(id) ? 'act' : 'room';     // only styling: which accent a button gets
+let prevGroup = null;
+for (const [id, label] of TOOLS) { const grp = TOOL_GROUP(id); if (prevGroup && grp !== prevGroup) { const sep = document.createElement('span'); sep.className = 'sep'; $('tools').appendChild(sep); } prevGroup = grp;
+  const b = document.createElement('button'); b.className = 'g-' + grp; b.textContent = label; b.id = 'b_' + id; b.onclick = () => {
   if (id.startsWith('sp')) { G.speed = [0, 1, 3, 8][+id[2] - 1]; } else if (RESEARCH[id] && !isAvail(id)) needs(id); else tool = id; refreshButtons(); }; $('tools').appendChild(b); }
 function refreshButtons() { for (const [id] of TOOLS) { const b = $('b_' + id); b.classList.toggle('on', id === tool || (id.startsWith('sp') && [0, 1, 3, 8][+id[2] - 1] === G.speed)); } }
 function posF(e) { const r = cv.getBoundingClientRect(); return { fx: (e.clientX - r.left) / r.width * W, fy: (e.clientY - r.top) / r.height * H }; }

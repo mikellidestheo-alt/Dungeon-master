@@ -27,7 +27,7 @@ function start() {
   canvas.style.cssText = 'width:100%;display:block;border-radius:6px;touch-action:none;cursor:crosshair';
   cv2d.style.display = 'none'; stage.appendChild(canvas);
   const banner = document.createElement('div');
-  banner.style.cssText = 'position:absolute;inset:0;display:none;align-items:center;justify-content:center;flex-direction:column;background:rgba(0,0,0,.6);border-radius:6px;text-align:center;pointer-events:none';
+  banner.style.cssText = 'position:absolute;inset:0;display:none;align-items:center;justify-content:center;flex-direction:column;background:radial-gradient(ellipse at center,rgba(0,0,0,.55),rgba(0,0,0,.82));text-align:center;pointer-events:none';
   stage.appendChild(banner);
 
   const scene = new THREE.Scene();
@@ -337,7 +337,7 @@ function start() {
   const shotGeo = new THREE.SphereGeometry(.09, 8, 6), splatGeo = new THREE.CircleGeometry(.3, 14); splatGeo.rotateX(-Math.PI / 2);
   function numberMat(n, color) {
     const key = n + color; let m = numTex.get(key); if (m) return m;
-    const c = document.createElement('canvas'); c.width = 64; c.height = 32; const x = c.getContext('2d'); x.font = 'bold 26px sans-serif'; x.textAlign = 'center'; x.lineWidth = 4; x.strokeStyle = '#000'; x.strokeText(n, 32, 25); x.fillStyle = color; x.fillText(n, 32, 25);
+    const c = document.createElement('canvas'); c.width = 64; c.height = 32; const x = c.getContext('2d'); x.font = '700 24px Cinzel, Georgia, serif'; x.textAlign = 'center'; x.lineWidth = 4; x.strokeStyle = '#000'; x.strokeText(n, 32, 25); x.fillStyle = color; x.fillText(n, 32, 25);
     m = new THREE.SpriteMaterial({ map: new THREE.CanvasTexture(c), transparent: true, depthTest: false }); numTex.set(key, m); return m;
   }
   function syncEffects() {
@@ -413,8 +413,10 @@ function start() {
   addEventListener('keyup', e => keys.delete(e.key.toLowerCase()));
 
   /* ------------------------------------------------------------------ frame */
+  if (document.fonts) document.fonts.load('700 24px Cinzel').then(() => numTex.clear());                       // number sprites cached before the font arrived are redrawn
   const bannerHtml = (over) => over === 'victory'
-    ? '<div style="font:bold 44px sans-serif;color:#f0c040">VICTORY</div>' : '<div style="font:bold 44px sans-serif;color:#e0624f">DEFEAT</div>';
+    ? '<div style="font:900 clamp(30px,7vw,52px) \'Cinzel Decorative\',Cinzel,Georgia,serif;letter-spacing:.14em;color:#f6cf6a;text-shadow:0 2px 0 #000,0 0 22px #f2a93a">VICTORY</div>'
+    : '<div style="font:900 clamp(30px,7vw,52px) \'Cinzel Decorative\',Cinzel,Georgia,serif;letter-spacing:.14em;color:#e2604d;text-shadow:0 2px 0 #000,0 0 22px #c0392b">DEFEAT</div>';
   window.__render3d = function (dt) {
     const sp = dt * cam.dist * 0.5, r = screenRight(), u = screenUp();
     const mv = (v, s) => { cam.x += v.x * s; cam.z += v.z * s; };
@@ -430,7 +432,7 @@ function start() {
     placeSprite(gateSpr, G.gate.x + .5, 0, G.gate.y + .5); gateSpr.material.color.setScalar(G.gateOpen ? 1.05 + Math.sin(G.time * 2) * .1 : 0.5);
     heartLight.intensity = 2.0 + Math.sin(G.time * 4) * .5; portalLight.intensity = G.portalOwned ? 1.6 : 0; gateLight.intensity = G.gateOpen ? 1.8 : .6;
     renderer.render(scene, camera);
-    const show = !!G.over; if (show) { const msg = bannerHtml(G.over) + '<div style="font:16px sans-serif;color:#e8dcc8;margin-top:6px">' + G.kills + ' heroes slain · ' + Math.floor(G.time) + 's · reload to play again</div>'; if (banner.innerHTML !== msg) banner.innerHTML = msg; }
+    const show = !!G.over; if (show) { const msg = bannerHtml(G.over) + '<div style="font:italic 19px \'EB Garamond\',Georgia,serif;font-variant-numeric:lining-nums;color:#eadfc6;margin-top:8px">' + G.kills + ' heroes slain · ' + Math.floor(G.time) + 's · reload to play again</div>'; if (banner.innerHTML !== msg) banner.innerHTML = msg; }
     banner.style.display = show ? 'flex' : 'none';
   };
   window.__three = { scene, camera, renderer, cam, SPR, TEXS };

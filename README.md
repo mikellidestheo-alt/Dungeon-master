@@ -20,7 +20,7 @@ study of [OpenKeeper](https://github.com/tonihele/OpenKeeper) (a Java re-impleme
 | `web/assets/audio/` | Optional: `sounds.json` maps effect ids to your own recordings, which then replace the synthesised ones. Ships empty; its media files are git-ignored |
 | `tools/test_audio.js` | Headless Chromium checks for the sound system: `node tools/test_audio.js` |
 | `tools/process_art.py` | Cuts the flat background (and the painted ground shadow of characters) out of the original JPGs: `python3 tools/process_art.py <folder> [--set units --max 320]` re-generates `web/assets/sprites/` |
-| `web/vendor/` | three.js 0.160.0 (MIT) kept in the repo so nothing loads from a CDN |
+| `web/vendor/` | three.js 0.160.0 (MIT) and the UI fonts in `fonts/` (Cinzel, Cinzel Decorative, IM Fell English, EB Garamond; SIL Open Font License, licences alongside), kept in the repo so nothing loads from a CDN |
 
 ## Run the prototype
 
@@ -33,6 +33,8 @@ python3 -m http.server -d web 8000     # then open http://localhost:8000   (?see
 
 **3D controls:** `W A S D`/arrows pan along the screen axes, mouse wheel zooms, middle-drag pans. Clicking picks the wall top or floor under the cursor.
 The camera is isometric (45°, narrow field of view) to match the sprite art; `?cam=top` gives the earlier steep top-down perspective.
+
+**UI style:** the page is dressed as a dungeon keeper's war room instead of a generic web app: Cinzel Decorative for the title, Cinzel for the HUD, buttons and headings, IM Fell English for the log and help scroll, EB Garamond for the data panels. Stone-and-bronze plates with rivets, a gilded frame and torchlit vignette around the dungeon view, rune-diamond slider handles, parchment for the help, and the toolbar split into groups with their own accent (gold rooms, red traps, violet spells, speed). The look is all CSS in `web/index.html` (colours and fonts are variables at the top of its `<style>`), the canvas text and banners use the same fonts, and no image assets were added.
 
 **Art status:** props and characters use your sprites (billboards with a soft ground shadow, mirrored to face the way they
 walk, and a faint x-ray silhouette when a wall hides them); floors, walls and effects are drawn in code. The 2D fallback view
