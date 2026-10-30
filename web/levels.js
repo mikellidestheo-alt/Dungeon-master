@@ -121,6 +121,7 @@ window.LEVELS = {
  * The sandbox: a level made from a few options instead of written by hand (sandbox.html builds the URL, docs/06-levels.md explains it).
  *   index.html?level=sandbox&diff=normal&waves=8&gold=1500&mana=300&unlocks=none&seed=7        a fixed number of waves
  *   index.html?level=sandbox&diff=hard&endless=1                                               endless: waves never stop
+ *   add &gates=2 for a second Hero Gate in the north: each wave is then split between the Gates you have linked
  * It plays on the classic map (random blobs, so every seed is a different dungeon).
  * ------------------------------------------------------------------------------------------------------------------------------- */
 // Difficulty presets: all data. heroMult scales every hero, scale adds strength per wave, prep is the time from linking the Hero Gate to
@@ -150,12 +151,14 @@ window.makeSandbox = function (params) {
   const get = (k) => params && (typeof params.get === 'function' ? params.get(k) : params[k]), L = window.SANDBOX_LIMITS;
   const num = (k) => { const lim = L[k], v = parseInt(get(k), 10); return Number.isFinite(v) ? Math.max(lim[0], Math.min(lim[1], v)) : lim[2]; };
   const diff = window.DIFFICULTY[get('diff')] ? get('diff') : 'normal', D = window.DIFFICULTY[diff], endless = get('endless') === '1', n = num('waves');
-  const base = JSON.parse(JSON.stringify(window.LEVELS.classic)), seed = parseInt(get('seed'), 10);
+  const base = JSON.parse(JSON.stringify(window.LEVELS.classic)), seed = parseInt(get('seed'), 10), twin = get('gates') === '2';
+  if (twin) { base.terrain.caverns.push({ rect: [19, 2, 25, 6], owner: 'hero' }); base.gates.push([22, 4]); }      // a second hero cavern and Gate in the north
   const lv = {
-    id: 'sandbox', name: endless ? 'Endless Siege' : 'Sandbox', seed: Number.isFinite(seed) ? seed : 7, sandbox: { diff, endless },
+    id: 'sandbox', name: endless ? 'Endless Siege' : 'Sandbox', seed: Number.isFinite(seed) ? seed : 7, sandbox: { diff, endless, gates: twin ? 2 : 1 },
     tagline: 'Your own rules.', terrain: base.terrain, heart: base.heart, portal: base.portal, gates: base.gates,
     briefing: (endless ? 'Heroes will keep coming, stronger and in greater numbers, with a boss every fifth wave (the Prince, then the King). How many waves can your dungeon survive?'
-      : 'Survive ' + n + ' waves of heroes.') + ' Difficulty: ' + D.name + '. Dig east to the Portal, build your dungeon, and link a tunnel to the Hero Gate in the south when you are ready.',
+      : 'Survive ' + n + ' waves of heroes.') + ' Difficulty: ' + D.name + '. Dig east to the Portal, build your dungeon, and link a tunnel to the Hero Gate in the south when you are ready.'
+      + (twin ? ' A second Gate in the north opens too once you tunnel to it, and every wave is then split between the two.' : ''),
     start: { gold: num('gold'), mana: num('mana'), imps: 3, unlock: get('unlocks') === 'all' ? 'all' : 'none', research: 'prison', pretag: base.start.pretag,
       welcome: endless ? 'Endless Siege (' + D.name + '). Build, then open the Hero Gate.' : 'Sandbox (' + D.name + ', ' + n + ' waves).' },
     waves: { prep: D.prep, interval: D.interval, scale: D.scale, heroMult: D.heroMult, plan: [] },

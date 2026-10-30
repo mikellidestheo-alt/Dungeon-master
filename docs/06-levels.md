@@ -62,7 +62,7 @@ out of the log; `optional: true` marks a bonus that the chapter stars will use.
 | `survive` | | every wave has arrived and no hero is left (needs `waves.plan`) |
 | `wave` | `n` | `n` waves have spawned (needs `waves.plan`) |
 | `portal` | | the Portal is claimed (needs a Portal) |
-| `gate` | | a tunnel links the Hero Gate to your Heart (needs a Hero Gate) |
+| `gate` | `n`=1 | tunnels link `n` Hero Gates to your Heart (needs that many Gates) |
 | `dug` | `n` | `n` tiles of earth or gold were dug out (counted as they crumble) |
 | `mined` | `n` | `n` gold has been released from seams |
 | `claimed` | `n` | imps have claimed `n` floor tiles |
@@ -90,6 +90,21 @@ ticks them off, and the victory text is `LV.victory` if the level sets one.
 ```
 A step with `when` moves on by itself the moment its condition holds (even if it already held, so steps never get stuck behind things the
 player did early). The ✕ hides the guide for the session; `?guide=0` turns it off. The guide never blocks play.
+
+## Several Hero Gates
+
+Every `X` on a grid (or entry in `gates`) is a Hero Gate, and each one is **linked on its own**: it opens the moment a path of open floor
+joins it to your Heart. Rules:
+
+- The **first** link starts the invasion clock (`waves.prep`); later links only add an entrance (the log says "Hero Gate 2 is linked too").
+  A Gate you never tunnel to never sends anyone.
+- A wave is **split, not doubled**: its heroes are dealt out between the Gates that are linked when it spawns, starting from a different
+  Gate each wave (so the Prince arrives at one Gate and the King at the other). Each Gate's group has its own leader. The HUD shows
+  "gates 1/2" next to the countdown once a level has more than one.
+- Heroes that flee run back to **the Gate they came out of** and escape through it.
+- The `gate` objective can ask for several: `{ type: 'gate', n: 2 }` ("Link tunnels to 2 Hero Gates").
+- 3D: every Gate has its own sprite and light, dim until linked, glowing once linked.
+- Sandbox: `&gates=2` adds a second hero cavern and Gate in the north of the classic map (the sandbox page has a "Two Gates" switch).
 
 ## Chapters, stars and saves
 
@@ -184,7 +199,7 @@ Every row must be the same length; the map size is the grid's size.
 | `g` | gold seam | | `h` | hero land |
 | `G` | gem seam (never runs out) | | `H` `P` `X` | centre of the Dungeon Heart / Portal / Hero Gate: becomes a 3x3 room |
 
-Put each marker inside a cavern at least 3x3 wide so the room pad fits. Several `X` give several gates (rooms and validation work; only the first one spawns heroes today). `tiny` is both the format's proof and a fast level for tests.
+Put each marker inside a cavern at least 3x3 wide so the room pad fits. Several `X` give several Hero Gates (see "Several Hero Gates"). `tiny` is both the format's proof and a fast level for tests.
 
 ## Adding a level
 
@@ -197,9 +212,8 @@ Put each marker inside a cavern at least 3x3 wide so the room pad fits. Several 
    and plays `tiny` from start to victory. `node tools/test_objectives.js` covers objectives, the guide, the briefing and gate-less levels
    (it plays `lesson`, a no-Portal, no-Gate level won by objectives, from start to victory). `node tools/test_campaign.js` covers the star
    rules, saves, the menu, and the Victory / Defeat screens. `node tools/test_sandbox.js` covers the wave generator, the sandbox options,
-   endless mode and the sandbox page.
+   endless mode and the sandbox page. `node tools/test_gates.js` covers several Hero Gates.
 
 ## What a level cannot express yet (planned)
 
-- **More than one working Hero Gate**: the rooms are built for each `X`, but heroes still spawn only at the first.
 - **Pre-placed creatures, doors and traps, per-level terrain tweaks**: not in the format yet.

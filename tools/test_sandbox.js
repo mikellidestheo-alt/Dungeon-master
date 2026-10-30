@@ -144,7 +144,7 @@ const HEROES = ['Knight', 'Archer', 'Mage', 'Thief', 'Guard', 'Monk', 'Prince', 
     const sb = () => page.evaluate(() => ({ st: { ...window.__sandbox.state }, wavesOut: document.getElementById('wavesOut').textContent, wavesDis: document.getElementById('waves').disabled, summary: document.getElementById('summary').textContent, begin: document.getElementById('begin').textContent,
       on: [...document.querySelectorAll('.opt.on')].map(b => b.dataset.v) }));
     let s = await sb();
-    check('defaults: fixed siege, 8 waves, Keeper', s.st.mode === 'fixed' && s.st.waves === 8 && s.st.diff === 'normal' && s.on.join() === 'fixed,normal' && s.wavesOut === '8' && !s.wavesDis, JSON.stringify(s.on));
+    check('defaults: fixed siege, 8 waves, Keeper', s.st.mode === 'fixed' && s.st.waves === 8 && s.st.diff === 'normal' && s.on.join() === 'fixed,normal,1' && s.wavesOut === '8' && !s.wavesDis, JSON.stringify(s.on));
     await page.fill('#waves', '12'); await page.click('.opt[data-v="hard"]'); await page.fill('#gold', '3000'); await page.fill('#mana', '500'); await page.check('#unlocks'); await page.fill('#seed', '42'); s = await sb();
     check('sliders, preset, research and seed update the summary', s.st.waves === 12 && s.st.diff === 'hard' && s.st.gold === 3000 && s.st.mana === 500 && s.st.unlocks && s.st.seed === 42 && /Overlord/.test(s.summary) && /12<?.*waves/.test(s.summary) && /3000 gold/.test(s.summary) && /everything researched/.test(s.summary), s.summary);
     await page.click('.opt[data-v="endless"]'); s = await sb();

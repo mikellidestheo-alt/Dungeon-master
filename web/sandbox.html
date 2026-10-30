@@ -58,6 +58,7 @@
         <div class="seg two" id="mode"><button class="opt" data-v="fixed">A fixed siege<small>beat every wave to win</small></button><button class="opt" data-v="endless">Endless<small>waves never stop; a boss every 5th</small></button></div></div>
       <div class="row"><label class="t" for="waves">Waves <output id="wavesOut"></output></label><input type="range" id="waves"><div class="hint" id="wavesHint"></div></div>
       <div class="row"><h2>Difficulty</h2><div class="seg four" id="diff"></div></div>
+      <div class="row"><h2>Hero Gates</h2><div class="seg two" id="gates"><button class="opt" data-v="1">One Gate<small>heroes come from the south</small></button><button class="opt" data-v="2">Two Gates<small>each wave is split between them</small></button></div></div>
       <div class="row"><label class="t" for="gold">Starting gold <output id="goldOut"></output></label><input type="range" id="gold" step="100"></div>
       <div class="row"><label class="t" for="mana">Starting mana <output id="manaOut"></output></label><input type="range" id="mana" step="50"></div>
       <div class="row"><label class="check"><input type="checkbox" id="unlocks"> Everything researched from the start</label><div class="hint">Prison, Temple, Torture Chamber, traps and every spell, without a Library.</div></div>
@@ -77,7 +78,7 @@
 <script>
 (function () {
   const qs = new URLSearchParams(location.search), $ = (id) => document.getElementById(id), L = window.SANDBOX_LIMITS, D = window.DIFFICULTY, STORE = 'dm.sandbox';
-  const def = { mode: 'fixed', waves: L.waves[2], diff: 'normal', gold: L.gold[2], mana: L.mana[2], unlocks: false, seed: 7 };
+  const def = { gates: 1, mode: 'fixed', waves: L.waves[2], diff: 'normal', gold: L.gold[2], mana: L.mana[2], unlocks: false, seed: 7 };
   let st = Object.assign({}, def);
   try { Object.assign(st, JSON.parse(localStorage.getItem(STORE)) || {}); } catch (e) { /* storage blocked: defaults */ }
   const clamp = (v, k) => Math.max(L[k][0], Math.min(L[k][1], Number.isFinite(+v) ? Math.round(+v) : L[k][2]));
@@ -85,6 +86,7 @@
   for (const k of ['waves', 'gold', 'mana']) { const el = $(k); el.min = L[k][0]; el.max = L[k][1]; el.oninput = () => { st[k] = +el.value; render(); }; }
   const dEl = $('diff'); for (const id in D) { const b = document.createElement('button'); b.className = 'opt'; b.dataset.v = id; b.innerHTML = D[id].name + '<small>×' + D[id].heroMult + ' heroes</small>'; b.onclick = () => { st.diff = id; render(); }; dEl.appendChild(b); }
   for (const b of $('mode').children) b.onclick = () => { st.mode = b.dataset.v; render(); };
+  for (const b of $('gates').children) b.onclick = () => { st.gates = +b.dataset.v; render(); };
   $('unlocks').onchange = () => { st.unlocks = $('unlocks').checked; render(); };
   $('seed').oninput = () => { st.seed = clamp2($('seed').value); render(true); };
   const clamp2 = (v) => Math.max(0, Math.min(999999, Number.isFinite(parseInt(v, 10)) ? parseInt(v, 10) : 7));
@@ -92,18 +94,19 @@
 
   function params() {
     const p = new URLSearchParams(); p.set('level', 'sandbox'); p.set('diff', st.diff); p.set('gold', st.gold); p.set('mana', st.mana); p.set('unlocks', st.unlocks ? 'all' : 'none'); p.set('seed', st.seed);
+    if (st.gates === 2) p.set('gates', '2');
     if (st.mode === 'endless') p.set('endless', '1'); else p.set('waves', st.waves);
     p.set('brief', '1'); for (const k of ['view', 'sound']) if (qs.get(k) !== null) p.set(k, qs.get(k)); return p;
   }
   function render(keepSeedField) {
-    st.waves = clamp(st.waves, 'waves'); st.gold = clamp(st.gold, 'gold'); st.mana = clamp(st.mana, 'mana'); if (!D[st.diff]) st.diff = 'normal'; if (st.mode !== 'endless') st.mode = 'fixed';
-    for (const b of $('mode').children) b.classList.toggle('on', b.dataset.v === st.mode); for (const b of dEl.children) b.classList.toggle('on', b.dataset.v === st.diff);
+    st.waves = clamp(st.waves, 'waves'); st.gold = clamp(st.gold, 'gold'); st.mana = clamp(st.mana, 'mana'); if (!D[st.diff]) st.diff = 'normal'; if (st.mode !== 'endless') st.mode = 'fixed'; st.gates = st.gates === 2 ? 2 : 1;
+    for (const b of $('mode').children) b.classList.toggle('on', b.dataset.v === st.mode); for (const b of dEl.children) b.classList.toggle('on', b.dataset.v === st.diff); for (const b of $('gates').children) b.classList.toggle('on', +b.dataset.v === st.gates);
     $('waves').value = st.waves; $('gold').value = st.gold; $('mana').value = st.mana; $('unlocks').checked = !!st.unlocks; if (!keepSeedField) $('seed').value = st.seed;
     const endless = st.mode === 'endless'; $('waves').disabled = endless; $('wavesOut').textContent = endless ? '∞' : st.waves; $('wavesHint').textContent = endless ? 'Endless mode has no last wave.' : 'Boss waves (Prince, King) come every 5th wave.';
     $('goldOut').textContent = st.gold; $('manaOut').textContent = st.mana;
     const d = D[st.diff];
     $('summary').innerHTML = '<b>' + d.name + '</b>: ' + d.blurb + '<br>Heroes are <b>×' + d.heroMult + '</b> strength; the first wave lands <b>' + fmt(d.prep) + '</b> after you link the Hero Gate, then one every <b>' + fmt(d.interval) + '</b>' + (endless ? ', ever faster' : '') +
-      '. The Dungeon Heart holds <b>' + d.heartHp + '</b>.<br>' + (endless ? 'How long can you last?' : 'Survive <b>' + st.waves + '</b> waves.') + ' You start with <b>' + st.gold + '</b> gold' + (st.mana ? ' and <b>' + st.mana + '</b> mana' : '') + (st.unlocks ? ', everything researched' : '') + '.';
+      '. The Dungeon Heart holds <b>' + d.heartHp + '</b>.' + (st.gates === 2 ? ' Heroes will pour from <b>two Hero Gates</b>.' : '') + '<br>' + (endless ? 'How long can you last?' : 'Survive <b>' + st.waves + '</b> waves.') + ' You start with <b>' + st.gold + '</b> gold' + (st.mana ? ' and <b>' + st.mana + '</b> mana' : '') + (st.unlocks ? ', everything researched' : '') + '.';
     $('best').innerHTML = Object.keys(D).map(id => '<tr class="' + (id === st.diff ? 'cur' : '') + '"><td>' + D[id].name + '</td><td>' + (Progress.endlessBest(id) || '—') + '</td></tr>').join('');
     $('begin').textContent = endless ? 'Begin the Endless Siege' : 'Begin sandbox';
     try { localStorage.setItem(STORE, JSON.stringify(st)); } catch (e) { /* not remembered */ }

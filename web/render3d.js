@@ -49,7 +49,7 @@ function start() {
   const sun = new THREE.DirectionalLight(0xfff0d8, 1.25); sun.position.set(4, 12, 9); scene.add(sun);
   const heartLight = new THREE.PointLight(0xff3020, 2.2, 9, 1.6); heartLight.position.set(G.heart.x + .5, 1.3, G.heart.y + .5); scene.add(heartLight);
   const portalLight = new THREE.PointLight(0xff5030, 0, 9, 1.6); if (G.portal) portalLight.position.set(G.portal.x + .5, 1.2, G.portal.y + .5); scene.add(portalLight);      // levels may have no Portal or no Gate
-  const gateLight = new THREE.PointLight(0xffd070, 1.0, 8, 1.6); if (G.gate) gateLight.position.set(G.gate.x + .5, 1.2, G.gate.y + .5); else gateLight.intensity = 0; scene.add(gateLight);
+  const gateLights = G.gates.map(gt => { const l = new THREE.PointLight(0xffd070, 1.0, 8, 1.6); l.position.set(gt.x + .5, 1.2, gt.y + .5); scene.add(l); return l; });      // one per Hero Gate (a level may have none)
 
   /* ------------------------------------------------------------------ procedural pixel-art textures (grey; tinted per tile) */
   const hash = (x, y, k = 0) => { let h = x * 374761393 + y * 668265263 + k * 2246822519; h = (h ^ (h >> 13)) * 1274126177; return ((h ^ (h >> 16)) >>> 0) / 4294967295; };
@@ -212,7 +212,7 @@ function start() {
   }
 
   /* landmarks: Heart, Portal (yours), Hero Gate (theirs) */
-  const heartSpr = makeSprite('heart'), portalSpr = makeSprite('portal'), gateSpr = makeSprite('hero_gate');
+  const heartSpr = makeSprite('heart'), portalSpr = makeSprite('portal'), gateSprs = G.gates.map(() => makeSprite('hero_gate'));
 
   /* ------------------------------------------------------------------ units: character sprites as billboards */
   /* screen height of each character in tiles-diamond units (a floor tile's diamond is about 1.3 wide). Default 1.2. */
@@ -431,10 +431,10 @@ function start() {
     // landmarks
     const pulse = 1 + Math.sin(G.time * 4) * .035 + (G.heartFlash > 0 ? .1 : 0);
     placeSprite(heartSpr, G.heart.x + .5, 0, G.heart.y + .5, pulse); heartSpr.material.color.setScalar(G.heartFlash > 0 ? 2.4 : 1);
-    portalSpr.visible = !!G.portal; gateSpr.visible = !!G.gate;
+    portalSpr.visible = !!G.portal;
     if (G.portal) { placeSprite(portalSpr, G.portal.x + .5, 0, G.portal.y + .5); portalSpr.material.color.setScalar(G.portalOwned ? 1 + Math.sin(G.time * 3) * .12 : 0.55); }
-    if (G.gate) { placeSprite(gateSpr, G.gate.x + .5, 0, G.gate.y + .5); gateSpr.material.color.setScalar(G.gateOpen ? 1.05 + Math.sin(G.time * 2) * .1 : 0.5); }
-    heartLight.intensity = 2.0 + Math.sin(G.time * 4) * .5; portalLight.intensity = G.portalOwned ? 1.6 : 0; gateLight.intensity = !G.gate ? 0 : G.gateOpen ? 1.8 : .6;
+    G.gates.forEach((gt, i) => { placeSprite(gateSprs[i], gt.x + .5, 0, gt.y + .5); gateSprs[i].material.color.setScalar(gt.open ? 1.05 + Math.sin(G.time * 2 + i) * .1 : 0.5); gateLights[i].intensity = gt.open ? 1.8 : .6; });      // a linked Gate glows
+    heartLight.intensity = 2.0 + Math.sin(G.time * 4) * .5; portalLight.intensity = G.portalOwned ? 1.6 : 0;
     renderer.render(scene, camera);
   };
   window.__three = { scene, camera, renderer, cam, SPR, TEXS };

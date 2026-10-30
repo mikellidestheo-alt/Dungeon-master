@@ -75,11 +75,12 @@ const G = {
   map: [], time: 0, speed: 1, gold: LV.start.gold, imps: [], creatures: [], tasks: new Map(),
   nextImp: 0, nextSpawn: 20, nextPay: VAR.PAY_DAY_FREQUENCY_SECONDS, scanT: 0, log: [],
   portalOwned: false, heart: { x: POS.heart[0], y: POS.heart[1] }, portal: POS.portal && { x: POS.portal[0], y: POS.portal[1] },
-  gates: POS.gates.map(g => ({ x: g[0], y: g[1] })), gate: POS.gates.length ? { x: POS.gates[0][0], y: POS.gates[0][1] } : null,
+  gates: POS.gates.map(g => ({ x: g[0], y: g[1], open: false })), gate: null,
   heroes: [], prisoners: [], shots: [], fx: [], doors: [], traps: [], clouds: [], mana: LV.start.mana, maxMana: 1000, manaRate: 3, spellCd: {}, rally: null, ownedTiles: 0, manaT: 0, research: { current: LV.start.research || null, points: {}, done: {} }, chickens: [], hatchT: 0, hatchTiles: [], hatchScan: 0, heartHp: VAR.HEART_HEALTH, heartFlash: 0, gateOpen: false, gateT: 0,
   wave: 0, nextWave: Infinity, over: null, kills: 0, held: null, nextId: 0,
   stats: { dug: 0, mined: 0, claimed: 0, spells: 0 }, objDone: {}, objProg: {}, guideStep: 0, guideHidden: false,   // counters the objectives read; which objectives are done; where the tutorial guide is
 };
+G.gate = G.gates[0] || null;                          // the first Hero Gate (the one a single-Gate level has); G.gates holds them all, each with its own `open` flag
 const idx = (x, y) => y * W + x;
 const inb = (x, y) => x >= 0 && y >= 0 && x < W && y < H;
 const tile = (x, y) => inb(x, y) ? G.map[idx(x, y)] : null;
@@ -140,7 +141,7 @@ function validateLevel(lv) {
     if (d.params && d.params.includes('n')) need(c.n > 0, where + ': n must be positive');
     if (c.room) need(ROOM_TOOLS[c.room], where + ': no room called ' + c.room); if (c.item) need(RESEARCH[c.item], where + ': nothing to research called ' + c.item);
     if (c.kind) need(KINDS.some(k => k.name === c.kind), where + ': no creature called ' + c.kind);
-    if (d.needs === 'waves') need(plan.length, where + ': "' + c.type + '" needs waves.plan'); if (d.needs === 'gate') need(gates.length, where + ': "' + c.type + '" needs a Hero Gate'); if (d.needs === 'portal') need(pos.portal, where + ': "' + c.type + '" needs a Portal');
+    if (d.needs === 'waves') need(plan.length, where + ': "' + c.type + '" needs waves.plan'); if (d.needs === 'gate') need(gates.length >= (c.n || 1), where + ': "' + c.type + '" needs ' + (c.n > 1 ? c.n + ' Hero Gates' : 'a Hero Gate')); if (d.needs === 'portal') need(pos.portal, where + ': "' + c.type + '" needs a Portal');
   };
   objs.forEach((o, i) => cond(o, 'objective ' + (i + 1)));
   (lv.guide || []).forEach((g, i) => { need(g && g.text, 'guide step ' + (i + 1) + ' needs text'); if (g && g.when) cond(g.when, 'guide step ' + (i + 1)); if (g && g.tool) need(TOOLS.some(t => t[0] === g.tool), 'guide step ' + (i + 1) + ': no tool called ' + g.tool); });
@@ -565,7 +566,7 @@ function gainXp(c) {                              // CreatureExperienceSystem, r
   }
 }
 function startFlee(u) {                           // weak and in danger: run to the Heart (keepers) or back to the Gate (heroes)
-  const goal = u.team === 'k' || !G.gate ? { x: G.heart.x, y: G.heart.y + 2 } : { x: G.gate.x, y: G.gate.y };
+  const goal = u.team === 'k' || !G.gate ? { x: G.heart.x, y: G.heart.y + 2 } : u.homeGate || G.gate;      // heroes run back to the Gate they arrived by
   const p = findPath(u.tx, u.ty, goal.x, goal.y); if (!p || !p.length) return false;
   u.state = 'flee'; u.go(p); return true;
 }
@@ -644,24 +645,37 @@ class Hero extends Mover {
   }
 }
 function spawnWave() {
-  const n = G.wave, scale = (1 + LV.waves.scale * n) * (LV.waves.heroMult || 1), party = [];
+  const n = G.wave, scale = (1 + LV.waves.scale * n) * (LV.waves.heroMult || 1);
   const kinds = waveNames(n).map(nm => HEROES.find(h => h.name === nm));
-  for (let i = 0; i < kinds.length; i++) {
-    const kind = kinds[i];
-    const h = new Hero(G.gate.x - 1 + (i % 3), G.gate.y - 1 + ((i / 3) | 0), kind, scale, party); party.push(h); G.heroes.push(h);
-  }
+  /* The wave comes out of every linked Hero Gate: its heroes are dealt out between them (the wave is no bigger, it is split), starting
+   * from a different gate each wave so the boss does not always arrive at the same one. Each gate's group has its own leader. If the
+   * level flags the invasion as open without any gate linked (tests), the first gate is used. */
+  let gates = G.gates.filter(g => g.open); if (!gates.length) gates = [G.gate];
+  const parties = gates.map(() => []);
+  kinds.forEach((kind, j) => {
+    const gi = (j + n) % gates.length, gt = gates[gi], party = parties[gi], slot = party.length;
+    const h = new Hero(gt.x - 1 + (slot % 3), gt.y - 1 + ((slot / 3) | 0), kind, scale, party); h.homeGate = gt; party.push(h); G.heroes.push(h);
+  });
   if (window.Sound) Sound.stinger(kinds[0].boss ? 'boss' : 'wave');
   G.wave++; G.nextWave = G.wave < VAR.WAVES ? G.time + waveInterval(n) : Infinity;
-  say('⚔ ' + waveText() + ': ' + kinds.length + ' heroes pour out of the Hero Gate' + (kinds[0].boss ? ', led by the ' + kinds[0].name + '!' : '!'));
+  say('⚔ ' + waveText() + ': ' + kinds.length + ' heroes pour out of ' + (gates.length > 1 ? 'the ' + gates.length + ' Hero Gates' : 'the Hero Gate') + (kinds[0].boss ? ', led by the ' + kinds[0].name + '!' : '!'));
 }
 function heroLogic(dt) {
-  if (!G.gate) return;
-  if (!G.gateOpen) {
-    G.gateT -= dt; if (G.gateT > 0) return; G.gateT = 2;
-    if (findPath(G.gate.x, G.gate.y, G.heart.x, G.heart.y)) { G.gateOpen = true; sfx('gong'); G.nextWave = G.time + VAR.FIRST_WAVE_DELAY;
-      say('The Hero Gate is linked to your dungeon! Heroes will invade in ' + VAR.FIRST_WAVE_DELAY + 's.'); }
-    return;
+  if (!G.gates.length) return;
+  if (G.gates.some(g => !g.open)) {                    // every 2 s: has a tunnel reached a Gate that was still shut?
+    G.gateT -= dt;
+    if (G.gateT <= 0) {
+      G.gateT = 2;
+      G.gates.forEach((gt, i) => {
+        if (gt.open || !findPath(gt.x, gt.y, G.heart.x, G.heart.y)) return;
+        gt.open = true; sfx('gong');
+        if (!G.gateOpen) { G.gateOpen = true; G.nextWave = G.time + VAR.FIRST_WAVE_DELAY;       // the first link starts the invasion clock
+          say('The Hero Gate is linked to your dungeon! Heroes will invade in ' + VAR.FIRST_WAVE_DELAY + 's.'); }
+        else say('Hero Gate ' + (i + 1) + ' is linked too: heroes will now arrive there as well.');
+      });
+    }
   }
+  if (!G.gateOpen) return;
   if (G.time >= G.nextWave && G.wave < VAR.WAVES) spawnWave();
 }
 
@@ -674,7 +688,7 @@ const roomCount = (room) => { const id = ROOM_TOOLS[room]; let n = 0; for (const
 const COND = {
   survive:   { needs: 'waves',  f: () => [G.wave >= VAR.WAVES && !G.heroes.length ? 1 : 0, 1], label: () => 'Defeat every wave of invaders' },
   portal:    { needs: 'portal', f: () => [G.portalOwned ? 1 : 0, 1], label: () => 'Claim the Portal' },
-  gate:      { needs: 'gate',   f: () => [G.gateOpen ? 1 : 0, 1], label: () => 'Link a tunnel to the Hero Gate' },
+  gate:      { needs: 'gate',   f: (c) => [G.gates.filter(g => g.open).length, c.n || 1], label: (c) => (c.n || 1) > 1 ? 'Link tunnels to ' + c.n + ' Hero Gates' : 'Link a tunnel to the Hero Gate' },
   wave:      { needs: 'waves',  params: ['n'], f: (c) => [G.wave, c.n], label: (c) => 'Withstand ' + c.n + ' wave' + (c.n > 1 ? 's' : '') },
   dug:       { params: ['n'], f: (c) => [G.stats.dug, c.n], label: (c) => 'Dig out ' + c.n + ' tiles' },
   mined:     { params: ['n'], f: (c) => [G.stats.mined, c.n], label: (c) => 'Mine ' + c.n + ' gold' },
@@ -1034,7 +1048,7 @@ function draw() {
     if (t.t === T.LAIR) { ctx.fillStyle = '#8a70c0'; ctx.fillRect(px + 4, py + 6, TS - 8, TS - 12); if (t.bed && t.bed.occupant) { ctx.fillStyle = t.bed.occupant.color; ctx.fillRect(px + 6, py + 7, 5, 5); } }
     if (t.t === T.HEART && (x === G.heart.x && y === G.heart.y)) { ctx.fillStyle = '#ff4a4a'; ctx.beginPath(); ctx.arc(px + TS / 2, py + TS / 2, 7 + Math.sin(G.time * 4) * 1.2, 0, 7); ctx.fill(); }
     if (!tr.solid && t.owner === HERO_LAND) { ctx.fillStyle = 'rgba(190,70,50,.22)'; ctx.fillRect(px, py, TS, TS); }
-    if (t.t === T.GATE && G.gate && (x === G.gate.x && y === G.gate.y)) { ctx.strokeStyle = G.gateOpen ? '#ff8a50' : '#8a5a4a'; ctx.lineWidth = 2; ctx.strokeRect(px + 3, py + 3, TS - 6, TS - 6); ctx.lineWidth = 1; }
+    const gt = t.t === T.GATE && G.gates.find(g => g.x === x && g.y === y); if (gt) { ctx.strokeStyle = gt.open ? '#ff8a50' : '#8a5a4a'; ctx.lineWidth = 2; ctx.strokeRect(px + 3, py + 3, TS - 6, TS - 6); ctx.lineWidth = 1; }
     if (t.t === T.HEART && (x === G.heart.x && y === G.heart.y) && G.heartFlash > 0) { ctx.fillStyle = 'rgba(255,255,255,.5)'; ctx.fillRect(px - TS, py - TS, TS * 3, TS * 3); }
     if (t.t === T.PORTAL && G.portal && (x === G.portal.x && y === G.portal.y)) { ctx.strokeStyle = G.portalOwned ? '#c090ff' : '#7a5aa0'; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(px + TS / 2, py + TS / 2, 7, 0, 7); ctx.stroke(); ctx.lineWidth = 1; }
     if (t.tag && tr.solid) { ctx.strokeStyle = '#ffe070'; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.moveTo(px + 3, py + 3); ctx.lineTo(px + TS - 3, py + TS - 3); ctx.moveTo(px + TS - 3, py + 3); ctx.lineTo(px + 3, py + TS - 3); ctx.stroke(); ctx.lineWidth = 1; }
@@ -1142,7 +1156,7 @@ function renderHud() {
   for (const id in RESEARCH) { const b = $('b_' + id); if (!isAvail(id)) { b.style.opacity = 0.3; b.title = 'Locked — research it in a Library'; } else { b.title = ''; if (!SPELLS[id]) b.style.opacity = ''; } }
   renderResearch(); renderObjectives(); renderGuide(); renderEnd();
   $('hHeart').textContent = Math.ceil(G.heartHp); $('hHeroes').textContent = G.heroes.length; $('hWave').textContent = !VAR.WAVES ? '—' : VAR.WAVES === Infinity ? G.wave + ' / ∞' : G.wave + '/' + VAR.WAVES;
-  $('hNext').textContent = !VAR.WAVES ? '—' : !G.gateOpen ? 'tunnel to Gate' : G.nextWave === Infinity ? '—' : Math.max(0, Math.ceil(G.nextWave - G.time)) + 's';
+  $('hNext').textContent = !VAR.WAVES ? '—' : !G.gateOpen ? 'tunnel to Gate' : G.nextWave === Infinity ? '—' : Math.max(0, Math.ceil(G.nextWave - G.time)) + 's' + (G.gates.length > 1 ? ' · gates ' + G.gates.filter(g => g.open).length + '/' + G.gates.length : '');
   let dig = 0, claim = 0, busy = 0, upkeep = 0; for (const t of G.tasks.values()) { if (t.type === 'DIG') dig++; else if (t.type === 'CLAIM') claim++; else upkeep++; if (t.who.size) busy++; }
   const mood = G.creatures.map(c => c.name + ' #' + c.id + ' Lv' + c.level + ' ' + Math.ceil(c.hp) + '/' + c.maxHp + 'hp: ' + c.mood + (c.lair || c.noLair ? '' : ' (no bed)')).join('<br>');
   $('tasks').innerHTML = 'Dig tiles <b>' + dig + '</b> · Claim tiles <b>' + claim + '</b> · Repair/rearm <b>' + upkeep + '</b> · in progress <b>' + busy + '</b><br>' +
@@ -1251,4 +1265,4 @@ function frame(now) {
 }
 requestAnimationFrame(frame);
 window.__ui = { get mouse() { return mouse; }, get tool() { return tool; }, inputDown, inputMove, inputUp, guideTarget };
-window.__game = { LV, LEVEL_TABLE, CAMPAIGN, finishGame, renderEnd, COND, OBJECTIVES, GUIDE, condState, updateObjectives, guideNow, guideTarget, showBriefing, validateLevel, buildMap, levelSize, levelPos, strike, Chicken, updateHatchery, prayRate, spriteOf, pickKind, RESEARCH, isAvail, unlockAll, addResearch, SKELETON, freeSlot, updateJail, knockOut, KO_SECONDS, TORTURE_SECONDS, SPELLS, SPELL_ORDER, castSpell, TRAPS, DOOR, placeThings, removeThings, doorAt, trapAt, HERO_LAND, W, H, G, HEROES, KINDS, spawnWave, Creature, Imp, Hero, hurt, los, T, TERRAIN, step, tagRect, build, scanTasks, findPath, capacity, goldReleased, damageTile, perApplication, VAR, audioMood, SPELL_SND, release };
+window.__game = { LV, LEVEL_TABLE, CAMPAIGN, startFlee, finishGame, renderEnd, COND, OBJECTIVES, GUIDE, condState, updateObjectives, guideNow, guideTarget, showBriefing, validateLevel, buildMap, levelSize, levelPos, strike, Chicken, updateHatchery, prayRate, spriteOf, pickKind, RESEARCH, isAvail, unlockAll, addResearch, SKELETON, freeSlot, updateJail, knockOut, KO_SECONDS, TORTURE_SECONDS, SPELLS, SPELL_ORDER, castSpell, TRAPS, DOOR, placeThings, removeThings, doorAt, trapAt, HERO_LAND, W, H, G, HEROES, KINDS, spawnWave, Creature, Imp, Hero, hurt, los, T, TERRAIN, step, tagRect, build, scanTasks, findPath, capacity, goldReleased, damageTile, perApplication, VAR, audioMood, SPELL_SND, release };

@@ -24,6 +24,7 @@ study of [OpenKeeper](https://github.com/tonihele/OpenKeeper) (a Java re-impleme
 | `web/assets/audio/` | Optional: `sounds.json` maps effect ids to your own recordings, which then replace the synthesised ones. Ships empty; its media files are git-ignored |
 | `tools/test_levels.js` | Headless Chromium checks for the level format and loader: `node tools/test_levels.js` |
 | `tools/test_audio.js` | Headless Chromium checks for the sound system: `node tools/test_audio.js` |
+| `tools/test_gates.js` | Headless Chromium checks for several Hero Gates (linking, split waves, fleeing, 3D): `node tools/test_gates.js` |
 | `tools/test_sandbox.js` | Headless Chromium checks for the sandbox, the wave generator and endless mode: `node tools/test_sandbox.js` |
 | `tools/test_campaign.js` | Headless Chromium checks for the chapter menu, saved progress, stars and the Victory / Defeat screens: `node tools/test_campaign.js` |
 | `tools/test_objectives.js` | Headless Chromium checks for objectives, the tutorial guide, briefings and gate-less levels: `node tools/test_objectives.js` |
