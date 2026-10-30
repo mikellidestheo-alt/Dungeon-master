@@ -19,6 +19,7 @@ const VAR = {                                         // Variable.MiscVariable.M
   PAY_DAY_FREQUENCY_SECONDS: 90,                      // stock is 600; shortened so you see it
   IMP_EFFICIENCY: 80,                                 // TileWork.FULL_EFFICIENCY comment: "80% for a fresh imp"
   IMP_MAX_GOLD: 400,
+  STUDY_SECONDS: 20,                                  // MOTIONLESS_WHILE_RESEARCHING_SECONDS is 70 in the stock levels
   CREATURE_SLEEPS_WHEN_BELOW_PERCENT_HEALTH: 50,      // stock value, drives "go heal in your lair"
   OWN_LAND_HEALTH_INCREASE_PER_SECOND: 0.8,           // Creature.Attributes.ownLandHealthIncrease, scaled to our hp
   HEART_HEALTH: 2500,
@@ -28,7 +29,7 @@ const VAR = {                                         // Variable.MiscVariable.M
 };
 
 /* ---- terrain table (Terrain.kwd analogue). flags: S solid, I impenetrable, O ownable, T taggable ---- */
-const T = { ROCK: 0, EARTH: 1, GOLD: 2, GEM: 3, PATH: 4, TREASURY: 5, LAIR: 6, HEART: 7, PORTAL: 8, GATE: 9, PRISON: 10, TORTURE: 11 };
+const T = { ROCK: 0, EARTH: 1, GOLD: 2, GEM: 3, PATH: 4, TREASURY: 5, LAIR: 6, HEART: 7, PORTAL: 8, GATE: 9, PRISON: 10, TORTURE: 11, LIBRARY: 12 };
 const HERO_LAND = 2;                                  // tile.owner for the good player (Player.GOOD_PLAYER_ID analogue)
 const TERRAIN = [
   { name: 'Rock',     solid: 1, imp: 1, own: 0, tag: 0, maxHealth: 1 },
@@ -43,6 +44,7 @@ const TERRAIN = [
   { name: 'Hero Gate',solid: 0, own: 0, room: 1, maxHealth: 1000 },
   { name: 'Prison',   solid: 0, own: 1, room: 1, maxHealth: 1000, cost: 100 },
   { name: 'Torture Chamber', solid: 0, own: 1, room: 1, maxHealth: 1000, cost: 150 },
+  { name: 'Library',  solid: 0, own: 1, room: 1, maxHealth: 1000, cost: 120 },
 ];
 
 /* ---- tiny seeded RNG so levels are reproducible (?seed=123) ---- */
@@ -56,7 +58,7 @@ const G = {
   map: [], time: 0, speed: 1, gold: 1000, imps: [], creatures: [], tasks: new Map(),
   nextImp: 0, nextSpawn: 20, nextPay: VAR.PAY_DAY_FREQUENCY_SECONDS, scanT: 0, log: [],
   portalOwned: false, heart: { x: 6, y: H >> 1 }, portal: { x: W - 8, y: H >> 1 }, gate: { x: 22, y: H - 5 },
-  heroes: [], prisoners: [], shots: [], fx: [], doors: [], traps: [], clouds: [], mana: 300, maxMana: 1000, manaRate: 3, spellCd: {}, rally: null, ownedTiles: 0, manaT: 0, heartHp: VAR.HEART_HEALTH, heartFlash: 0, gateOpen: false, gateT: 0,
+  heroes: [], prisoners: [], shots: [], fx: [], doors: [], traps: [], clouds: [], mana: 300, maxMana: 1000, manaRate: 3, spellCd: {}, rally: null, ownedTiles: 0, manaT: 0, research: { current: 'prison', points: {}, done: {} }, heartHp: VAR.HEART_HEALTH, heartFlash: 0, gateOpen: false, gateT: 0,
   wave: 0, nextWave: Infinity, over: null, kills: 0, held: null, nextId: 0,
 };
 const idx = (x, y) => y * W + x;
@@ -303,24 +305,26 @@ function capacity() { let c = 2000;                 // the Heart itself holds a 
 
 /* combat stats mirror Creature.Attributes: hp, melee damage / recharge ("MELEE_RECHARGE_TIME_SECONDS"), range, speed */
 const KINDS = [
-  { name: 'Goblin',  color: '#6fbf4f', pay: 60,  hp: 80,  dmg: 8,  range: 1.2, cdMax: 1.0, ranged: 0 },
-  { name: 'Troll',   color: '#b08850', pay: 90,  hp: 170, dmg: 12, range: 1.2, cdMax: 1.2, ranged: 0 },
-  { name: 'Warlock', color: '#a070e0', pay: 120, hp: 65,  dmg: 14, range: 5,   cdMax: 1.6, ranged: 1 },
+  { name: 'Goblin',  color: '#6fbf4f', pay: 60,  hp: 80,  dmg: 8,  range: 1.2, cdMax: 1.0, ranged: 0, research: 0.7 },
+  { name: 'Troll',   color: '#b08850', pay: 90,  hp: 170, dmg: 12, range: 1.2, cdMax: 1.2, ranged: 0, research: 0.4 },
+  { name: 'Warlock', color: '#a070e0', pay: 120, hp: 65,  dmg: 14, range: 5,   cdMax: 1.6, ranged: 1, research: 1.6 },
 ];
 class Creature extends Mover {                    // CreatureMoodSystem / CreatureSleepSystem: reduced to one lair + payday
   constructor(x, y, kind) { super(x, y, 1.6); Object.assign(this, kind); this.energy = 100 + (rand() * 0 | 0); this.anger = 0; this.lair = null; this.state = 'idle'; this.wait = 1;
     this.id = ++Creature.n; this.energy = 70 + rand() * 30;
-    Object.assign(this, { maxHp: kind.hp, team: 'k', cd: 0, haste: 0, sight: 7, level: 1, xp: 0, rep: 0, dead: false, flash: 0, held: false }); }
+    Object.assign(this, { desk: null, studyT: 0, studyThink: 0, maxHp: kind.hp, team: 'k', cd: 0, haste: 0, sight: 7, level: 1, xp: 0, rep: 0, dead: false, flash: 0, held: false }); }
   get mood() { return this.anger >= 1600 ? 'angry' : this.anger >= 800 ? 'unhappy' : 'content'; }
+  releaseDesk() { if (this.desk) { this.desk.occ = null; this.desk = null; } }
   update(dt) {
     if (this.dead || this.held) return;
     this.flash = Math.max(0, this.flash - dt);
+    if (this.desk && this.state !== 'research' && this.state !== 'toDesk') this.releaseDesk();           // anything that interrupts studying frees the desk
     if (this.unconscious) { if (!this.carriedBy) { this.uTime -= dt; if (this.uTime <= 0) { say(this.name + ' #' + this.id + ' bled out.'); kill(this, null); } } return; }
     if (this.state !== 'sleep') this.energy -= 1.4 * dt;
     if (!this.lair && !this.noLair) {             // REASON_NO_LAIR: anger accrues until a bed is assigned
       this.anger += 25 * dt; const bed = freeBed(); if (bed) { bed.occupant = this; this.lair = bed; say(this.name + ' #' + this.id + ' claimed a bed.'); }
     }
-    if (this.anger >= 3000) { say(this.name + ' #' + this.id + ' is furious and leaves your dungeon!'); if (this.lair) this.lair.occupant = null; return 'leave'; }
+    if (this.anger >= 3000) { say(this.name + ' #' + this.id + ' is furious and leaves your dungeon!'); if (this.lair) this.lair.occupant = null; this.releaseDesk(); return 'leave'; }
     if (fightBrain(this, dt)) return;                                     // CreatureState: shouldFleeOrAttack comes first
     if (this.hp < this.maxHp)                                             // own-land regen, much faster asleep in the lair
       this.hp = Math.min(this.maxHp, this.hp + (this.state === 'sleep' ? 8 : VAR.OWN_LAND_HEALTH_INCREASE_PER_SECOND) * dt);
@@ -338,8 +342,19 @@ class Creature extends Mover {                    // CreatureMoodSystem / Creatu
       if (this.energy >= 100 && this.hp >= this.maxHp * 0.8) { this.state = 'idle'; this.wait = 1; }
     } else if (this.state === 'toBed') {
       if (this.stepMove(dt)) this.state = 'sleep';
+    } else if (this.state === 'toDesk') {
+      if (!G.research.current) { this.releaseDesk(); this.state = 'idle'; this.path = null; }
+      else if (this.stepMove(dt)) { this.state = 'research'; this.studyT = VAR.STUDY_SECONDS; }
+    } else if (this.state === 'research') {                              // task/creature/Research: sit still at a desk and add research points
+      this.studyT -= dt; if (G.research.current) addResearch(this.research * (1 + 0.1 * (this.level - 1)) * dt);
+      if (this.studyT <= 0 || !G.research.current || this.energy < 35) { this.releaseDesk(); this.state = 'idle'; this.wait = 1; }
     } else {
       if ((this.energy < 35 || this.hp < this.maxHp * VAR.CREATURE_SLEEPS_WHEN_BELOW_PERCENT_HEALTH / 100) && this.lair) { const p = findPath(this.tx, this.ty, this.lair.x, this.lair.y); if (p) { this.go(p); this.state = 'toBed'; return; } }
+      this.studyThink -= dt;
+      if (this.research > 0 && G.research.current && !this.path && this.studyThink <= 0) {                // idle thinkers look for a free desk
+        this.studyThink = 2; const desk = freeSlot(T.LIBRARY, this), p = desk && findPath(this.tx, this.ty, desk.x, desk.y);
+        if (p) { desk.t.occ = this; this.desk = desk.t; this.state = 'toDesk'; this.go(p); return; }
+      }
       if (this.path) this.stepMove(dt); else { this.wait -= dt; if (this.wait <= 0) { this.wait = 1 + rand() * 3; const c = ownedFloor(); if (c) this.go(findPath(this.tx, this.ty, c.x, c.y)); } }
     }
   }
@@ -398,7 +413,7 @@ function kill(t, src) {
   if (t.door) { t.dead = true; G.doors = G.doors.filter(d => d !== t); const dt_ = tile(t.tx, t.ty); if (dt_) dt_.door = null; G.fx.push({ x: t.x, y: t.y, splat: true, life: 3 }); G.dirty = true; say('A door was smashed!'); return; }
   t.dead = true; G.fx.push({ x: t.x, y: t.y, splat: true, life: 6 });
   if (t.isImp) { t.drop(); say('An imp was slain.'); }
-  else if (t.team === 'k') { if (t.lair) t.lair.occupant = null; say(t.name + ' #' + t.id + ' has fallen!'); }
+  else if (t.team === 'k') { if (t.lair) t.lair.occupant = null; if (t.releaseDesk) t.releaseDesk(); say(t.name + ' #' + t.id + ' has fallen!'); }
   else { G.kills++; say('A hero ' + t.name + ' is slain.'); }
   if (src && src.team === 'k' && src.level && !src.dead) gainXp(src);
 }
@@ -500,6 +515,7 @@ const DOOR = { cost: 100, hp: 400 };
 const doorAt = (x, y) => { const t = tile(x, y); return t && t.door || null; };
 const trapAt = (x, y) => { const t = tile(x, y); return t && t.trap || null; };
 function placeThings(kind, x0, y0, x1, y1) {
+  if (RESEARCH[kind] && !needs(kind)) return;
   const def = kind === 'door' ? DOOR : TRAPS[kind], name = kind === 'door' ? 'Door' : def.name; let n = 0, spent = 0;
   for (let y = Math.min(y0, y1); y <= Math.max(y0, y1); y++) for (let x = Math.min(x0, x1); x <= Math.max(x0, x1); x++) {
     const t = tile(x, y); if (!t || t.t !== T.PATH || t.owner !== 1 || t.door || t.trap) continue;
@@ -540,6 +556,32 @@ function updateTraps(dt) {
   }
   G.clouds = G.clouds.filter(c => c.life > 0);
 }
+
+/* ===================================================================================== library & research
+ * OpenKeeper marks every room, door, trap and spell UNAVAILABLE / RESEARCHABLE / AVAILABLE (ResearchableEntity). The Library
+ * holds desks; creatures with a research talent (Attributes.researchPerSecond) sit at them (task/creature/Research) and
+ * pour points into the current item until PlayerSpellbookSystem makes it available. Everything not listed here
+ * (Treasury, Lair, Library, Doors, Create Imp) is available from the start. */
+const RESEARCH = {
+  prison:    { kind: 'room',  name: 'Prison',          pts: 90 },
+  torture:   { kind: 'room',  name: 'Torture Chamber', pts: 150 },
+  gas:       { kind: 'trap',  name: 'Gas Trap',        pts: 80 },
+  bolt:      { kind: 'trap',  name: 'Lightning Trap',  pts: 140 },
+  heal:      { kind: 'spell', name: 'Heal',            pts: 60 },
+  haste:     { kind: 'spell', name: 'Speed',           pts: 90 },
+  lightning: { kind: 'spell', name: 'Lightning',       pts: 120 },
+  rally:     { kind: 'spell', name: 'Call to Arms',    pts: 150 },
+};
+const RESEARCH_ROOM = { [T.PRISON]: 'prison', [T.TORTURE]: 'torture' };
+const isAvail = (id) => !RESEARCH[id] || !!G.research.done[id];
+function needs(id) { if (isAvail(id)) return true; say(RESEARCH[id].name + ' is not researched yet — build a Library and let your thinkers study.'); return false; }
+function nextResearch() { return Object.keys(RESEARCH).find(id => !G.research.done[id]) || null; }
+function addResearch(p) {
+  const r = G.research, id = r.current; if (!id) return;
+  r.points[id] = (r.points[id] || 0) + p;
+  if (r.points[id] >= RESEARCH[id].pts) { r.done[id] = true; r.current = nextResearch(); say('✦ Research complete: ' + RESEARCH[id].name + '!' + (r.current ? ' Now studying ' + RESEARCH[r.current].name + '.' : ' Nothing left to research.')); }
+}
+function unlockAll() { for (const id in RESEARCH) G.research.done[id] = true; G.research.current = null; }
 
 /* ===================================================================================== knock-out, prison & torture
  * In OpenKeeper a creature that loses its last hit points in a fight falls unconscious (CREATURE_DYING_STATE_DURATION_SECONDS,
@@ -593,7 +635,7 @@ function release(b, how) {
   G.prisoners = G.prisoners.filter(p => p !== b); if (b.cell) b.cell.occ = null; b.dead = true; b.imprisoned = false;
   const tx = Math.floor(b.x), ty = Math.floor(b.y);
   if (how === 'convert') {
-    const c = new Creature(tx, ty, { name: 'Ex-' + b.name, color: b.color, pay: 70, hp: b.maxHp, dmg: b.dmg, range: b.range, cdMax: b.cdMax, ranged: b.ranged });
+    const c = new Creature(tx, ty, { name: 'Ex-' + b.name, color: b.color, pay: 70, hp: b.maxHp, dmg: b.dmg, range: b.range, cdMax: b.cdMax, ranged: b.ranged, research: b.name === 'Mage' ? 1.2 : 0.4 });
     G.creatures.push(c); G.fx.push({ x: c.x, y: c.y, ring: true, r: 1.2, color: '#c080ff', life: 0.8, max: 0.8 });
     say('The ' + b.name + ' breaks and joins your dungeon as ' + c.name + '!');
   } else if (how === 'starve') {
@@ -622,6 +664,7 @@ function ring(f, color, r) { G.fx.push({ x: f.fx, y: f.fy, ring: true, r, color,
 function castSpell(id, f) {                      // f = {fx, fy} world position of the click
   const sp = SPELLS[id], tx = Math.floor(f.fx), ty = Math.floor(f.fy), t = tile(tx, ty);
   if (G.over || !t) return false;
+  if (RESEARCH[id] && !isAvail(id)) { needs(id); return false; }
   const fail = (m) => { say(m); return false; };
   if (G.mana < sp.cost) return fail('Not enough mana for ' + sp.name + ' (' + sp.cost + ').');
   if ((G.spellCd[id] || 0) > 0) return fail(sp.name + ' is recharging.');
@@ -652,6 +695,7 @@ function castSpell(id, f) {                      // f = {fx, fy} world position 
 
 /* ===================================================================================== player actions */
 function build(roomId, x0, y0, x1, y1) {          // RoomPlacementValidator (reduced): owned, empty, affordable
+  if (RESEARCH_ROOM[roomId] && !needs(RESEARCH_ROOM[roomId])) return;
   const tr = TERRAIN[roomId]; let n = 0, spent = 0;
   for (let y = Math.min(y0, y1); y <= Math.max(y0, y1); y++) for (let x = Math.min(x0, x1); x <= Math.max(x0, x1); x++) {
     const t = tile(x, y); if (!t || t.t !== T.PATH || t.owner !== 1) continue;
@@ -701,7 +745,7 @@ const MODE_2D = qs.get('view') === '2d';
 cv.width = W * TS; cv.height = H * TS;
 const hash = (x, y) => { let h = x * 374761393 + y * 668265263; h = (h ^ (h >> 13)) * 1274126177; return ((h ^ (h >> 16)) >>> 0) / 4294967295; };
 const COL = { [T.ROCK]: '#1c1a1a', [T.EARTH]: '#6a4a2c', [T.GOLD]: '#6a4a2c', [T.GEM]: '#4a3a4a', [T.PATH]: '#3b3128' };
-const ROOMCOL = { [T.TREASURY]: '#7a6420', [T.LAIR]: '#4a3a6a', [T.HEART]: '#8a2a2a', [T.PORTAL]: '#5a2a7a', [T.GATE]: '#6a3a2a', [T.PRISON]: '#4a5560', [T.TORTURE]: '#5a2020' };
+const ROOMCOL = { [T.TREASURY]: '#7a6420', [T.LAIR]: '#4a3a6a', [T.HEART]: '#8a2a2a', [T.PORTAL]: '#5a2a7a', [T.GATE]: '#6a3a2a', [T.PRISON]: '#4a5560', [T.TORTURE]: '#5a2020', [T.LIBRARY]: '#3a4a6a' };
 const scr = (u) => u.held && mouse.fx !== undefined ? [mouse.fx * TS, mouse.fy * TS - 6] : [u.x * TS, u.y * TS];
 function bar(px, py, u) {                                     // health bar above any damaged unit
   if (u.hp >= u.maxHp) return; ctx.fillStyle = 'rgba(0,0,0,.7)'; ctx.fillRect(px - 7, py - 12, 14, 3);
@@ -724,6 +768,7 @@ function draw() {
     if (t.t === T.GOLD) { ctx.fillStyle = t.gold > 0 ? '#f4c430' : '#8a7a40'; for (let i = 0; i < 5; i++) ctx.fillRect(px + 3 + hash(x + i, y * 7) * 13, py + 3 + hash(x * 5, y + i) * 13, 3, 3); }
     if (t.t === T.GEM) { ctx.fillStyle = '#5ee0ff'; for (let i = 0; i < 4; i++) ctx.fillRect(px + 3 + hash(x + i, y * 3) * 12, py + 3 + hash(x * 9, y + i) * 12, 4, 4); }
     if (t.t === T.TREASURY) { const f = Math.min(1, G.gold / Math.max(1, capacity())); ctx.fillStyle = '#f4c430'; ctx.fillRect(px + 4, py + TS - 4 - f * (TS - 8), TS - 8, f * (TS - 8) + 0); ctx.strokeStyle = '#c8a030'; ctx.strokeRect(px + 3.5, py + 3.5, TS - 7, TS - 7); }
+    if (t.t === T.LIBRARY) { ctx.fillStyle = '#c0a060'; ctx.fillRect(px + 3, py + 3, TS - 6, 4); ctx.fillStyle = '#d06060'; ctx.fillRect(px + 4, py + 4, 3, 2); ctx.fillStyle = '#6090d0'; ctx.fillRect(px + 9, py + 4, 3, 2); ctx.fillStyle = '#8a6a40'; ctx.fillRect(px + 6, py + 11, TS - 12, 5); }
     if (t.t === T.PRISON) { ctx.strokeStyle = '#b8c0d0'; ctx.lineWidth = 1; for (let k = 1; k < 4; k++) { ctx.beginPath(); ctx.moveTo(px + k * TS / 4, py + 3); ctx.lineTo(px + k * TS / 4, py + TS - 3); ctx.stroke(); } }
     if (t.t === T.TORTURE) { ctx.strokeStyle = '#d06a50'; ctx.beginPath(); ctx.moveTo(px + 4, py + 4); ctx.lineTo(px + TS - 4, py + TS - 4); ctx.moveTo(px + TS - 4, py + 4); ctx.lineTo(px + 4, py + TS - 4); ctx.stroke(); }
     if (t.t === T.LAIR) { ctx.fillStyle = '#8a70c0'; ctx.fillRect(px + 4, py + 6, TS - 8, TS - 12); if (t.bed && t.bed.occupant) { ctx.fillStyle = t.bed.occupant.color; ctx.fillRect(px + 6, py + 7, 5, 5); } }
@@ -756,6 +801,7 @@ function draw() {
     for (let l = 1; l < c.level; l++) { ctx.fillStyle = '#ffe070'; ctx.fillRect(px - 5 + (l - 1) * 3, py + 6, 2, 2); }
     bar(px, py, c); ctx.fillStyle = '#000'; ctx.font = 'bold 8px sans-serif'; ctx.textAlign = 'center'; ctx.fillText(c.name[0], px, py + 3);
     if (c.unconscious) { ctx.fillStyle = 'rgba(0,0,0,.55)'; ctx.fillRect(px - 5, py - 5, 10, 10); ctx.fillStyle = '#fff'; ctx.fillText('x', px, py + 3); }
+    if (c.state === 'research') { ctx.fillStyle = '#ffd860'; ctx.fillRect(px - 3, py - 11, 6, 4); ctx.fillStyle = '#7a5a10'; ctx.fillRect(px, py - 11, 1, 4); }
     if (c.state === 'sleep') { ctx.fillStyle = '#9cf'; ctx.fillText('z', px + 7, py - 5); }
     if (c.mood !== 'content') { ctx.fillStyle = c.mood === 'angry' ? '#ff3030' : '#ffb030'; ctx.fillText('!', px, py - 8); } }
   for (const h of G.heroes.concat(G.prisoners)) { const px = h.x * TS, py = h.y * TS;
@@ -780,17 +826,17 @@ function draw() {
 /* ===================================================================================== UI wiring */
 const $ = (id) => document.getElementById(id);
 const TOOLS = [ ['dig', 'Dig (tag)'], ['hand', '✋ Hand'], ['treasury', 'Treasury ' + TERRAIN[T.TREASURY].cost + 'g/tile'], ['lair', 'Lair ' + TERRAIN[T.LAIR].cost + 'g/tile'],
-  ['prison', 'Prison ' + TERRAIN[T.PRISON].cost + 'g/tile'], ['torture', 'Torture ' + TERRAIN[T.TORTURE].cost + 'g/tile'],
+  ['library', 'Library ' + TERRAIN[T.LIBRARY].cost + 'g/tile'], ['prison', 'Prison ' + TERRAIN[T.PRISON].cost + 'g/tile'], ['torture', 'Torture ' + TERRAIN[T.TORTURE].cost + 'g/tile'],
   ['door', 'Door ' + DOOR.cost + 'g'], ['gas', 'Gas Trap ' + TRAPS.gas.cost + 'g'], ['bolt', 'Lightning Trap ' + TRAPS.bolt.cost + 'g'],
   ...SPELL_ORDER.map((id, i) => [id, SPELLS[id].icon + ' ' + SPELLS[id].name + ' ' + SPELLS[id].cost + ' [' + (i + 1) + ']']),
   ['sp1', '⏸ Pause'], ['sp2', '1×'], ['sp3', '3×'], ['sp4', '8×'] ];
 for (const [id, label] of TOOLS) { const b = document.createElement('button'); b.textContent = label; b.id = 'b_' + id; b.onclick = () => {
-  if (id.startsWith('sp')) { G.speed = [0, 1, 3, 8][+id[2] - 1]; } else tool = id; refreshButtons(); }; $('tools').appendChild(b); }
+  if (id.startsWith('sp')) { G.speed = [0, 1, 3, 8][+id[2] - 1]; } else if (RESEARCH[id] && !isAvail(id)) needs(id); else tool = id; refreshButtons(); }; $('tools').appendChild(b); }
 function refreshButtons() { for (const [id] of TOOLS) { const b = $('b_' + id); b.classList.toggle('on', id === tool || (id.startsWith('sp') && [0, 1, 3, 8][+id[2] - 1] === G.speed)); } }
 function posF(e) { const r = cv.getBoundingClientRect(); return { fx: (e.clientX - r.left) / r.width * W, fy: (e.clientY - r.top) / r.height * H }; }
 function pos(e) { const r = cv.getBoundingClientRect(); return { x: Math.max(0, Math.min(W - 1, Math.floor((e.clientX - r.left) / r.width * W))), y: Math.max(0, Math.min(H - 1, Math.floor((e.clientY - r.top) / r.height * H))) }; }
 /* Input is expressed in world terms ({x,y} tile, {fx,fy} float tile coords) so the 2D and the 3D view share it. */
-const ROOM_TOOLS = { treasury: T.TREASURY, lair: T.LAIR, prison: T.PRISON, torture: T.TORTURE };
+const ROOM_TOOLS = { treasury: T.TREASURY, lair: T.LAIR, library: T.LIBRARY, prison: T.PRISON, torture: T.TORTURE };
 function inputDown(p, f, button) { mouse = { x: p.x, y: p.y, sx: p.x, sy: p.y, down: button === 2 ? 3 : 1, fx: f.fx, fy: f.fy }; }
 function inputMove(p, f) { mouse.x = p.x; mouse.y = p.y; mouse.fx = f.fx; mouse.fy = f.fy; }
 function inputUp(p, f) {
@@ -802,7 +848,7 @@ function inputUp(p, f) {
   else if (!right && ROOM_TOOLS[tool]) build(ROOM_TOOLS[tool], mouse.sx, mouse.sy, p.x, p.y);
   mouse.down = 0;
 }
-addEventListener('keydown', e => { const i = '12345'.indexOf(e.key); if (i >= 0 && e.target.tagName !== 'INPUT') { tool = SPELL_ORDER[i]; refreshButtons(); } });
+addEventListener('keydown', e => { const i = '12345'.indexOf(e.key); if (i >= 0 && e.target.tagName !== 'INPUT') { if (isAvail(SPELL_ORDER[i])) tool = SPELL_ORDER[i]; else needs(SPELL_ORDER[i]); refreshButtons(); } });
 cv.addEventListener('contextmenu', e => e.preventDefault());
 cv.addEventListener('pointerdown', e => { inputDown(pos(e), posF(e), e.button); cv.setPointerCapture(e.pointerId); });
 cv.addEventListener('pointermove', e => inputMove(pos(e), posF(e)));
@@ -828,6 +874,8 @@ function renderHud() {
   $('hPay').textContent = Math.max(0, Math.ceil(G.nextPay)); $('hTime').textContent = Math.floor(G.time);
   $('hMana').textContent = Math.floor(G.mana) + '/' + G.maxMana;
   for (const id of SPELL_ORDER) $('b_' + id).style.opacity = G.mana >= SPELLS[id].cost && !(G.spellCd[id] > 0) ? 1 : 0.45;
+  for (const id in RESEARCH) { const b = $('b_' + id); if (!isAvail(id)) { b.style.opacity = 0.3; b.title = 'Locked — research it in a Library'; } else { b.title = ''; if (!SPELLS[id]) b.style.opacity = ''; } }
+  renderResearch();
   $('hHeart').textContent = Math.ceil(G.heartHp); $('hHeroes').textContent = G.heroes.length; $('hWave').textContent = G.wave + '/' + VAR.WAVES;
   $('hNext').textContent = !G.gateOpen ? 'tunnel to Gate' : G.nextWave === Infinity ? '—' : Math.max(0, Math.ceil(G.nextWave - G.time)) + 's';
   let dig = 0, claim = 0, busy = 0, upkeep = 0; for (const t of G.tasks.values()) { if (t.type === 'DIG') dig++; else if (t.type === 'CLAIM') claim++; else upkeep++; if (t.who.size) busy++; }
@@ -836,7 +884,29 @@ function renderHud() {
     'Prisoners <b>' + G.prisoners.length + '</b> · knocked out <b>' + G.creatures.concat(G.heroes).filter(u => u.unconscious).length + '</b><br>Idle imps <b>' + G.imps.filter(i => i.state === 'idle').length + '</b>/' + G.imps.length + '<br><span style="color:var(--dim)">' + (mood || 'No creatures yet — dig east and claim the purple portal.') + '</span>';
 }
 
+/* Research panel: one button per item, click to choose what the Library studies next. */
+const rItems = {};
+for (const id in RESEARCH) {
+  const b = document.createElement('button'); b.className = 'ritem'; b.dataset.id = id; b.innerHTML = '<span class="n"></span><span class="s"></span><span class="bar"></span>';
+  b.onclick = () => { if (!G.research.done[id]) { G.research.current = id; say('Now researching ' + RESEARCH[id].name + '.'); } };
+  $('research').appendChild(b); rItems[id] = b;
+}
+function renderResearch() {
+  const r = G.research; let studying = 0, rate = 0;
+  for (const c of G.creatures) if (c.state === 'research') { studying++; rate += c.research * (1 + 0.1 * (c.level - 1)); }
+  for (const id in RESEARCH) {
+    const b = rItems[id], it = RESEARCH[id], done = !!r.done[id], pct = Math.min(100, Math.floor((r.points[id] || 0) / it.pts * 100));
+    b.classList.toggle('done', done); b.classList.toggle('cur', r.current === id);
+    b.querySelector('.n').textContent = it.name; b.querySelector('.s').textContent = done ? '✓ ' + it.kind : (r.current === id ? '▶ ' : '') + it.kind + ' ' + pct + '%';
+    b.querySelector('.bar').style.width = (done ? 100 : pct) + '%';
+  }
+  const libTiles = G.map.filter(t => t.t === T.LIBRARY && t.owner === 1).length;
+  $('researchInfo').textContent = !libTiles ? 'No Library yet — build one on your claimed floor, then thinkers (Warlocks study best) will sit at its desks.'
+    : studying + ' studying at ' + libTiles + ' desk(s), +' + rate.toFixed(1) + ' pts/s' + (r.current ? '' : ' — nothing selected');
+}
+
 genMap(); scanTasks();
+if (qs.get('unlock') === '1') unlockAll();
 for (let i = 0; i < 3; i++) G.imps.push(new Imp(G.heart.x - 1 + i, G.heart.y + 2));
 say('Welcome, Keeper. Tag earth near the Heart; dig east to the portal.');
 refreshButtons();
@@ -851,4 +921,4 @@ function frame(now) {
 }
 requestAnimationFrame(frame);
 window.__ui = { get mouse() { return mouse; }, get tool() { return tool; }, inputDown, inputMove, inputUp };
-window.__game = { SKELETON, freeSlot, updateJail, knockOut, KO_SECONDS, TORTURE_SECONDS, SPELLS, SPELL_ORDER, castSpell, TRAPS, DOOR, placeThings, removeThings, doorAt, trapAt, HERO_LAND, W, H, G, HEROES, KINDS, spawnWave, Creature, Imp, Hero, hurt, los, T, TERRAIN, step, tagRect, build, scanTasks, findPath, capacity, goldReleased, damageTile, perApplication, VAR };
+window.__game = { RESEARCH, isAvail, unlockAll, addResearch, SKELETON, freeSlot, updateJail, knockOut, KO_SECONDS, TORTURE_SECONDS, SPELLS, SPELL_ORDER, castSpell, TRAPS, DOOR, placeThings, removeThings, doorAt, trapAt, HERO_LAND, W, H, G, HEROES, KINDS, spawnWave, Creature, Imp, Hero, hurt, los, T, TERRAIN, step, tagRect, build, scanTasks, findPath, capacity, goldReleased, damageTile, perApplication, VAR };

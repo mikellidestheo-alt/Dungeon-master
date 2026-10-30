@@ -28,6 +28,12 @@
   .box h2 { font-size: 12px; text-transform: uppercase; color: var(--dim); margin: 0 0 4px; letter-spacing: .08em; }
   #log { font-size: 12px; max-height: 120px; overflow: auto; }
   #log div { color: var(--dim); } #log div.new { color: var(--ink); }
+  .ritem { position: relative; overflow: hidden; text-align: left; display: flex; justify-content: space-between; gap: 8px; padding: 6px 10px 8px; }
+  .ritem .s { color: var(--dim); font-size: 12px; }
+  .ritem .bar { position: absolute; left: 0; bottom: 0; height: 3px; width: 0; background: var(--gold); }
+  .ritem.cur { border-color: var(--gold); background: #4a3a1c; }
+  .ritem.done { opacity: .55; cursor: default; }
+  #researchInfo { color: var(--dim); font-size: 12px; margin-top: 6px; }
   #help { font-size: 12px; color: var(--dim); margin-top: 8px; }
   #help code { color: var(--ink); }
 </style>
@@ -50,6 +56,7 @@
   <div id="side">
     <div class="box"><h2>Task board (player 1)</h2><div id="tasks"></div></div>
     <div class="box"><h2>Log</h2><div id="log"></div></div>
+    <div class="box" style="grid-column: 1 / -1"><h2>Research</h2><div id="research" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:6px"></div><div id="researchInfo"></div></div>
   </div>
   <div id="help">
     <b>How to play:</b> pick <code>Dig</code>, drag over earth/gold to tag it (right-drag untags). Imps dig, mine, claim floor and carry gold home.

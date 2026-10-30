@@ -67,15 +67,21 @@ function start() {
   const cages = new THREE.InstancedMesh(cageGeo, new THREE.MeshBasicMaterial({ color: 0xb8c0d0, wireframe: true }), N);
   const rackGeo = new THREE.BoxGeometry(.8, .14, .5); rackGeo.translate(0, .2, 0);
   const racks = new THREE.InstancedMesh(rackGeo, new THREE.MeshLambertMaterial({ color: 0x3a2018, emissive: 0x401008 }), N);
-  for (const m of [goldBits, gemBits, piles, beds, tags, cages, racks]) { m.frustumCulled = false; scene.add(m); }
+  const shelfGeo = new THREE.BoxGeometry(.9, .85, .16); shelfGeo.translate(0, .425, -.38);
+  const shelves = new THREE.InstancedMesh(shelfGeo, new THREE.MeshLambertMaterial({ color: 0x6a4424 }), N);
+  const bookGeo = new THREE.BoxGeometry(.8, .12, .08); bookGeo.translate(0, .62, -.3);
+  const books = new THREE.InstancedMesh(bookGeo, new THREE.MeshLambertMaterial({ color: 0xc04a4a, emissive: 0x301010 }), N);
+  const deskGeo = new THREE.BoxGeometry(.5, .3, .36); deskGeo.translate(0, .15, .08);
+  const desks = new THREE.InstancedMesh(deskGeo, new THREE.MeshLambertMaterial({ color: 0x8a6a40 }), N);
+  for (const m of [goldBits, gemBits, piles, beds, tags, cages, racks, shelves, books, desks]) { m.frustumCulled = false; scene.add(m); }
 
   const COL = { floor: 0x4a3f33, owned: 0x4b6cc8, hero: 0x8a3a30, earth: 0x7a5636, near: 0xa47c52, rock: 0x2d2b2e, gold: 0x7a5a30, gem: 0x40364a,
-    [T.TREASURY]: 0x9a7e28, [T.LAIR]: 0x5a4a8a, [T.HEART]: 0x9a3030, [T.PORTAL]: 0x6a3a9a, [T.GATE]: 0x8a4a32, [T.PRISON]: 0x56606c, [T.TORTURE]: 0x6a2828 };
+    [T.TREASURY]: 0x9a7e28, [T.LAIR]: 0x5a4a8a, [T.HEART]: 0x9a3030, [T.PORTAL]: 0x6a3a9a, [T.GATE]: 0x8a4a32, [T.PRISON]: 0x56606c, [T.TORTURE]: 0x6a2828, [T.LIBRARY]: 0x3e4c78 };
   const tmpOwned = new THREE.Color(COL.owned);
   const ownedFloor = (x, y) => { const t = G.map[y * W + x]; return !!t && t.owner === 1 && !TERRAIN[t.t].solid; };
 
   function updateTiles() {
-    let nGold = 0, nGem = 0, nPile = 0, nBed = 0, nTag = 0, nCage = 0, nRack = 0;
+    let nGold = 0, nGem = 0, nPile = 0, nBed = 0, nTag = 0, nCage = 0, nRack = 0, nLib = 0;
     const fill = Math.min(1, G.gold / Math.max(1, capacity()));
     for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
       const i = y * W + x, t = G.map[i], tr = TERRAIN[t.t], n = hash(x, y), shade = 0.88 + n * 0.24;
@@ -103,11 +109,12 @@ function start() {
       } else wallMesh.setColorAt(i, col.set(0));
       dummy.rotation.set(0, 0, 0); dummy.position.set(x + .5, 0, y + .5); if (h > 0) dummy.scale.set(1, h, 1); else dummy.scale.set(0, 0, 0); dummy.updateMatrix(); wallMesh.setMatrixAt(i, dummy.matrix);   // no block on open floor
       if (t.t === T.TREASURY && t.owner === 1) { dummy.position.set(x + .5, 0, y + .5); dummy.scale.set(1, 0.12 + fill * 0.55, 1); dummy.rotation.set(0, 0, 0); dummy.updateMatrix(); piles.setMatrixAt(nPile++, dummy.matrix); }
+      if (t.t === T.LIBRARY && t.owner === 1) { dummy.position.set(x + .5, 0, y + .5); dummy.scale.set(1, 1, 1); dummy.rotation.set(0, 0, 0); dummy.updateMatrix(); shelves.setMatrixAt(nLib, dummy.matrix); books.setMatrixAt(nLib, dummy.matrix); desks.setMatrixAt(nLib++, dummy.matrix); }
       if (t.t === T.PRISON && t.owner === 1) { dummy.position.set(x + .5, 0, y + .5); dummy.scale.set(1, 1, 1); dummy.rotation.set(0, 0, 0); dummy.updateMatrix(); cages.setMatrixAt(nCage++, dummy.matrix); }
       if (t.t === T.TORTURE && t.owner === 1) { dummy.position.set(x + .5, 0, y + .5); dummy.scale.set(1, 1, 1); dummy.rotation.set(0, (x + y) % 2 ? 0 : Math.PI / 2, 0); dummy.updateMatrix(); racks.setMatrixAt(nRack++, dummy.matrix); }
       if (t.t === T.LAIR && t.owner === 1) { dummy.position.set(x + .5, 0, y + .5); dummy.scale.set(1, 1, 1); dummy.rotation.set(0, 0, 0); dummy.updateMatrix(); beds.setMatrixAt(nBed++, dummy.matrix); }
     }
-    for (const [m, c] of [[goldBits, nGold], [gemBits, nGem], [piles, nPile], [beds, nBed], [tags, nTag], [cages, nCage], [racks, nRack]]) { m.count = c; m.instanceMatrix.needsUpdate = true; }
+    for (const [m, c] of [[goldBits, nGold], [gemBits, nGem], [piles, nPile], [beds, nBed], [tags, nTag], [cages, nCage], [racks, nRack], [shelves, nLib], [books, nLib], [desks, nLib]]) { m.count = c; m.instanceMatrix.needsUpdate = true; }
     for (const m of [floorMesh, wallMesh]) { m.instanceMatrix.needsUpdate = true; m.instanceColor.needsUpdate = true; }
   }
 
@@ -152,7 +159,7 @@ function start() {
       g.position.set(held ? mouse.fx : u.x, (held ? 1.4 : 0) + bob + (lying ? (u.carriedBy ? .62 : .14) : 0), held ? mouse.fy : u.y); g.rotation.set(0, -(u.face || 0), lying ? Math.PI / 2 : 0);
       g.scale.setScalar(u.state === 'sleep' ? .8 : 1);
       // colour: flash on hit, imps tint when fleeing, ring pulse while working
-      if (d.mat.emissive) d.mat.emissive.set(u.haste > 0 ? 0x2850ff : 0x000000);
+      if (d.mat.emissive) d.mat.emissive.set(u.haste > 0 ? 0x2850ff : u.state === 'research' ? 0x7a5a10 : 0x000000);
       if (u.flash > 0) d.mat.color.set(0xffffff); else if (u.isImp && u.state === 'flee') d.mat.color.set(0xff9060); else d.mat.color.copy(d.base);
       if (u.isImp && u.state === 'work') g.scale.setScalar(1 + Math.sin(G.time * 18) * .08);
       const showBar = u.hp < u.maxHp; d.bar.visible = showBar; if (showBar) { const r = Math.max(0.001, u.hp / u.maxHp); d.bar.userData.fg.scale.x = .5 * r; }

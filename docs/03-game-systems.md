@@ -79,6 +79,8 @@ Prototype spells (`SPELLS`, `castSpell`, `updateMana` in `web/game.js`) follow t
 
 Prototype knock-out/prison/torture (`knockOut`, `dropOff`, `updateJail`, `release` in `web/game.js`) follows OpenKeeper's `Unconscious` component and `RescueCreatureTask` / `CaptureEnemyCreatureTask` / `CarryEnemyCreatureToPrison`. Not modelled: jailbreaks by hero parties, torturers (creatures with the TORTURE job), per-creature `tortureTimeToConvert`, the Graveyard, and prisoners being fed.
 
+Prototype research (`RESEARCH`, `addResearch`, Library desks and the `research` creature state in `web/game.js`) follows OpenKeeper's `ResearchableEntity` states and `task/creature/Research`: study at a desk, `researchPerSecond` points per creature. Not modelled: spell/trap/room research *prerequisites*, research stolen by enemies, Workshop crates, and the Temple.
+
 ## 8. Player verbs (the "hand" & spells) `[src: GameWorldController, PlayerState, KeeperSpellCastValidator]`
 Tag/untag dig · build/sell room · place door/trap · pick up creature/object (`InHand`, `Placeable`) · drop · slap · cast keeper spell (mana cost, research state `UNAVAILABLE/RESEARCHABLE/AVAILABLE`) · possess creature (`PossessedSystem`, mana per second).
 Research states per item type `ROOM, DOOR, TRAP, SPELL, CREATURE`.

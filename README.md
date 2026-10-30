@@ -57,6 +57,13 @@ seams, room building, lair assignment, mood/anger, sleep and payday, free-imp sp
   not picked up within 60 s bleeds out. Prisoners lose health; if one starves a **Skeleton** rises for you. Imps move
   prisoners to a **Torture Chamber** (150g/tile) where, after 30 s, 70 % convert into your creatures (`Ex-Knight` ...) and
   30 % die. Imps still run from live heroes, so capturing only works once you are winning the fight.
+* **Library and research:** Prison, Torture Chamber, Gas Trap, Lightning Trap and the spells Heal, Speed, Lightning and
+  Call to Arms start **locked** (greyed out; build attempts and casts are refused for free). Treasury, Lair, Library,
+  Doors and Create Imp are available from the start. Build a **Library** (120g/tile, one desk per tile): idle creatures
+  with a talent for study sit at desks and add research points (Warlocks 1.6/s, Goblins 0.7, Trolls 0.4, converted Mages
+  1.2). Pick what to study next by clicking an item in the **Research** panel, otherwise the next one is chosen
+  automatically. With 3 desks and a mixed crew the first item arrived at about 200 s and 7 of 8 by about 730 s, so link
+  the tunnel to the Hero Gate only when you are ready. `?unlock=1` unlocks everything for sandbox play.
 * You win by surviving all waves, lose if the Heart (2500 hp) falls.
 
 Numbers marked `VAR` come from OpenKeeper's level variables; combat stats are tuning values.
