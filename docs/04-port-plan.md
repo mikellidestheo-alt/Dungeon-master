@@ -32,7 +32,7 @@
 7. **Scripting** — trigger tree interpreter (conditions × actions), action points, objectives, win/lose.
 8. **Heroes/AI** — hero gate parties, invasion triggers, rival keeper AI.
 9. **BYO-asset loader** — `WadFile`, RefPack decompress, `KwdFile` readers, KMF → glTF converter, texture decoder → PNG. Do this in a Node CLI first (testable against `assets/`), then lift into the page.
-10. **3D renderer** — slab meshes from `complete/side/top` art resources, wall-section selection by neighbour mask, lighting from terrain colours, water/lava planes, fog of war texture, minimap.
+10. **3D renderer** *(started: `web/render3d.js` draws the sim with instanced stand-in meshes, no DK2 art, no fog of war or wall-piece selection yet)* — slab meshes from `complete/side/top` art resources, wall-section selection by neighbour mask, lighting from terrain colours, water/lava planes, fog of war texture, minimap.
 
 ## Suggested module layout (TypeScript)
 ```

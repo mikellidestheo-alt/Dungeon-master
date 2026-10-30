@@ -11,14 +11,19 @@ study of [OpenKeeper](https://github.com/tonihele/OpenKeeper) (a Java re-impleme
 | `docs/02-file-formats.md` | DK2 binary formats as OpenKeeper parses them: WAD (+ RefPack LZ), KWD blocks, tile/terrain/room/creature layouts, balance variables |
 | `docs/03-game-systems.md` | Gameplay rules distilled into a spec (terrain health state machine, tasks, economy, mood, rooms, combat) |
 | `docs/04-port-plan.md` | Stack choices (browser vs Linux-native), legal notes, milestone list, which Java files to read for each milestone |
-| `web/index.html` | **Playable prototype**, single file, no dependencies, no copyrighted assets |
+| `web/index.html`, `web/game.js` | **Playable prototype**: the headless-style simulation plus a 2D canvas view, no copyrighted assets |
+| `web/render3d.js` | **3D view** (three.js, stand-in boxes/cones/cylinders). Only reads the sim state, so art can be swapped later |
+| `web/vendor/` | three.js 0.160.0 (MIT) kept in the repo so nothing loads from a CDN |
 
 ## Run the prototype
 
 ```sh
-python3 -m http.server -d web 8000     # then open http://localhost:8000
-# or just open web/index.html in a browser;  ?seed=123 gives another map
+python3 -m http.server -d web 8000     # then open http://localhost:8000   (?seed=123 gives another map)
+# ?view=2d forces the old flat canvas view. Opening index.html straight from disk (file://) also falls back to 2D,
+# because browsers block ES modules there.
 ```
+
+**3D controls:** `W A S D`/arrows pan, mouse wheel zooms, middle-drag pans. Clicking picks the wall top or floor under the cursor.
 
 Tag earth with **Dig** (left-drag; right-drag untags). Imps dig, mine gold, claim floor and haul gold to a
 **Treasury**. Dig east to the purple portal and claim it; creatures arrive and need a **Lair**, get angry without
