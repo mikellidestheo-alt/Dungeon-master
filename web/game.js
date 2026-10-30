@@ -54,7 +54,7 @@ const G = {
   map: [], time: 0, speed: 1, gold: 1000, imps: [], creatures: [], tasks: new Map(),
   nextImp: 0, nextSpawn: 20, nextPay: VAR.PAY_DAY_FREQUENCY_SECONDS, scanT: 0, log: [],
   portalOwned: false, heart: { x: 6, y: H >> 1 }, portal: { x: W - 8, y: H >> 1 }, gate: { x: 22, y: H - 5 },
-  heroes: [], shots: [], fx: [], doors: [], traps: [], clouds: [], heartHp: VAR.HEART_HEALTH, heartFlash: 0, gateOpen: false, gateT: 0,
+  heroes: [], shots: [], fx: [], doors: [], traps: [], clouds: [], mana: 300, maxMana: 1000, manaRate: 3, spellCd: {}, rally: null, ownedTiles: 0, manaT: 0, heartHp: VAR.HEART_HEALTH, heartFlash: 0, gateOpen: false, gateT: 0,
   wave: 0, nextWave: Infinity, over: null, kills: 0, held: null, nextId: 0,
 };
 const idx = (x, y) => y * W + x;
@@ -177,7 +177,7 @@ class Mover {
   get tx() { return Math.floor(this.x); } get ty() { return Math.floor(this.y); }
   go(path) { this.path = path && path.length ? path.slice() : null; return path !== null; }
   stepMove(dt, mult = 1) {                        // mult: running (fleeing) is faster, Attributes.runSpeed
-    let left = this.speed * dt * mult; this.blocker = null;
+    let left = this.speed * dt * mult * (this.haste > 0 ? 1.6 : 1); this.blocker = null;
     while (this.path && this.path.length && left > 0) {
       const n = this.path[0];
       if (this.team === 'h' && this.state !== 'flee') {       // a closed door stops invaders until it is smashed; keepers walk through
@@ -284,7 +284,7 @@ const KINDS = [
 class Creature extends Mover {                    // CreatureMoodSystem / CreatureSleepSystem: reduced to one lair + payday
   constructor(x, y, kind) { super(x, y, 1.6); Object.assign(this, kind); this.energy = 100 + (rand() * 0 | 0); this.anger = 0; this.lair = null; this.state = 'idle'; this.wait = 1;
     this.id = ++Creature.n; this.energy = 70 + rand() * 30;
-    Object.assign(this, { maxHp: kind.hp, team: 'k', cd: 0, sight: 7, level: 1, xp: 0, rep: 0, dead: false, flash: 0, held: false }); }
+    Object.assign(this, { maxHp: kind.hp, team: 'k', cd: 0, haste: 0, sight: 7, level: 1, xp: 0, rep: 0, dead: false, flash: 0, held: false }); }
   get mood() { return this.anger >= 1600 ? 'angry' : this.anger >= 800 ? 'unhappy' : 'content'; }
   update(dt) {
     if (this.dead || this.held) return;
@@ -297,6 +297,15 @@ class Creature extends Mover {                    // CreatureMoodSystem / Creatu
     if (fightBrain(this, dt)) return;                                     // CreatureState: shouldFleeOrAttack comes first
     if (this.hp < this.maxHp)                                             // own-land regen, much faster asleep in the lair
       this.hp = Math.min(this.maxHp, this.hp + (this.state === 'sleep' ? 8 : VAR.OWN_LAND_HEALTH_INCREASE_PER_SECOND) * dt);
+    if (G.rally && G.time < G.rally.until) {                             // Call to Arms: drop everything and gather at the flag
+      this.rep -= dt;
+      if (dist(this, G.rally) > 1.6) {
+        if (this.state !== 'rally' || !this.path || this.rep <= 0) { this.rep = 1; this.state = 'rally'; this.go(findPath(this.tx, this.ty, Math.floor(G.rally.x), Math.floor(G.rally.y))); }
+        this.stepMove(dt);
+      } else { this.state = 'rally'; this.path = null; }
+      return;
+    }
+    if (this.state === 'rally') { this.state = 'idle'; this.path = null; }
     if (this.state === 'sleep') {
       this.energy = Math.min(100, this.energy + 12 * dt); this.anger = Math.max(0, this.anger + VAR.MODIFY_ANGER_OF_CREATURE_IN_LAIR_PER_SECOND * dt);
       if (this.energy >= 100 && this.hp >= this.maxHp * 0.8) { this.state = 'idle'; this.wait = 1; }
@@ -377,7 +386,7 @@ function startFlee(u) {                           // weak and in danger: run to 
   u.state = 'flee'; u.go(p); return true;
 }
 function fightBrain(u, dt) {                      // true = this unit's turn was consumed by combat
-  u.cd = Math.max(0, u.cd - dt);
+  u.cd = Math.max(0, u.cd - dt * (u.haste > 0 ? 1.6 : 1));          // Speed spell: faster recharge too
   if (u.state === 'flee') {
     if (u.stepMove(dt, 1.5)) { u.state = 'idle'; u.wait = 1;
       if (u.team === 'h') { u.dead = true; u.escaped = true; say('A hero ' + u.name + ' escaped through the Gate.'); } }
@@ -502,6 +511,55 @@ function updateTraps(dt) {
   G.clouds = G.clouds.filter(c => c.life > 0);
 }
 
+/* ===================================================================================== mana & spells
+ * ManaCalculatorLogic: mana flows in from your territory (OpenKeeper adds prayer in the Temple); KeeperSpellCastValidator
+ * checks cost, cooldown and a valid target before PlayerSpellbookSystem lets a spell fire. All five spells start researched. */
+const SPELLS = {
+  lightning: { name: 'Lightning',    icon: '⚡', cost: 120, cd: 4,  r: 1.5, color: '#fff6a0' },
+  heal:      { name: 'Heal',         icon: '✚',  cost: 80,  cd: 3,  r: 3.2, color: '#6fe08a' },
+  haste:     { name: 'Speed',        icon: '»',  cost: 90,  cd: 6,  r: 3.2, color: '#6aa0ff' },
+  rally:     { name: 'Call to Arms', icon: '⚑',  cost: 150, cd: 10, r: 0.8, color: '#ffa040' },
+  imp:       { name: 'Create Imp',   icon: '✦',  cost: 100, cd: 2,  r: 0.5, color: '#ff6a6a' },
+};
+const SPELL_ORDER = ['lightning', 'heal', 'haste', 'rally', 'imp'];
+function updateMana(dt) {
+  G.manaT -= dt; if (G.manaT <= 0) { G.manaT = 1; G.ownedTiles = 0; for (const t of G.map) if (t.owner === 1 && !TERRAIN[t.t].solid) G.ownedTiles++; G.manaRate = 3 + 0.04 * G.ownedTiles; }
+  G.mana = Math.min(G.maxMana, G.mana + G.manaRate * dt);
+  for (const k in G.spellCd) G.spellCd[k] = Math.max(0, G.spellCd[k] - dt);
+}
+const unitsNear = (list, f, r) => list.filter(u => !u.dead && Math.hypot(u.x - f.fx, u.y - f.fy) <= r);
+function ring(f, color, r) { G.fx.push({ x: f.fx, y: f.fy, ring: true, r, color, life: 0.6, max: 0.6 }); }
+function castSpell(id, f) {                      // f = {fx, fy} world position of the click
+  const sp = SPELLS[id], tx = Math.floor(f.fx), ty = Math.floor(f.fy), t = tile(tx, ty);
+  if (G.over || !t) return false;
+  const fail = (m) => { say(m); return false; };
+  if (G.mana < sp.cost) return fail('Not enough mana for ' + sp.name + ' (' + sp.cost + ').');
+  if ((G.spellCd[id] || 0) > 0) return fail(sp.name + ' is recharging.');
+  if (id === 'lightning') {
+    const foes = unitsNear(G.heroes, f, sp.r).sort((a, b) => Math.hypot(a.x - f.fx, a.y - f.fy) - Math.hypot(b.x - f.fx, b.y - f.fy));
+    if (!foes.length) return fail('Lightning needs a hero under the cursor.');
+    const first = foes[0], chain = G.heroes.filter(h => !h.dead && h !== first && dist(h, first) <= 3.5).slice(0, 2);
+    G.fx.push({ x: first.x, y: first.y, bolt: true, life: 0.35 }); first.stun = Math.max(first.stun || 0, 1.2); hurt(first, 70, null);
+    for (const h of chain) { G.fx.push({ x: h.x, y: h.y, bolt: true, life: 0.3 }); h.stun = Math.max(h.stun || 0, 0.6); hurt(h, 35, null); }
+  } else if (id === 'heal') {
+    const us = unitsNear(G.creatures.concat(G.imps), f, sp.r).filter(u => u.hp < u.maxHp);
+    if (!us.length) return fail('Nobody nearby needs healing.');
+    for (const u of us) { u.hp = Math.min(u.maxHp, u.hp + 60); G.fx.push({ x: u.x, y: u.y - 0.4, txt: '+60', life: 0.7, color: '#8fffa0' }); }
+    ring(f, sp.color, sp.r);
+  } else if (id === 'haste') {
+    const us = unitsNear(G.creatures, f, sp.r); if (!us.length) return fail('No creatures in range of Speed.');
+    for (const u of us) u.haste = 12; ring(f, sp.color, sp.r);
+  } else if (id === 'rally') {
+    if (TERRAIN[t.t].solid) return fail('Plant the flag on open floor.');
+    G.rally = { x: f.fx, y: f.fy, until: G.time + 25 }; ring(f, sp.color, 1.6); say('Call to Arms! Your creatures gather at the flag.');
+  } else if (id === 'imp') {
+    if (TERRAIN[t.t].solid || t.owner !== 1) return fail('Imps can only be created on your claimed floor.');
+    if (G.imps.length >= 14) return fail('Too many imps already.');
+    G.imps.push(new Imp(tx, ty)); ring(f, sp.color, 0.8);
+  }
+  G.mana -= sp.cost; G.spellCd[id] = sp.cd; return true;
+}
+
 /* ===================================================================================== player actions */
 function build(roomId, x0, y0, x1, y1) {          // RoomPlacementValidator (reduced): owned, empty, affordable
   const tr = TERRAIN[roomId]; let n = 0, spent = 0;
@@ -535,6 +593,7 @@ function step(dt) {
   }
   G.creatures = G.creatures.filter(c => c.dead ? false : c.update(dt) !== 'leave');
   for (const h of G.heroes) h.update(dt);
+  updateMana(dt); for (const c of G.creatures) if (c.haste > 0) c.haste -= dt;
   updateTraps(dt); updateShots(dt); heroLogic(dt);
   G.heroes = G.heroes.filter(h => !h.dead); G.creatures = G.creatures.filter(c => !c.dead); G.imps = G.imps.filter(i => !i.dead);
   // payday
@@ -590,6 +649,8 @@ function draw() {
   for (const tr of G.traps) { const px = tr.x * TS, py = tr.y * TS; ctx.globalAlpha = tr.charges ? 0.95 : 0.35; ctx.strokeStyle = TRAPS[tr.kind].color; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(px, py, 6, 0, 7); ctx.stroke(); ctx.lineWidth = 1;
     ctx.fillStyle = TRAPS[tr.kind].color; for (let i = 0; i < tr.charges; i++) ctx.fillRect(px - 5 + i * 4, py - 1, 3, 3); ctx.globalAlpha = 1; }
   for (const c of G.clouds) { ctx.fillStyle = `rgba(120,220,70,${0.28 * Math.min(1, c.life)})`; ctx.beginPath(); ctx.arc(c.x * TS, c.y * TS, c.r * TS, 0, 7); ctx.fill(); }
+  if (G.rally && G.time < G.rally.until) { const px = G.rally.x * TS, py = G.rally.y * TS; ctx.strokeStyle = '#ffa040'; ctx.beginPath(); ctx.moveTo(px, py + 6); ctx.lineTo(px, py - 12); ctx.stroke(); ctx.fillStyle = '#ff6a20'; ctx.fillRect(px, py - 12, 9, 6); }
+  for (const f of G.fx) if (f.ring) { const k = 1 - f.life / f.max; ctx.strokeStyle = f.color; ctx.globalAlpha = 1 - k; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(f.x * TS, f.y * TS, f.r * TS * (0.3 + 0.7 * k), 0, 7); ctx.stroke(); ctx.lineWidth = 1; ctx.globalAlpha = 1; }
   for (const f of G.fx) if (f.bolt) { ctx.strokeStyle = '#fff6a0'; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(f.x * TS - 3, f.y * TS - 14); ctx.lineTo(f.x * TS + 3, f.y * TS - 6); ctx.lineTo(f.x * TS - 2, f.y * TS - 2); ctx.lineTo(f.x * TS + 2, f.y * TS + 4); ctx.stroke(); ctx.lineWidth = 1; }
   for (const f of G.fx) if (f.splat) { ctx.fillStyle = `rgba(140,20,20,${Math.min(.5, f.life / 6)})`; ctx.beginPath(); ctx.arc(f.x * TS, f.y * TS, 6, 0, 7); ctx.fill(); }
   for (const i of G.imps) { const [px, py] = scr(i); ctx.fillStyle = i.flash > 0 ? '#fff' : i.state === 'flee' ? '#ff9060' : '#d04040'; ctx.beginPath(); ctx.arc(px, py, 4.2, 0, 7); ctx.fill();
@@ -599,6 +660,7 @@ function draw() {
     bar(px, py, i); }
   for (const c of G.creatures) { const [px, py] = scr(c); ctx.fillStyle = c.flash > 0 ? '#fff' : c.color; ctx.fillRect(px - 5, py - 5, 10, 10);
     if (c.state === 'fight' || c.state === 'flee') { ctx.strokeStyle = c.state === 'flee' ? '#ffb030' : '#ff4040'; ctx.strokeRect(px - 6.5, py - 6.5, 13, 13); }
+    if (c.haste > 0) { ctx.strokeStyle = '#6aa0ff'; ctx.strokeRect(px - 7.5, py - 7.5, 15, 15); }
     for (let l = 1; l < c.level; l++) { ctx.fillStyle = '#ffe070'; ctx.fillRect(px - 5 + (l - 1) * 3, py + 6, 2, 2); }
     bar(px, py, c); ctx.fillStyle = '#000'; ctx.font = 'bold 8px sans-serif'; ctx.textAlign = 'center'; ctx.fillText(c.name[0], px, py + 3);
     if (c.state === 'sleep') { ctx.fillStyle = '#9cf'; ctx.fillText('z', px + 7, py - 5); }
@@ -608,7 +670,7 @@ function draw() {
     ctx.fillStyle = '#000'; ctx.font = 'bold 8px sans-serif'; ctx.textAlign = 'center'; ctx.fillText(h.letter, px, py + 3); bar(px, py, h); }
   for (const s of G.shots) { ctx.fillStyle = s.color; ctx.beginPath(); ctx.arc(s.x * TS, s.y * TS, 2.2, 0, 7); ctx.fill(); }
   ctx.font = 'bold 9px sans-serif'; ctx.textAlign = 'center';
-  for (const f of G.fx) if (!f.splat && !f.bolt) { ctx.globalAlpha = Math.min(1, f.life * 2); ctx.fillStyle = f.color; ctx.fillText(f.txt, f.x * TS, (f.y - (0.7 - f.life) * 0.8) * TS); ctx.globalAlpha = 1; }
+  for (const f of G.fx) if (!f.splat && !f.bolt && !f.ring) { ctx.globalAlpha = Math.min(1, f.life * 2); ctx.fillStyle = f.color; ctx.fillText(f.txt, f.x * TS, (f.y - (0.7 - f.life) * 0.8) * TS); ctx.globalAlpha = 1; }
   { const hp = G.heartHp / VAR.HEART_HEALTH, bx = (G.heart.x - 1) * TS, by = (G.heart.y + 2) * TS + 2;     // Heart health
     ctx.fillStyle = 'rgba(0,0,0,.7)'; ctx.fillRect(bx, by, TS * 3, 4); ctx.fillStyle = hp > .5 ? '#e05050' : '#ff9030'; ctx.fillRect(bx, by, TS * 3 * hp, 4); }
   if (G.over) { ctx.fillStyle = 'rgba(0,0,0,.65)'; ctx.fillRect(0, 0, cv.width, cv.height); ctx.textAlign = 'center';
@@ -617,13 +679,15 @@ function draw() {
   if (mouse.down && tool !== 'hand') {                        // drag preview
     const x0 = Math.min(mouse.sx, mouse.x), x1 = Math.max(mouse.sx, mouse.x), y0 = Math.min(mouse.sy, mouse.y), y1 = Math.max(mouse.sy, mouse.y);
     ctx.fillStyle = mouse.down === 3 ? 'rgba(255,80,80,.25)' : 'rgba(255,230,120,.25)'; ctx.fillRect(x0 * TS, y0 * TS, (x1 - x0 + 1) * TS, (y1 - y0 + 1) * TS);
-  } else if (mouse.x >= 0) { ctx.strokeStyle = '#fff'; ctx.strokeRect(mouse.x * TS + .5, mouse.y * TS + .5, TS - 1, TS - 1); }
+  } else if (mouse.x >= 0 && SPELLS[tool] && mouse.fx !== undefined) { ctx.strokeStyle = SPELLS[tool].color; ctx.setLineDash([4, 3]); ctx.beginPath(); ctx.arc(mouse.fx * TS, mouse.fy * TS, SPELLS[tool].r * TS, 0, 7); ctx.stroke(); ctx.setLineDash([]); }
+  else if (mouse.x >= 0) { ctx.strokeStyle = '#fff'; ctx.strokeRect(mouse.x * TS + .5, mouse.y * TS + .5, TS - 1, TS - 1); }
 }
 
 /* ===================================================================================== UI wiring */
 const $ = (id) => document.getElementById(id);
 const TOOLS = [ ['dig', 'Dig (tag)'], ['hand', '✋ Hand'], ['treasury', 'Treasury ' + TERRAIN[T.TREASURY].cost + 'g/tile'], ['lair', 'Lair ' + TERRAIN[T.LAIR].cost + 'g/tile'],
   ['door', 'Door ' + DOOR.cost + 'g'], ['gas', 'Gas Trap ' + TRAPS.gas.cost + 'g'], ['bolt', 'Lightning ' + TRAPS.bolt.cost + 'g'],
+  ...SPELL_ORDER.map((id, i) => [id, SPELLS[id].icon + ' ' + SPELLS[id].name + ' ' + SPELLS[id].cost + ' [' + (i + 1) + ']']),
   ['sp1', '⏸ Pause'], ['sp2', '1×'], ['sp3', '3×'], ['sp4', '8×'] ];
 for (const [id, label] of TOOLS) { const b = document.createElement('button'); b.textContent = label; b.id = 'b_' + id; b.onclick = () => {
   if (id.startsWith('sp')) { G.speed = [0, 1, 3, 8][+id[2] - 1]; } else tool = id; refreshButtons(); }; $('tools').appendChild(b); }
@@ -637,10 +701,12 @@ function inputUp(p, f) {
   if (!mouse.down) return; const right = mouse.down === 3;
   if (tool === 'hand') { if (!right) handClick(f); }
   else if (tool === 'dig') tagRect(mouse.sx, mouse.sy, p.x, p.y, !right);
+  else if (SPELLS[tool]) { if (!right) castSpell(tool, f); }
   else if (tool === 'door' || tool === 'gas' || tool === 'bolt') { if (right) removeThings(mouse.sx, mouse.sy, p.x, p.y); else placeThings(tool, mouse.sx, mouse.sy, p.x, p.y); }
   else if (!right) build(tool === 'treasury' ? T.TREASURY : T.LAIR, mouse.sx, mouse.sy, p.x, p.y);
   mouse.down = 0;
 }
+addEventListener('keydown', e => { const i = '12345'.indexOf(e.key); if (i >= 0 && e.target.tagName !== 'INPUT') { tool = SPELL_ORDER[i]; refreshButtons(); } });
 cv.addEventListener('contextmenu', e => e.preventDefault());
 cv.addEventListener('pointerdown', e => { inputDown(pos(e), posF(e), e.button); cv.setPointerCapture(e.pointerId); });
 cv.addEventListener('pointermove', e => inputMove(pos(e), posF(e)));
@@ -664,6 +730,8 @@ function renderHud() {
   $('hGold').textContent = Math.floor(G.gold); $('hCap').textContent = capacity(); $('hImps').textContent = G.imps.length;
   $('hCreatures').textContent = G.creatures.length; $('hMax').textContent = VAR.CREATURES_SUPPORTED_BY_FIRST_PORTAL;
   $('hPay').textContent = Math.max(0, Math.ceil(G.nextPay)); $('hTime').textContent = Math.floor(G.time);
+  $('hMana').textContent = Math.floor(G.mana) + '/' + G.maxMana;
+  for (const id of SPELL_ORDER) $('b_' + id).style.opacity = G.mana >= SPELLS[id].cost && !(G.spellCd[id] > 0) ? 1 : 0.45;
   $('hHeart').textContent = Math.ceil(G.heartHp); $('hHeroes').textContent = G.heroes.length; $('hWave').textContent = G.wave + '/' + VAR.WAVES;
   $('hNext').textContent = !G.gateOpen ? 'tunnel to Gate' : G.nextWave === Infinity ? '—' : Math.max(0, Math.ceil(G.nextWave - G.time)) + 's';
   let dig = 0, claim = 0, busy = 0, upkeep = 0; for (const t of G.tasks.values()) { if (t.type === 'DIG') dig++; else if (t.type === 'CLAIM') claim++; else upkeep++; if (t.who.size) busy++; }
@@ -687,4 +755,4 @@ function frame(now) {
 }
 requestAnimationFrame(frame);
 window.__ui = { get mouse() { return mouse; }, get tool() { return tool; }, inputDown, inputMove, inputUp };
-window.__game = { TRAPS, DOOR, placeThings, removeThings, doorAt, trapAt, HERO_LAND, W, H, G, HEROES, KINDS, spawnWave, Creature, Imp, Hero, hurt, los, T, TERRAIN, step, tagRect, build, scanTasks, findPath, capacity, goldReleased, damageTile, perApplication, VAR };
+window.__game = { SPELLS, SPELL_ORDER, castSpell, TRAPS, DOOR, placeThings, removeThings, doorAt, trapAt, HERO_LAND, W, H, G, HEROES, KINDS, spawnWave, Creature, Imp, Hero, hurt, los, T, TERRAIN, step, tagRect, build, scanTasks, findPath, capacity, goldReleased, damageTile, perApplication, VAR };

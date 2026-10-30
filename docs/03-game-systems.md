@@ -75,6 +75,8 @@ worker.execute(): while adjacent/at target, tick executeTask; on isValid()==fals
 
 Prototype doors/traps (`placeThings`, `fireTrap`, `updateTraps` in `web/game.js`): doors block invaders until smashed, traps are hidden, charge-limited and re-armed by imps for gold; OpenKeeper's versions are `DoorsController`/`TrapsController` with `DoorComponent`/`TrapComponent`, manufactured at the Workshop.
 
+Prototype spells (`SPELLS`, `castSpell`, `updateMana` in `web/game.js`) follow the `KeeperSpellCastValidator` pattern: mana cost + cooldown + valid target before anything fires. Not modelled: researching spells in the Library, Temple prayer mana, possession, slap.
+
 ## 8. Player verbs (the "hand" & spells) `[src: GameWorldController, PlayerState, KeeperSpellCastValidator]`
 Tag/untag dig · build/sell room · place door/trap · pick up creature/object (`InHand`, `Placeable`) · drop · slap · cast keeper spell (mana cost, research state `UNAVAILABLE/RESEARCHABLE/AVAILABLE`) · possess creature (`PossessedSystem`, mana per second).
 Research states per item type `ROOM, DOOR, TRAP, SPELL, CREATURE`.

@@ -11,7 +11,7 @@ if (params.get('view') !== '2d') {
 }
 
 function start() {
-  const { G, T, TERRAIN, HERO_LAND, W, H, capacity, VAR, TRAPS } = window.__game, UI = window.__ui;
+  const { G, T, TERRAIN, HERO_LAND, W, H, capacity, VAR, TRAPS, SPELLS } = window.__game, UI = window.__ui;
   const WALL_H = 1.25, ROCK_H = 1.6;
 
   /* ------------------------------------------------------------------ renderer, scene, camera */
@@ -145,6 +145,7 @@ function start() {
       g.position.set(held ? mouse.fx : u.x, (held ? 1.4 : 0) + bob, held ? mouse.fy : u.y); g.rotation.y = -(u.face || 0);
       g.scale.setScalar(u.state === 'sleep' ? .8 : 1);
       // colour: flash on hit, imps tint when fleeing, ring pulse while working
+      if (d.mat.emissive) d.mat.emissive.set(u.haste > 0 ? 0x2850ff : 0x000000);
       if (u.flash > 0) d.mat.color.set(0xffffff); else if (u.isImp && u.state === 'flee') d.mat.color.set(0xff9060); else d.mat.color.copy(d.base);
       if (u.isImp && u.state === 'work') g.scale.setScalar(1 + Math.sin(G.time * 18) * .08);
       const showBar = u.hp < u.maxHp; d.bar.visible = showBar; if (showBar) { const r = Math.max(0.001, u.hp / u.maxHp); d.bar.userData.fg.scale.x = .5 * r; }
@@ -188,7 +189,8 @@ function start() {
   }
 
   /* shots, damage numbers, blood splats (small pools) */
-  const shotPool = [], splatPool = [], numPool = [], boltPool = [], cloudPool = [], numTex = new Map();
+  const shotPool = [], splatPool = [], numPool = [], boltPool = [], cloudPool = [], ringPool = [], numTex = new Map();
+  const ringGeo = new THREE.RingGeometry(.92, 1, 40); ringGeo.rotateX(-Math.PI / 2);
   const boltGeo = new THREE.CylinderGeometry(.05, .05, 3, 6), cloudGeo = new THREE.SphereGeometry(1, 16, 10);
   const shotGeo = new THREE.SphereGeometry(.09, 8, 6), splatGeo = new THREE.CircleGeometry(.3, 14); splatGeo.rotateX(-Math.PI / 2);
   function numberMat(n, color) {
@@ -197,13 +199,15 @@ function start() {
     m = new THREE.SpriteMaterial({ map: new THREE.CanvasTexture(c), transparent: true, depthTest: false }); numTex.set(key, m); return m;
   }
   function syncEffects() {
-    shotPool.forEach(m => m.visible = false); splatPool.forEach(m => m.visible = false); numPool.forEach(m => m.visible = false); boltPool.forEach(m => m.visible = false); cloudPool.forEach(m => m.visible = false);
+    shotPool.forEach(m => m.visible = false); splatPool.forEach(m => m.visible = false); numPool.forEach(m => m.visible = false); boltPool.forEach(m => m.visible = false); cloudPool.forEach(m => m.visible = false); ringPool.forEach(m => m.visible = false);
     G.clouds.forEach((c, i) => { let m = cloudPool[i]; if (!m) { m = new THREE.Mesh(cloudGeo, new THREE.MeshBasicMaterial({ color: 0x78dc46, transparent: true, depthWrite: false })); scene.add(m); cloudPool[i] = m; }
       m.visible = true; m.material.opacity = .28 * Math.min(1, c.life); m.scale.set(c.r, .8 + Math.sin(G.time * 5 + i) * .08, c.r); m.position.set(c.x, .5, c.y); });
     G.shots.forEach((s, i) => { let m = shotPool[i]; if (!m) { m = new THREE.Mesh(shotGeo, new THREE.MeshBasicMaterial({ color: 0xffffff })); scene.add(m); shotPool[i] = m; }
       m.visible = true; m.material.color.set(s.color); m.position.set(s.x, .6, s.y); });
-    let si = 0, ni = 0, bi = 0;
+    let si = 0, ni = 0, bi = 0, ri = 0;
     for (const f of G.fx) {
+      if (f.ring) { let m = ringPool[ri]; if (!m) { m = new THREE.Mesh(ringGeo, new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, side: THREE.DoubleSide, depthWrite: false })); scene.add(m); ringPool[ri] = m; }
+        ri++; const k = 1 - f.life / f.max; m.visible = true; m.material.color.set(f.color); m.material.opacity = 1 - k; m.scale.setScalar(f.r * (0.3 + 0.7 * k)); m.position.set(f.x, .08, f.y); continue; }
       if (f.bolt) { let m = boltPool[bi]; if (!m) { m = new THREE.Mesh(boltGeo, new THREE.MeshBasicMaterial({ color: 0xfff6a0 })); scene.add(m); boltPool[bi] = m; }
         bi++; m.visible = true; m.position.set(f.x, 1.5, f.y); m.scale.set(1 + (Math.random() - .5) * .8, 1, 1 + (Math.random() - .5) * .8); }
       else if (f.splat) { let m = splatPool[si]; if (!m) { m = new THREE.Mesh(splatGeo, new THREE.MeshBasicMaterial({ color: 0x8c1414, transparent: true })); scene.add(m); splatPool[si] = m; }
@@ -213,12 +217,18 @@ function start() {
     }
   }
 
+  /* Call to Arms flag */
+  const flag = new THREE.Group(); const pole = new THREE.Mesh(new THREE.CylinderGeometry(.03, .03, 1.4, 6), new THREE.MeshLambertMaterial({ color: 0xcccccc })); pole.position.y = .7; flag.add(pole);
+  const cloth = new THREE.Mesh(new THREE.PlaneGeometry(.55, .32), new THREE.MeshBasicMaterial({ color: 0xff6a20, side: THREE.DoubleSide })); cloth.position.set(.28, 1.2, 0); flag.add(cloth); flag.visible = false; scene.add(flag);
+
   /* hover / drag-selection highlight */
   const sel = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: .25, depthWrite: false }));
   sel.rotation.x = -Math.PI / 2; sel.renderOrder = 5; scene.add(sel);
   function syncSelection() {
     const m = UI.mouse, tool = UI.tool; sel.visible = m.x >= 0;
+    flag.visible = !!(G.rally && G.time < G.rally.until); if (flag.visible) { flag.position.set(G.rally.x, 0, G.rally.y); cloth.rotation.y = Math.sin(G.time * 4) * .25; }
     if (!sel.visible) return;
+    if (SPELLS[tool] && m.fx !== undefined) { const r = SPELLS[tool].r; sel.scale.set(r * 2, r * 2, 1); sel.position.set(m.fx, .06, m.fy); sel.material.color.set(SPELLS[tool].color); sel.material.opacity = .28; return; }
     let x0 = m.x, x1 = m.x, y0 = m.y, y1 = m.y;
     if (m.down && tool !== 'hand') { x0 = Math.min(m.sx, m.x); x1 = Math.max(m.sx, m.x); y0 = Math.min(m.sy, m.y); y1 = Math.max(m.sy, m.y); }
     sel.scale.set(x1 - x0 + 1, y1 - y0 + 1, 1); sel.position.set((x0 + x1 + 1) / 2, tool === 'dig' ? WALL_H + .05 : .05, (y0 + y1 + 1) / 2);

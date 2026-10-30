@@ -45,6 +45,12 @@ seams, room building, lair assignment, mood/anger, sleep and payday, free-imp sp
   poison cloud) and **Lightning Traps** (200g, burst + stun) are hidden from heroes, fire when stepped on, hold a few
   charges, and imps re-arm them for gold. With the same 8 creatures and 3 lair tiles, one door plus three traps in the
   tunnel to the Hero Gate turned a lost game into a win in my bot test (9 heroes killed, Heart untouched).
+* **Mana and spells** (hotkeys `1`–`5`, click to cast; mana comes from your claimed floor, about 5.7/s at the start,
+  1000 max, and every spell has a cooldown): **⚡ Lightning** (120 – 70 damage to the hero under the cursor, 35 chained to
+  two nearby ones, with a stun), **✚ Heal** (80 – +60 hp to creatures and imps in range), **» Speed** (90 – creatures move
+  and recharge 1.6× faster for 12 s), **⚑ Call to Arms** (150 – creatures drop everything and gather at a flag for 25 s),
+  **✦ Create Imp** (100 – on claimed floor). A failed cast costs nothing. In my bot test the same weak defence that
+  lost without spells won with them (8 heroes killed, no creature lost, mana nearly spent).
 * You win by surviving all waves, lose if the Heart (2500 hp) falls.
 
 Numbers marked `VAR` come from OpenKeeper's level variables; combat stats are tuning values.
