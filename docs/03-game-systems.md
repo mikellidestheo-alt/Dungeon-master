@@ -66,7 +66,7 @@ worker.execute(): while adjacent/at target, tick executeTask; on isValid()==fals
 * Room health: attackable (`ATTACK_ROOM_HEALTH`), convertible by enemy (`CONVERT_ROOM_HEALTH`), repairable.
 * Rooms in DK2 `[dk2]`: Dungeon Heart, Portal, Treasury, Lair, Hatchery, Training Room, Library, Workshop, Guard Room, Barracks, Prison, Torture Chamber, Temple, Graveyard, Casino, Combat Pit, Bridge (wooden id 8 `[src]`/stone).
 
-## 7. Combat `[partly src]`
+## 7. Combat `[partly src]` — prototype: `fightBrain`, `Hero`, `spawnWave` in `web/index.html`
 * Senses (`distanceCanSee`/`Hear`), `Threat`, `fear`; `shouldFleeOrAttack` first in IDLE. `FightStyle` (blitzer/blocker/flanker/support) chooses engagement. Melee: `CreatureMeleeAttack` w/ `MELEE_DAMAGE`, `MELEE_RECHARGE_TIME_SECONDS`.
 * `HealthSystem` applies `Damage` components to `Health`, regenerates on own land (`OWN_LAND_HEALTH_INCREASE_PER_SECOND`), triggers `Death`/`Unconscious`.
 * Unconscious creatures → imps create `Rescue` (own) or `Capture` (enemy) tasks → carried to Lair / Prison.

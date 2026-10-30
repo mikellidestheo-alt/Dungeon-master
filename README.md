@@ -26,8 +26,18 @@ one, and get paid every payday. `window.__game` exposes the sim for testing.
 
 The prototype implements: terrain-health state machine (`damageTile`/`healTile`), per-player task board with
 per-tile tasks and assignee caps, A* with no corner-cutting, imp work/deliver loop, gold-proportional mining, gem
-seams, room building, lair assignment, mood/anger, sleep and payday, free-imp spawning. Numbers marked `VAR` come
-from OpenKeeper's level variables.
+seams, room building, lair assignment, mood/anger, sleep and payday, free-imp spawning, plus **combat and heroes**:
+
+* **Hero Gate** (red-tinted cavern, south): dig a tunnel to it and invasion waves start (5 waves, growing parties of
+  Knights, Archers and Mages that follow a party leader and hunt your Dungeon Heart; ranged heroes shoot).
+* **Fight AI** modelled on `CreatureState.IDLE`'s "flee or attack first": sense (sight + line of sight; keepers also
+  "hear" intruders on their own land) → flee when below 25 % hp → chase until in range → strike on recharge.
+  Imps never fight, they run to the Heart. Heroes that get weak run back to the Gate and escape.
+* Creatures heal on your land, sleep in lairs below 50 % hp, and **level up** from kills.
+* **✋ Hand**: pick up an imp or creature and drop it into the fight.
+* You win by surviving all waves, lose if the Heart (2500 hp) falls.
+
+Numbers marked `VAR` come from OpenKeeper's level variables; combat stats are tuning values.
 
 ## Licensing — read before you ship
 
