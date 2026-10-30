@@ -1,21 +1,22 @@
 /* The campaign: ten chapters, each a plain level object in the format of levels.js (docs/06-levels.md). Every chapter teaches one thing and
  * the difficulty rises through data alone:
  *
- *   #   chapter                 new            waves  hero x  prep  gap   Gates  start unlock
- *   1   The Awakening           dig, mine, claim, build   1     0.5   180   -      1     nothing
- *   2   Creatures of the Dark   the Portal      3      0.70  160   110    1     nothing
- *   3   Mouths to Feed          Hatchery        4      0.75  150   110    1     nothing
- *   4   The Library             research        4      0.80  140   105    1     nothing (you research Gas Trap, Heal)
- *   5   Doors and Snares        doors, traps; Dwarf  5  0.90  125   100    1     Gas and Lightning traps
- *   6   The Dungeon Below       Prison, Torture; Monk  5  1.00  110   100   1     + Prison, Torture Chamber
- *   7   Prayers and Power       Temple, spells; Fairy  6  1.05  100    95   1     + Temple and every spell
- *   8   Two Gates               two entrances; Giant   6  1.10   90    90   2     everything
- *   9   The Siege               Prince, Stone Knight   8  1.25   75    85   2     everything
- *   10  The King's Crusade      the King; three Gates  10 1.40   60    80   3     everything
+ *   #   chapter                 new                    waves  hero x  prep  gap   Gates  start unlock
+ *   1   The Awakening           dig, mine, claim, build   1     0.50   180   110    1     nothing
+ *   2   Creatures of the Dark   the Portal                3     0.70   160   110    1     nothing
+ *   3   Mouths to Feed          Hatchery                  4     0.90   120   110    1     nothing
+ *   4   The Library             research                  4     1.05   100   100    1     nothing (you research Gas Trap, Heal)
+ *   5   Doors and Snares        doors, traps; Dwarf       5     1.05   100   100    1     Gas and Lightning traps
+ *   6   The Dungeon Below       Prison, Torture; Monk     6     1.05   100   100    1     + Prison, Torture Chamber
+ *   7   Prayers and Power       Temple, spells; Fairy     6     1.20    90   100    1     + Temple and every spell
+ *   8   Two Gates               two entrances; Giant      7     1.20    80   100    2     everything
+ *   9   The Siege               Prince, Stone Knight      8     1.20    70   100    2     everything
+ *   10  The King's Crusade      the King; three Gates    10     1.30    60    90    3     everything
  *
  * "hero x" is waves.heroMult, "prep" the seconds from the first linked Gate to wave 1, "gap" the seconds between waves.
  * The maps are text grids (legend in levels.js). Ridges of rock (#) with gaps cut each map into chambers, so every tunnel to a Gate has
- * choke points for doors and traps. tools/test_chapters.js checks that every chapter validates and teaches what the table says.
+ * choke points for doors and traps. tools/test_chapters.js checks that every chapter validates and teaches what the table says;
+ * tools/test_bots.js plays every chapter with scripted players to check that each is winnable but not trivial (docs/06-levels.md, "Balance").
  */
 (function () {
   const L = window.LEVELS, HERO = { K: 'Knight', A: 'Archer', M: 'Mage', T: 'Thief', G: 'Guard', H: 'Monk', P: 'Prince', D: 'Dwarf', N: 'Giant', S: 'Stone Knight', F: 'Fairy', Y: 'King' };
@@ -100,7 +101,7 @@
       '####################################'
     ] },
     start: { gold: 1000, mana: 300, imps: 3, unlock: 'none', research: null, pretag: [], welcome: 'Claim the Portal in the east, then raise an army.' },
-    waves: { prep: 160, interval: 110, scale: 0.06, heroMult: 0.70, plan: W('K A', 'K K A', 'K A A T') },
+    waves: { prep: 160, interval: 110, scale: 0.06, heroMult: 0.7, plan: W('K A', 'K K A', 'K A A T') },
     rules: { heartHp: 2800 },
     objectives: [
       { type: 'portal', text: 'Claim the Portal' },
@@ -148,7 +149,7 @@
       '######################################'
     ] },
     start: { gold: 1000, mana: 300, imps: 3, unlock: 'none', research: null, pretag: [], welcome: 'Hungry creatures are angry creatures. Build a Hatchery.' },
-    waves: { prep: 150, interval: 110, scale: 0.06, heroMult: 0.75, plan: W('K A', 'K A T', 'G K A A', 'K T A G A') },
+    waves: { prep: 120, interval: 110, scale: 0.07, heroMult: 0.9, plan: W('K A', 'K A T', 'G K A A', 'K T A G A') },
     rules: { heartHp: 2800 },
     objectives: [
       { type: 'portal', text: 'Claim the Portal' },
@@ -197,7 +198,7 @@
       '########################################'
     ] },
     start: { gold: 1000, mana: 400, imps: 3, unlock: 'none', research: null, pretag: [], welcome: 'Build a Library, then pick what to study in the Research panel.' },
-    waves: { prep: 140, interval: 105, scale: 0.07, heroMult: 0.80, plan: W('K A M', 'G K A T', 'K M M A T', 'G G K M A T') },
+    waves: { prep: 100, interval: 100, scale: 0.08, heroMult: 1.05, plan: W('K A M T', 'G K A T M', 'K M M A T G', 'G G K M A T A') },
     rules: { heartHp: 2700 },
     objectives: [
       { type: 'portal', text: 'Claim the Portal' },
@@ -250,7 +251,7 @@
       '##########################################'
     ] },
     start: { gold: 1200, mana: 400, imps: 3, unlock: TRAPS, research: null, pretag: [], welcome: 'Doors and traps are ready. The gaps in the rock ridges are your choke points.' },
-    waves: { prep: 125, interval: 100, scale: 0.07, heroMult: 0.90, plan: W('K A T', 'D K A', 'G D K A', 'D D G M A T', 'D G K M A T A') },
+    waves: { prep: 100, interval: 100, scale: 0.09, heroMult: 1.05, plan: W('K A T D', 'D K A T A', 'G D K A M T', 'D D G M A T K', 'D G K M A T A G') },
     rules: { heartHp: 2500 },
     objectives: [
       { type: 'portal', text: 'Claim the Portal' },
@@ -301,7 +302,7 @@
       '############################################'
     ] },
     start: { gold: 1500, mana: 400, imps: 3, unlock: [...TRAPS, 'prison', 'torture'], research: null, pretag: [], welcome: 'The Prison and Torture Chamber are ready. Heroes who fall can be taken alive.' },
-    waves: { prep: 110, interval: 100, scale: 0.08, heroMult: 1.00, plan: W('K H A', 'G K H A T', 'D K H M A', 'G G H K M A T', 'D G K H H M A T') },
+    waves: { prep: 100, interval: 100, scale: 0.09, heroMult: 1.05, plan: W('K H A T', 'G K H A T M', 'D K H M A T G', 'G G H K M A T D', 'D G K H H M A T K', 'G D K H M A T D K') },
     rules: { heartHp: 2500 },
     objectives: [
       { type: 'portal', text: 'Claim the Portal' },
@@ -354,7 +355,7 @@
       '##############################################'
     ] },
     start: { gold: 1500, mana: 500, imps: 3, unlock: [...TRAPS, ...ROOMS, ...SPELLS], research: null, pretag: [], welcome: 'Every spell is ready. Build a Temple to refill your mana.' },
-    waves: { prep: 100, interval: 95, scale: 0.08, heroMult: 1.05, plan: W('K F A', 'G K F M A', 'D K F A T', 'G D F F K M A', 'G G D F K M A T', 'D G K F F M A T A') },
+    waves: { prep: 90, interval: 100, scale: 0.12, heroMult: 1.2, plan: W('K F A T', 'G K F M A D', 'D K F A T G H', 'G D F F K M A T', 'G G D F K M A T H', 'D G K F F M A T A') },
     rules: { heartHp: 2500 },
     objectives: [
       { type: 'portal', text: 'Claim the Portal' },
@@ -383,11 +384,11 @@
       '################################################',
       '#...........#.......................#..........#',
       '#...........#..............hhhhhhh..#..........#',
-      '#...........#..............hhhhhhh..#..........#',
+      '#....gg.....#..............hhhhhhh..#..........#',
       '#...........#...........G..hhhXhhh..#..........#',
       '#...........#..............hhhhhhh..#....##....#',
       '#...........#..gg........g.hhhhhhh..#..........#',
-      '#...........#.......................#..........#',
+      '#...........#.gg....................#..........#',
       '#...........#.......g...##..........#..........#',
       '#...........#...........#...........#..........#',
       '#...........#..................##..............#',
@@ -395,9 +396,9 @@
       '#.ooooooo........##....#.#............._______.#',
       '#.ooooooo..............#.#............._______.#',
       '#.oooHooo...........g..................___P___.#',
-      '#.ooooooo.............g................_______.#',
+      '#.ooooooo.............g....gg.........._______.#',
       '#.ooooooo.............................._______.#',
-      '#.ooooooo...#....gg...................._______.#',
+      '#.ooooooo...#....gg.......g............_______.#',
       '#...........#.............g....................#',
       '#...........#.......................#..........#',
       '#...##......#...........##..........#...##.....#',
@@ -410,7 +411,8 @@
       '################################################'
     ] },
     start: { gold: 2000, mana: 500, imps: 4, unlock: 'all', research: null, pretag: [], welcome: 'Two Hero Gates, north and south. Everything is researched.' },
-    waves: { prep: 90, interval: 90, scale: 0.09, heroMult: 1.10, plan: W('K A N', 'G D F K A', 'N K H M A', 'G N D F K A M', 'N N G H K M A T', 'D G N F K H M A T') },
+    waves: { prep: 80, interval: 100, scale: 0.14, heroMult: 1.2,
+      plan: W('K A N T', 'G D F K A M', 'N K H M A T G', 'G N D F K A M T', 'N N G H K M A T D', 'D G N F K H M A T', 'N G D H F K M A T') },
     rules: { heartHp: 2500 },
     objectives: [
       { type: 'portal', text: 'Claim the Portal' },
@@ -434,7 +436,7 @@
       '##################################################',
       '#...........#...........#.............#..........#',
       '#...........#...........#......hhhhhhh#..........#',
-      '#...........#...........#.G....hhhhhhh#..........#',
+      '#....g......#...........#.G....hhhhhhh#..........#',
       '#...........#......#....#......hhhXhhh#..........#',
       '#...........#..g........#..#...hhhhhhh#..........#',
       '#...........#..................hhhhhhh#..........#',
@@ -443,7 +445,7 @@
       '#...........#.....#...............##..#..........#',
       '#...........#.....#.....#.............#..........#',
       '#...........#...........#.............#..........#',
-      '#.ooooooo...#...........#.....g.......#.._______.#',
+      '#.ooooooo...#...........#.....g....gg.#.._______.#',
       '#.ooooooo.....##........#.............#.._______.#',
       '#.ooooooo...............#................_______.#',
       '#.oooHooo.........g...#.#................___P___.#',
@@ -451,10 +453,10 @@
       '#.ooooooo...............#...##..#........_______.#',
       '#.ooooooo...#...........#...#...#........_______.#',
       '#...........#........g..#........................#',
-      '#...........#...........#.............#..........#',
+      '#...........#...........#.............#.gg.......#',
       '#.......##..#...........#......g......#..g.......#',
       '#...........#...........#.............#..........#',
-      '#...........#hhhhhhh....#.............#..........#',
+      '#..g........#hhhhhhh....#.............#..........#',
       '#...........#hhhhhhh....#..#...g......#.......##.#',
       '#...........#hhhXhhh....#..#..........#..........#',
       '#...........#hhhhhhh....#.G##.........#..........#',
@@ -463,15 +465,15 @@
       '##################################################'
     ] },
     start: { gold: 2000, mana: 600, imps: 4, unlock: 'all', research: null, pretag: [], welcome: 'Eight waves are coming. Two Gates, and the Prince himself.' },
-    waves: { prep: 75, interval: 85, scale: 0.09, heroMult: 1.25,
-      plan: W('K A T', 'G D K H A', 'N K F M A T', 'S G K H M A T', 'P S G D H F M A', 'S N G H F K M A T', 'S S N G D H F M A', 'P S S N G D H F M') },
+    waves: { prep: 70, interval: 100, scale: 0.08, heroMult: 1.2,
+      plan: W('K A T', 'G D K H A', 'N K F M A T', 'S G K H M A T', 'P G D H F M A T', 'N G H F K M A T A', 'S G D H F M A T A', 'P S G D H F M A') },
     rules: { heartHp: 2500 },
     objectives: [
       { type: 'portal', text: 'Claim the Portal' },
       { type: 'creatures', n: 10, text: 'Keep 10 creatures' },
       { type: 'gate', text: 'Tunnel to a Hero Gate' },
       { type: 'survive', text: 'Defeat all 8 waves' },
-      { type: 'kills', n: 24, optional: true, text: 'Slay 24 heroes' },
+      { type: 'kills', n: 20, optional: true, text: 'Slay 20 heroes' },
     ],
     guide: [
       { text: 'Eight waves are coming. Raise a strong army before you open a Gate: nothing starts until you tunnel to one.', tool: 'dig', when: { type: 'portal' } },
@@ -489,22 +491,22 @@
       '#...........#.............#....hhhhhhh..#..........#',
       '#...........#.............#....hhhhhhh..#..........#',
       '#.........G.#.............#....hhhXhhh..#..........#',
-      '#.......gg..#.............#....hhhhhhh..#..........#',
+      '#.......gg..#..........gg.#....hhhhhhh..#..........#',
       '#...........#...#.........#....hhhhhhh..#..........#',
       '#...........#...#.........#.............#..........#',
       '#...........#.................gg........#.....g....#',
-      '#...........#......##.........#.........#..........#',
+      '#.....gg....#......##.........#.........#..........#',
       '#...........#...........................#..........#',
       '#..g........#...........................#....##....#',
       '#...........#.............#........g....#..........#',
       '#.ooooooo...#.............#................_______.#',
       '#.ooooooo.................#..........##...._______.#',
-      '#.ooooooo.................#..........#....._______.#',
+      '#.ooooooo...............gg#..........#....._______.#',
       '#.oooHooo..........g......#....Gg..........___P___.#',
-      '#.ooooooo...............#.#...#............_______.#',
+      '#.ooooooo...............#.#...#.......g...._______.#',
       '#.ooooooo............##...#...#............_______.#',
       '#.ooooooo...#.............#................_______.#',
-      '#...........#...#.........#.............#..........#',
+      '#...........#...#.........#...........g.#..........#',
       '#...........#.............#.............#..........#',
       '#...........#...........................#..........#',
       '#...........#.....##....................#..........#',
@@ -518,15 +520,15 @@
       '####################################################'
     ] },
     start: { gold: 2500, mana: 600, imps: 4, unlock: 'all', research: null, pretag: [], welcome: 'The King is coming. Three Gates, ten waves, and everything researched.' },
-    waves: { prep: 60, interval: 80, scale: 0.10, heroMult: 1.40,
-      plan: W('S K A T', 'G N D H F M A', 'S N G K H F M A T', 'P S G D H F M A T', 'S S N G D H F M A', 'N N S G K H H F M', 'P S S N G D H F M', 'S S N N G D H F M', 'P S S N N G D H F', 'Y P S S N N G D H') },
+    waves: { prep: 60, interval: 90, scale: 0.04, heroMult: 1.3,
+      plan: W('K A T', 'G K H A', 'S K H A M T', 'P G K H A M T', 'S G D H F M A', 'N G K H F M A T', 'P S G H F M A T', 'S G D H F M A T', 'S G D H F M A T', 'Y P S G N H F M A') },
     rules: { heartHp: 2500 },
     objectives: [
       { type: 'portal', text: 'Claim the Portal' },
       { type: 'creatures', n: 12, text: 'Keep 12 creatures' },
       { type: 'gate', text: 'Tunnel to a Hero Gate' },
       { type: 'survive', text: 'Defeat all 10 waves, and the King' },
-      { type: 'kills', n: 40, optional: true, text: 'Slay 40 heroes' },
+      { type: 'kills', n: 22, optional: true, text: 'Slay 22 heroes' },
     ],
     guide: [
       { text: 'This is the last stand. Take your time: no hero moves until you tunnel to a Gate, and once you do the clock runs fast.', tool: 'dig', when: { type: 'portal' } },

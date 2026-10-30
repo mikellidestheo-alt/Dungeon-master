@@ -62,13 +62,13 @@ const IDS = ['tutorial', 'portal', 'hatchery', 'library', 'traps', 'prison', 'te
     console.log('3. the difficulty curve');
     const cur = await page.evaluate((IDS) => IDS.map(id => { const lv = window.__game.LEVEL_TABLE[id], w = lv.waves; return { waves: w.plan.length, mult: w.heroMult, prep: w.prep, gap: w.interval, scale: w.scale, heart: lv.rules.heartHp, gold: lv.start.gold, size: w.plan.reduce((n, p) => n + p.length, 0), maxParty: Math.max(...w.plan.map(p => p.length)) }; }), IDS);
     const up = (k, from = 0) => cur.every((c, i) => i <= from || c[k] >= cur[i - 1][k]), down = (k, from = 0) => cur.every((c, i) => i <= from || c[k] <= cur[i - 1][k]);
-    check('waves per chapter rise: 1, 3, 4, 4, 5, 5, 6, 6, 8, 10', cur.map(c => c.waves).join() === '1,3,4,4,5,5,6,6,8,10', cur.map(c => c.waves).join());
-    check('hero strength only rises: x0.5 ... x1.4', up('mult') && cur[0].mult === 0.5 && cur[9].mult === 1.4, cur.map(c => c.mult).join());
-    check('preparation only shrinks: 180 s down to 60 s', down('prep') && cur[0].prep === 180 && cur[9].prep === 60, cur.map(c => c.prep).join());
-    check('the gap between waves only shrinks: 110 down to 80', down('gap') && cur[0].gap === 110 && cur[9].gap === 80, cur.map(c => c.gap).join());
-    check('extra strength per wave only rises', up('scale'), cur.map(c => c.scale).join());
+    check('waves per chapter rise: 1, 3, 4, 4, 5, 6, 6, 7, 8, 10', cur.map(c => c.waves).join() === '1,3,4,4,5,6,6,7,8,10', cur.map(c => c.waves).join());
+    check('hero strength never falls: x0.5 ... x1.3', up('mult') && cur[0].mult === 0.5 && cur[9].mult === 1.3, cur.map(c => c.mult).join());
+    check('preparation never grows: 180 s down to 60 s', down('prep') && cur[0].prep === 180 && cur[9].prep === 60, cur.map(c => c.prep).join());
+    check('the gap between waves never grows: 110 down to 90', down('gap') && cur[0].gap === 110 && cur[9].gap === 90, cur.map(c => c.gap).join());
+    check('extra strength per wave stays between 0 and 0.15 (it is also used to balance chapters whose waves are heavy early or late)', cur.every(c => c.scale >= 0 && c.scale <= 0.15), cur.map(c => c.scale).join());
     check('the Heart is tougher in the early chapters, never above 3000', cur[0].heart === 3000 && cur.every(c => c.heart <= 3000) && down('heart'), cur.map(c => c.heart).join());
-    check('more heroes overall every chapter (1 in the Tutorial, 80 in the finale at least)', up('size') && cur[0].size === 1 && cur[9].size >= 80, cur.map(c => c.size).join());
+    check('more heroes overall every chapter (1 in the Tutorial, 65 or more in the finale)', up('size') && cur[0].size === 1 && cur[9].size >= 65, cur.map(c => c.size).join());
     check('a party never exceeds the Gate pad (9)', cur.every(c => c.maxParty <= 9), cur.map(c => c.maxParty).join());
     check('you start richer in later chapters', up('gold') && cur[0].gold === 800 && cur[9].gold === 2500, cur.map(c => c.gold).join());
 

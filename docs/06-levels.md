@@ -115,19 +115,19 @@ thing, and the difficulty rises through data alone:
 |---|---|---|---|---|---|---|---|---|---|
 | 1 | `tutorial` | The Awakening | dig, mine, claim, Treasury, Lair, Portal; one weak Knight | 1 | 0.50 | 180 | 110 | 1 | nothing |
 | 2 | `portal` | Creatures of the Dark | the Portal, beds, wages | 3 | 0.70 | 160 | 110 | 1 | nothing |
-| 3 | `hatchery` | Mouths to Feed | hunger, the Hatchery | 4 | 0.75 | 150 | 110 | 1 | nothing |
-| 4 | `library` | The Library | research (you study Gas Trap and Heal) | 4 | 0.80 | 140 | 105 | 1 | nothing |
-| 5 | `traps` | Doors and Snares | doors, traps; **Dwarf** | 5 | 0.90 | 125 | 100 | 1 | Gas, Lightning traps |
-| 6 | `prison` | The Dungeon Below | Prison, Torture Chamber; **Monk** | 5 | 1.00 | 110 | 100 | 1 | + Prison, Torture |
-| 7 | `temple` | Prayers and Power | Temple, spells; **Fairy** | 6 | 1.05 | 100 | 95 | 1 | + Temple, every spell |
-| 8 | `gates` | Two Gates | two entrances; **Giant** | 6 | 1.10 | 90 | 90 | 2 | everything |
-| 9 | `siege` | The Siege | **Prince**, **Stone Knight** | 8 | 1.25 | 75 | 85 | 2 | everything |
-| 10 | `crusade` | The King's Crusade | the **King**; three entrances | 10 | 1.40 | 60 | 80 | 3 | everything |
+| 3 | `hatchery` | Mouths to Feed | hunger, the Hatchery | 4 | 0.90 | 120 | 110 | 1 | nothing |
+| 4 | `library` | The Library | research (you study Gas Trap and Heal) | 4 | 1.05 | 100 | 100 | 1 | nothing |
+| 5 | `traps` | Doors and Snares | doors, traps; **Dwarf** | 5 | 1.05 | 100 | 100 | 1 | Gas, Lightning traps |
+| 6 | `prison` | The Dungeon Below | Prison, Torture Chamber; **Monk** | 6 | 1.05 | 100 | 100 | 1 | + Prison, Torture |
+| 7 | `temple` | Prayers and Power | Temple, spells; **Fairy** | 6 | 1.20 | 90 | 100 | 1 | + Temple, every spell |
+| 8 | `gates` | Two Gates | two entrances; **Giant** | 7 | 1.20 | 80 | 100 | 2 | everything |
+| 9 | `siege` | The Siege | **Prince**, **Stone Knight** | 8 | 1.20 | 70 | 100 | 2 | everything |
+| 10 | `crusade` | The King's Crusade | the **King**; three entrances | 10 | 1.30 | 60 | 90 | 3 | everything |
 
 "hero x" is `waves.heroMult`, "prep" the seconds from the first linked Gate to wave 1, "gap" the seconds between waves. Starting gold rises
-from 800 to 2500 and the extra strength per wave (`waves.scale`) from 0 to 0.10. Chapters 5 onwards also shrink the Heart from 3000 to 2500
-(the Tutorial and chapters 2-3 are more forgiving). Parties never exceed the Gate pad's nine heroes. **Design target** (to be confirmed by
-the bots of step 7): the Tutorial 5-8 minutes, chapters 2-4 10-12, 5-7 12-16, 8-9 16-22, the finale 22-28, about 2.5-3 hours in all.
+from 800 to 2500. `waves.scale` (extra strength per wave) is a balancing dial, 0 to 0.14: it is higher where a chapter's early waves are light.
+The Heart shrinks from 3000 to 2500 by chapter 5. Parties never exceed the Gate pad's nine heroes. **Length targets**: the Tutorial 5-8
+minutes, chapters 2-4 10-12, 5-7 12-16, 8-9 16-22, the finale 22-28, about 2.5-3 hours in all (see "Balance" for how that was checked).
 
 Things every chapter shares:
 
@@ -143,6 +143,54 @@ Things every chapter shares:
 - In chapters 9 and 10 you need only **one** Gate linked to start the clock: link one and fight on a single front, or open more and
   every wave is split between them.
 - `lesson`, `classic` and `tiny` stay in `levels.js` as fixtures and the sandbox's base map; they are not part of the campaign.
+
+## Balance
+
+`node tools/test_bots.js` plays every chapter with scripted players (`tools/bot.js`, which runs inside the game page through the public API
+and never uses randomness) and fails if a chapter is not winnable, is trivial, or runs outside its length target. A whole chapter takes
+a few seconds, so the full matrix (10 chapters x 2 bots x 8 seeds, 160 runs) takes about 80 seconds. `BOT_SEEDS`, `BOT_CHAPTERS=1,5,10`
+and `BOT_JSON=file` narrow or record it. A run is reproducible: the same chapter and seed always give the same result.
+
+- The **steady** bot plays like a sensible newcomer: it tags the nearest gold seams (and mines a gem seam when the seams run dry), digs to
+  the Portal, builds the Treasury, a Lair that grows with the army, a Hatchery (creatures starve without one) and whatever the chapter
+  asks for, studies what the objectives want, keeps four imps alive, digs a tunnel to the Gate but leaves the last tile, lines the
+  approach to the Heart with two doors and up to six traps, and only then opens the Gate. In battle it casts Lightning, Heal and Call to Arms.
+- The **lazy** bot does the least that starts the invasion: a Treasury, a Lair of three, the Portal, and a tunnel to the Gate at once.
+
+Results with 8 seeds each (what the test pins, with margins, is in the file):
+
+| # | chapter | steady bot wins | game time | creatures lost per run | bonus star | lazy bot survives |
+|---|---|---|---|---|---|---|
+| 1 | The Awakening | 8/8 | 5.7 min | 0 | - | 8/8 (it is the Tutorial) |
+| 2 | Creatures of the Dark | 8/8 | 10.4 | 0 | 8/8 | 8/8 |
+| 3 | Mouths to Feed | 8/8 | 11.8 | 0 | 8/8 | 8/8 |
+| 4 | The Library | 8/8 | 11.8 | 0 | 8/8 | 3/8 |
+| 5 | Doors and Snares | 8/8 | 12.4 | 0 | 8/8 | 4/8 |
+| 6 | The Dungeon Below | 8/8 | 13.2 | 3 (they leave) | 7/8 | 0/8 |
+| 7 | Prayers and Power | 8/8 | 13.4 | 0 | 8/8 | 0/8 |
+| 8 | Two Gates | 8/8 | 17.6 | 0.5 | 8/8 | 0/8 |
+| 9 | The Siege | 4/8 | 20.8 | 16 | 2/4 wins | 0/8 |
+| 10 | The King's Crusade | 4/8 | 22.6 | 16 | 3/4 wins | 0/8 |
+
+The bot is a *fast* player, so a first-time human takes longer: its times add up to about 140 minutes, against the 2.5-3 hours aimed for.
+"Not trivial" means the lazy bot never wins a chapter after the first and never survives chapters 6-10, while the finale costs even the
+careful bot about 16 creatures and half its runs. Chapters 1-8 are meant to be cleared cleanly by a prepared player: they teach, and
+the pressure arrives in 9 and 10.
+
+What the bots showed, and what changed because of it:
+
+- The first curve was a cliff: chapters 1-8 untouched, chapter 9 half-lost, chapter 10 hopeless. Total hero health per chapter went
+  75, 699, 1329, 1786, 2743, 3618, 4954, 6698, **13477**, **28984**. The ramp is now smooth: wave counts 1, 3, 4, 4, 5, 6, 6, 7, 8, 10, party
+  sizes 2 to 9, hero strength x0.5 to x1.3, and chapters 4-8 moved up while the finale came down.
+- Gold and imps decide the late chapters, not just heroes. Fifteen creatures cost about 1650 gold a payday, so a bot that only digs one
+  seam at a time went bankrupt by wave 7 and could not re-arm traps. The late maps now have 16-20 gold seams, and a player who lets the
+  imps die loses the traps too (the bot keeps four imps alive for exactly this).
+- **Only about 40% of heroes are ever slain**: weak heroes flee and escape through their Gate. A "slay 24 / 40 heroes" bonus was out of
+  reach; the bonuses are now 20 (chapter 9) and 22 (chapter 10), reached in about half of the wins.
+- The bot's own bugs mattered: its first route search ran through the hero cavern and opened the Gate by accident, and its first
+  defence zone sat on the wrong tunnel. Both were fixed in `bot.js`, not in the chapters.
+- The bot is a yardstick, not a person. It never uses the Hand, rarely levels creatures and does not play the spells cleverly, so a good
+  player should beat it; and results move by a seed or two when anything changes, which is why the thresholds have margins.
 
 ## Chapters, stars and saves
 
