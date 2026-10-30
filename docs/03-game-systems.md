@@ -81,6 +81,8 @@ Prototype knock-out/prison/torture (`knockOut`, `dropOff`, `updateJail`, `releas
 
 Prototype research (`RESEARCH`, `addResearch`, Library desks and the `research` creature state in `web/game.js`) follows OpenKeeper's `ResearchableEntity` states and `task/creature/Research`: study at a desk, `researchPerSecond` points per creature. Not modelled: spell/trap/room research *prerequisites*, research stolen by enemies, Workshop crates, and the Temple.
 
+Prototype hatchery/temple (`Chicken`, `updateHatchery`, the `eat`/`pray` creature states in `web/game.js`): chickens hatch per tile, hungry creatures run `GoToEat` and feed `REASON_NO_FOOD`, temple prayer converts `manaGenPrayer` into mana. Not modelled: creatures dying of hunger, chickens as a spell target, the Temple's sacrifice mechanic, and heroes attacking chickens.
+
 ## 8. Player verbs (the "hand" & spells) `[src: GameWorldController, PlayerState, KeeperSpellCastValidator]`
 Tag/untag dig · build/sell room · place door/trap · pick up creature/object (`InHand`, `Placeable`) · drop · slap · cast keeper spell (mana cost, research state `UNAVAILABLE/RESEARCHABLE/AVAILABLE`) · possess creature (`PossessedSystem`, mana per second).
 Research states per item type `ROOM, DOOR, TRAP, SPELL, CREATURE`.

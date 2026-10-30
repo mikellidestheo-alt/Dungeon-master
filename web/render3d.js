@@ -90,7 +90,7 @@ function start() {
     heart:     { w: 4.2, ay: 0.05 }, portal:   { w: 4.0, ay: -0.04 }, hero_gate: { w: 4.3, ay: -0.02 },
     treasure:  { w: 1.5, ay: 0.30 }, cage:     { w: 1.05, ay: 0.12 }, bookshelf: { w: 1.35, ay: 0.14 },
     bed:       { w: 1.2, ay: 0.45 }, rack:     { w: 1.45, ay: 0.20 }, door:      { w: 1.4, ay: 0.04 },
-    trap_gas:  { w: 1.5, ay: 0.36 }, trap_bolt: { w: 1.5, ay: 0.36 },
+    trap_gas:  { w: 1.5, ay: 0.36 }, trap_bolt: { w: 1.5, ay: 0.36 }, temple: { w: 1.5, ay: 0.3 },       // temple.png is a placeholder (tools/make_temple_placeholder.py)
   };
   /* Sprites are flat quads facing the camera, so the lower part of a tall sprite lies "in front of" the floor tile it stands on and gets
    * clipped by it. This offsets a sprite's depth towards the camera (by `uBias` world units) without moving it on screen. */
@@ -133,16 +133,17 @@ function start() {
 
   // floor tints (multiplied with the grey flagstone texture, so these are deliberately bright)
   const COL = { floor: 0x7a6e60, owned: 0x6a80b8, hero: 0xa04c44, earth: 0x8a6a46, near: 0x8d93a6, rock: 0x4a4a58, gold: 0x9a7a44, gem: 0x5a4a6a,
-    [T.TREASURY]: 0xb09848, [T.LAIR]: 0x7a68a0, [T.HEART]: 0xa04040, [T.PORTAL]: 0x80509a, [T.GATE]: 0xb0a070, [T.PRISON]: 0x7a8490, [T.TORTURE]: 0x8a3c3c, [T.LIBRARY]: 0x5a6aa0 };
+    [T.TREASURY]: 0xb09848, [T.LAIR]: 0x7a68a0, [T.HEART]: 0xa04040, [T.PORTAL]: 0x80509a, [T.GATE]: 0xb0a070, [T.PRISON]: 0x7a8490, [T.TORTURE]: 0x8a3c3c, [T.LIBRARY]: 0x5a6aa0, [T.HATCHERY]: 0x9a8450, [T.TEMPLE]: 0x8a7ab0 };
   const tmpOwned = new THREE.Color(COL.owned);
   const ownedFloor = (x, y) => { const t = G.map[y * W + x]; return !!t && t.owner === 1 && !TERRAIN[t.t].solid; };
-  const tileSprites = { treasure: new Map(), bed: new Map(), bookshelf: new Map(), cage: new Map(), rack: new Map() };
+  const tileSprites = { treasure: new Map(), bed: new Map(), bookshelf: new Map(), cage: new Map(), rack: new Map(), nest: new Map(), altar: new Map() };
+  const SPRITE_OF_KIND = { nest: 'bed', altar: 'temple' };                         // tile-sprite kinds that reuse another picture
 
   function updateTiles() {
     let nGold = 0, nGem = 0, nTag = 0; const used = {}; for (const k in tileSprites) used[k] = new Set();
     const fill = Math.min(1, G.gold / Math.max(1, capacity()));
     const sprite = (kind, i, x, y, k = 1, lift = 0, opacity = 1) => {
-      used[kind].add(i); let s = tileSprites[kind].get(i); if (!s) { s = makeSprite(kind === 'treasure' ? 'treasure' : kind === 'bed' ? 'bed' : kind); tileSprites[kind].set(i, s); }
+      used[kind].add(i); let s = tileSprites[kind].get(i); if (!s) { s = makeSprite(SPRITE_OF_KIND[kind] || kind); tileSprites[kind].set(i, s); }
       placeSprite(s, x + .5, lift, y + .5, k); s.material.opacity = opacity;
     };
     for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
@@ -176,6 +177,8 @@ function start() {
         if (t.t === T.TREASURY && fill > 0.02) sprite('treasure', i, x, y, 0.45 + 0.8 * fill);
         else if (t.t === T.LAIR) sprite('bed', i, x, y);
         else if (t.t === T.LIBRARY) sprite('bookshelf', i, x, y);
+        else if (t.t === T.HATCHERY) sprite('nest', i, x, y, 0.8);
+        else if (t.t === T.TEMPLE) sprite('altar', i, x, y);
         else if (t.t === T.PRISON) sprite('cage', i, x, y, 1, 0, t.occ ? 0.5 : 1);
         else if (t.t === T.TORTURE) sprite('rack', i, x, y, 1, 0, t.occ ? 0.7 : 1);
       }
@@ -192,15 +195,14 @@ function start() {
   /* screen height of each character in tiles-diamond units (a floor tile's diamond is about 1.3 wide). Default 1.2. */
   const USIZE = { imp: .9, goblin: 1.0, goblin_elite: 1.15, troll: 1.45, troll_elite: 1.55, warlock: 1.25, darkelf: 1.3, darkelf_elite: 1.35, bile: 1.5, bile_elite: 1.6,
     vampire: 1.35, vampire_elite: 1.4, salamander: 1.0, salamander_elite: 1.15, spider: .95, skeleton: 1.2, skeleton_knight: 1.3,
-    knight: 1.3, archer: 1.2, mage: 1.3, thief: 1.15, guard: 1.4, monk: 1.05, prince: 1.6 };
+    knight: 1.3, archer: 1.2, mage: 1.3, thief: 1.15, guard: 1.4, monk: 1.05, prince: 1.6, chicken: .55 };
   const { KINDS, HEROES, SKELETON, spriteOf } = window.__game;
-  for (const k of [...KINDS, ...HEROES, SKELETON, { sprite: 'imp' }]) for (const n of [k.sprite, k.elite]) if (n && !TEXS[n]) TEXS[n] = loader.load('assets/sprites/' + n + '.png', t => { t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 4; });
-  const flipped = {};                                                                // mirrored copy of a sprite, built once the image has loaded
-  function flipTex(name) {
-    if (flipped[name]) return flipped[name]; const im = TEXS[name] && TEXS[name].image; if (!im) return null;
-    const c = document.createElement('canvas'); c.width = im.width; c.height = im.height; const g = c.getContext('2d'); g.translate(im.width, 0); g.scale(-1, 1); g.drawImage(im, 0, 0);
-    const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 4; return (flipped[name] = t);
-  }
+  for (const k of [...KINDS, ...HEROES, SKELETON, { sprite: 'imp' }, { sprite: 'chicken' }]) for (const n of [k.sprite, k.elite]) if (n && !TEXS[n]) TEXS[n] = loader.load('assets/sprites/' + n + '.png', t => { t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 4; });
+  /* Animation strips (tools/make_frames.py): assets/anim/<name>.png holds idle(4) walk(6) attack(5) frames side by side; anim.json lists their sizes.
+   * Hand-drawn strips with the same layout drop straight in. Units without a strip fall back to their single pose. */
+  let ANIMS = {}; const ATEX = {};
+  fetch('assets/anim/anim.json').then(r => r.ok ? r.json() : {}).then(j => { ANIMS = j; for (const n in j) ATEX[n] = loader.load('assets/anim/' + n + '.png', t => { t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 4; }); }).catch(() => {});
+  const frameTex = (src) => { const t = src.clone(); t.needsUpdate = true; t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 4; return t; };   // own repeat/offset, shared GPU image
   const unitMeshes = new Map();
   const shadowGeo = new THREE.CircleGeometry(.5, 20); shadowGeo.rotateX(-Math.PI / 2);
   const barBg = new THREE.SpriteMaterial({ color: 0x000000, transparent: true, opacity: .75, depthTest: false });
@@ -219,41 +221,53 @@ function start() {
     const ghost = new THREE.Sprite(gmat); ghost.center.set(0.5, 0); ghost.renderOrder = 6; ghost.visible = false; g.add(ghost);
     const shadow = new THREE.Mesh(shadowGeo, new THREE.MeshBasicMaterial({ color: 0x000000, transparent: true, opacity: .38, depthWrite: false })); shadow.position.y = .015; shadow.renderOrder = 1; g.add(shadow);
     if (u.team === 'h') { const ring = new THREE.Mesh(new THREE.TorusGeometry(.3, .035, 6, 20), new THREE.MeshBasicMaterial({ color: 0x4a90ff })); ring.rotation.x = Math.PI / 2; ring.position.y = .03; g.add(ring); g.userData.ring = ring; }   // heroes carry a blue ring
-    const bar = makeBar(u); g.add(bar); g.userData = Object.assign(g.userData, { spr, ghost, shadow, bar, name, flip: false, fx: 1 });
+    const bar = makeBar(u); g.add(bar); g.userData = Object.assign(g.userData, { spr, ghost, shadow, bar, name, flip: false, fx: 1, phase: Math.random() });
     scene.add(g); return g;
   }
   function syncUnits() {
-    const all = [...G.imps, ...G.creatures, ...G.heroes, ...G.prisoners], seen = new Set(), mouse = UI.mouse, r = screenRight();
+    const all = [...G.imps, ...G.creatures, ...G.heroes, ...G.prisoners, ...G.chickens], seen = new Set(), mouse = UI.mouse, r = screenRight();
     for (const u of all) {
       seen.add(u); let g = unitMeshes.get(u); if (!g) { g = makeUnit(u); unitMeshes.set(u, g); }
       const d = g.userData, held = u.held && mouse.fx !== undefined, name = spriteOf(u) || 'imp';
-      const lying = u.unconscious || u.imprisoned, moving = !!u.path || u.state === 'work';
+      const lying = u.unconscious || u.imprisoned, moving = !!u.path && !lying;
       // which way to face on screen: mirror when walking or fighting towards the left
       const sx = Math.cos(u.face || 0) * r.x + Math.sin(u.face || 0) * r.z; if (sx < -0.25) d.flip = true; else if (sx > 0.25) d.flip = false;
-      const tex = d.flip ? (flipTex(name) || TEXS[name]) : TEXS[name];
-      if (d.spr.material.map !== tex) { d.spr.material.map = tex; d.ghost.material.map = tex; d.spr.material.needsUpdate = true; d.ghost.material.needsUpdate = true; }
-      const im = TEXS[name].image; if (!im) { d.spr.visible = d.ghost.visible = false; continue; }
-      const hgt = (USIZE[name] || 1.2) * (u.state === 'sleep' ? .88 : 1), wid = hgt * im.width / im.height;
-      const hop = moving && !lying ? Math.abs(Math.sin(G.time * 9 + u.x * 3)) * .09 : 0;
-      const lunge = u.cdMax && u.cd > u.cdMax - 0.16 ? 1.1 : 1;                       // a short squash-and-stretch when it strikes
-      const wob = u.isImp && u.state === 'work' ? 1 + Math.sin(G.time * 18) * .07 : 1;
+      // pick a picture source: the animation strip when there is one (and the unit is upright), else the single pose
+      const meta = ANIMS[name], strip = meta && !lying && ATEX[name] && ATEX[name].image ? ATEX[name] : null, srcTex = strip || TEXS[name];
+      if (!srcTex || !srcTex.image) { d.spr.visible = d.ghost.visible = false; continue; }
+      if (d.srcName !== name || d.src !== srcTex) { d.cache = d.cache || new Map(); d.tex = d.cache.get(srcTex) || frameTex(srcTex); d.cache.set(srcTex, d.tex); d.src = srcTex; d.srcName = name; d.spr.material.map = d.tex; d.ghost.material.map = d.tex; d.spr.material.needsUpdate = true; d.ghost.material.needsUpdate = true; }
+      let f = 0, N = 1;
+      if (strip) {
+        N = meta.attack[1]; const ph = d.phase, spd = (u.speed || 1.6) * (u.haste > 0 ? 1.6 : 1);
+        if (u.cdMax && u.cd > u.cdMax - 0.5) f = meta.attack[0] + Math.min(4, Math.floor((u.cdMax - u.cd) / 0.5 * 5));            // the swing starts the moment the blow lands
+        else if (u.isImp && u.state === 'work') f = meta.attack[0] + Math.floor(G.time * 5 + ph) % 5;                              // imps dig with the swing loop
+        else if (moving) f = meta.walk[0] + Math.floor(G.time * spd * 0.9 * 6 + ph * 6) % 6;
+        else f = meta.idle[0] + Math.floor(G.time * (u.state === 'sleep' ? 1.5 : 3.5) + ph * 4) % 4;
+      }
+      d.tex.repeat.x = (d.flip ? -1 : 1) / N; d.tex.offset.x = d.flip ? (f + 1) / N : f / N;
+      const hgt = (USIZE[name] || 1.2) * (u.state === 'sleep' ? .88 : 1);
+      const bw = strip ? meta.bw : srcTex.image.width, bh = strip ? meta.bh : srcTex.image.height, upp = hgt / bh, wid = bw * upp;       // wid = the character's own width on screen
+      const qw = strip ? meta.fw * upp : wid, qh = strip ? meta.fh * upp : hgt;                                                    // the quad is the whole padded frame
+      const hop = !strip && moving ? Math.abs(Math.sin(G.time * 9 + d.phase * 5)) * .09 : 0;                                       // single poses hop instead of striding
+      const lunge = !strip && u.cdMax && u.cd > u.cdMax - 0.16 ? 1.1 : 1;
+      const wob = !strip && u.isImp && u.state === 'work' ? 1 + Math.sin(G.time * 18) * .07 : 1;
       g.position.set(held ? mouse.fx : u.x, held ? 1.4 : 0, held ? mouse.fy : u.y);
-      const sc = lunge * wob; d.spr.scale.set(wid * sc, hgt / sc, 1); d.ghost.scale.copy(d.spr.scale);
+      const sc = lunge * wob; d.spr.scale.set(qw * sc, qh / sc, 1); d.ghost.scale.copy(d.spr.scale);
       if (lying) { d.spr.center.set(0.5, 0.5); d.spr.material.rotation = d.ghost.material.rotation = (d.flip ? -1 : 1) * Math.PI / 2; d.spr.position.y = d.ghost.position.y = (u.carriedBy ? .75 : .22) + wid * .12; }
       else { d.spr.center.set(0.5, 0); d.spr.material.rotation = d.ghost.material.rotation = 0; d.spr.position.y = d.ghost.position.y = hop; }
       d.ghost.center.copy(d.spr.center);
       setBias(d.spr.material, .25 + (lying ? wid * .5 : 0)); setBias(d.ghost.material, .75 + (lying ? wid * .5 : 0));
-      d.spr.visible = d.ghost.visible = true;
+      d.spr.visible = true; d.ghost.visible = !u.isChicken;
       // tint: flash white on hit, orange when an imp flees, blue under Speed, gold while studying, purple for converts, dim while asleep
       const c = d.spr.material.color;
       if (u.flash > 0) c.setScalar(2.4); else if (u.isImp && u.state === 'flee') c.setRGB(1.4, .85, .7);
-      else if (u.haste > 0) c.setRGB(.7, .9, 1.9); else if (u.state === 'research') c.setRGB(1.3, 1.15, .75);
+      else if (u.haste > 0) c.setRGB(.7, .9, 1.9); else if (u.state === 'research' || u.state === 'pray') c.setRGB(1.3, 1.15, .75);
       else if (u.tint) c.setRGB(1.1, .75, 1.35); else if (u.state === 'sleep') c.setRGB(.6, .6, .85); else c.setScalar(1);
       d.shadow.scale.set(Math.max(.5, wid * .75), Math.max(.5, wid * .75) * .85, Math.max(.5, wid * .75)); d.shadow.visible = !lying && !held;
       if (d.ring) { d.ring.position.y = d.spr.position.y * 0 + .03; d.ring.scale.setScalar(Math.max(.7, wid * .75)); d.ring.visible = !lying; }
       d.bar.position.y = lying ? .6 : hgt + .1 + hop; const showBar = u.hp < u.maxHp; d.bar.visible = showBar; if (showBar) d.bar.userData.fg.scale.x = .5 * Math.max(0.001, u.hp / u.maxHp);
     }
-    for (const [u, g] of unitMeshes) if (!seen.has(u)) { scene.remove(g); g.traverse(o => { if (o.isMesh) { if (o.geometry !== shadowGeo) o.geometry.dispose(); o.material.dispose(); } else if (o.isSprite && o.material.dispose && o.material !== barBg && o.material !== barKeeper && o.material !== barHero) o.material.dispose(); }); unitMeshes.delete(u); }
+    for (const [u, g] of unitMeshes) if (!seen.has(u)) { scene.remove(g); if (g.userData.cache) for (const t of g.userData.cache.values()) t.dispose(); g.traverse(o => { if (o.isMesh) { if (o.geometry !== shadowGeo) o.geometry.dispose(); o.material.dispose(); } else if (o.isSprite && o.material.dispose && o.material !== barBg && o.material !== barKeeper && o.material !== barHero) o.material.dispose(); }); unitMeshes.delete(u); }
   }
 
   /* doors & traps: sprites keyed by sim object */

@@ -28,7 +28,7 @@
 3. **Rooms** — placement validator, flood-fill room instances, Treasury → Lair → Hatchery → Training; storage controllers.
 4. **Creatures** — attributes table, needs (sleep/eat/pay), mood counters, portal spawn, experience.
 5. **Combat, doors & traps** — senses, flee/attack decision, melee, unconscious/capture, prison/torture, death/corpses. *(prototype has senses, flee/attack, melee + ranged shots, death, XP, hero parties and waves, knock-out, rescue, capture, prison and torture; jailbreaks and torturer jobs still to do)*
-6. **Player powers** *(prototype has the Hand, mana, five spells, and Library research gating rooms/traps/spells; possession, slap and the Workshop still to do)* — hand pick-up/drop/slap, mana, spell research, possession.
+6. **Player powers** *(prototype has the Hand, mana, five spells, and Library research gating rooms/traps/spells; Temple prayer for mana; possession, slap and the Workshop still to do)* — hand pick-up/drop/slap, mana, spell research, possession.
 7. **Scripting** — trigger tree interpreter (conditions × actions), action points, objectives, win/lose.
 8. **Heroes/AI** — hero gate parties, invasion triggers, rival keeper AI.
 9. **BYO-asset loader** — `WadFile`, RefPack decompress, `KwdFile` readers, KMF → glTF converter, texture decoder → PNG. Do this in a Node CLI first (testable against `assets/`), then lift into the page.
