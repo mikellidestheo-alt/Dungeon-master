@@ -3,7 +3,7 @@
  * Sound and music, all synthesised with WebAudio: no audio files are needed (or shipped).
  *
  *   game.js  --  sfx(id, x, y)  -->  Sound.play(id, tileX, tileY)      one-shot effects, quieter and panned by distance
- *            --  Sound.setMood({tension, boss, over})                   drives the music every frame
+ *            --  Sound.setMood({tension, boss, over})                   drives the music every frame; over = 'victory' | 'defeat' | 'retired'
  *   render3d --  Sound.setListener(...)                                  camera position (3D view only; the 2D view is un-attenuated)
  *
  * Swappable: every effect is a "voice" in `Sound.voices` (a function that schedules oscillators and noise), so you can
@@ -159,6 +159,16 @@
     for (let i = 0; i < 3; i++) timp(k, d, t + 0.5 + i * 0.9, 0.5 - i * 0.12);
   };
 
+  // screens: objectives, the tutorial guide, the briefing card, the end screen, the menus
+  V.objective = (k, d, t, p) => { [587.3, 740, 880].forEach((f, i) => k.tone(d, 'triangle', f * p.pitch, f * p.pitch, t + i * 0.1, 0.4, 0.2, 0.005)); bell(k, d, t + 0.28, 1174.7 * p.pitch, 0.1, 1.0); };      // an objective is done
+  V.guide = (k, d, t, p) => { k.noise(d, t, 0.2, 0.1, { type: 'highpass', f0: 3500, a: 0.05 }); bell(k, d, t + 0.04, 880 * p.pitch, 0.1, 0.7); };                                                      // the next hint appears
+  V.scroll = (k, d, t, p) => { k.noise(d, t, 0.55, 0.22, { f0: 600, f1: 2600, q: 1.2, a: 0.12 }); k.noise(d, t + 0.35, 0.25, 0.12, { type: 'highpass', f0: 4000 }); k.tone(d, 'sine', 110 * p.pitch, 165 * p.pitch, t, 0.7, 0.2, 0.2); };   // a briefing unrolls
+  V.begin = (k, d, t, p) => { timp(k, d, t, 0.5); for (const [f, o] of [[73.4, 0.1], [110, 0.35], [146.8, 0.6]]) k.tone(d, 'sawtooth', f * p.pitch, f * p.pitch, t + o, 0.9, 0.14, 0.12, { lp: 900 }); bell(k, d, t + 0.6, 587.3, 0.1, 1.0); };   // "Begin"
+  V.star = (k, d, t, p) => { ping(k, d, t, 1318.5 * p.pitch, 0.3); k.tone(d, 'sine', 2637 * p.pitch, 2637 * p.pitch, t + 0.02, 0.5, 0.1, 0.003); bell(k, d, t, 659.3 * p.pitch, 0.12, 0.9); };            // one earned star (pitch rises star by star)
+  V.newbest = (k, d, t, p) => { [587.3, 740, 880, 1174.7].forEach((f, i) => { k.tone(d, 'triangle', f, f, t + i * 0.09, 0.4, 0.2, 0.004); k.tone(d, 'sine', f * 2, f * 2, t + i * 0.09, 0.25, 0.06, 0.004); }); for (const f of [880, 1174.7, 1480]) bell(k, d, t + 0.45, f, 0.1, 1.8); };
+  V.retire = (k, d, t, p) => { bell(k, d, t, 146.8, 0.35, 2.8); k.tone(d, 'sawtooth', 73.4, 55, t + 0.2, 2.2, 0.12, 0.5, { lp: 350 }); };                                                                // endless run banked: a quiet low bell, not a defeat
+  V.dice = (k, d, t, p) => { for (let i = 0; i < 6; i++) k.noise(d, t + i * 0.05 + rnd(0, 0.02), 0.03, 0.25, { f0: rnd(900, 2400) * p.pitch, q: 3 }); k.tone(d, 'sine', 300, 200, t + 0.3, 0.08, 0.15); };   // the sandbox's random seed
+
   /* per-voice behaviour: [min seconds between plays, volume, rough length in s, random pitch spread, floor gain when positional] */
   const DEFAULT = [0.05, 0.8, 0.6, 0.08, 0];
   const DEF = {
@@ -171,6 +181,7 @@
     chime: [0.3, 0.7, 2.8, 0.05], cluck: [0.25, 0.6, 0.5, 0.12], squawk: [0.3, 0.7, 0.8, 0.1], imp: [0.15, 0.6, 0.6, 0.2], imp_scream: [0.2, 0.7, 0.5, 0.1], munch: [0.3, 0.7, 0.5],
     portal: [0.5, 0.8, 1.4], convert: [0.5, 0.8, 1.4], research: [1, 0.9, 2.2],
     gong: [0.5, 0.9, 4], horn: [1, 0.9, 2.4], boss_horn: [1, 1, 4], victory: [1, 1, 4], defeat: [1, 1, 5],
+    objective: [0.3, 0.8, 1.4], guide: [0.2, 0.6, 0.8], scroll: [0.5, 0.8, 0.9], begin: [1, 0.9, 1.8], star: [0.1, 0.8, 1, 0], newbest: [1, 0.9, 2.4], retire: [1, 0.9, 3], dice: [0.2, 0.7, 0.4, 0.1],
   };
 
   /* ---------------------------------------------------------------- the score */
@@ -334,7 +345,7 @@
     gainAt(x, y) { if (!L.on) return 1; const d = Math.hypot(x - L.x, y - L.y), g = 1 / (1 + (d / L.ref) * (d / L.ref)); return g < 0.04 ? 0 : g; },
     setMood(m) {
       if (!this.engine) return; this.engine.music.setMood(m);
-      if (m.over && m.over !== this.over) { this.over = m.over; this.play(m.over === 'victory' ? 'victory' : 'defeat'); }
+      if (m.over && m.over !== this.over) { this.over = m.over; this.play(m.over === 'victory' ? 'victory' : m.over === 'retired' ? 'retire' : 'defeat'); }
     },
     stinger(kind) { this.play(kind === 'boss' ? 'boss_horn' : 'horn'); },
     setVolume(v) { this.volume = Math.max(0, Math.min(1, v)); if (this.engine) this.engine.setLevel(this.volume, this.muted); this.save(); },
@@ -389,6 +400,6 @@
   hud.refresh();
   const first = () => { Sound.unlock(); removeEventListener('pointerdown', first); removeEventListener('keydown', first); };
   addEventListener('pointerdown', first); addEventListener('keydown', first);
-  document.addEventListener('click', e => { if (e.target.closest && e.target.closest('button') && e.target.id !== 'bMute') Sound.play('click'); });
+  document.addEventListener('click', e => { if (e.target.closest && e.target.closest('button') && e.target.id !== 'bMute' && !e.target.closest('[aria-disabled="true"]')) Sound.play('click'); });
   addEventListener('keydown', e => { if (e.key.toLowerCase() === 'm' && e.target.tagName !== 'INPUT' && !e.ctrlKey && !e.metaKey && !e.altKey) Sound.toggleMute(); });
 })();

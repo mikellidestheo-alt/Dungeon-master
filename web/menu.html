@@ -51,9 +51,21 @@
   .sbx { display: inline-block; margin-top: 4px; padding: 9px 22px; font: 600 14px var(--head); letter-spacing: .08em; color: #e9d6a6; text-decoration: none; background: linear-gradient(180deg, #3b2e20, #221911); border: 1px solid var(--bronze); border-radius: 3px; box-shadow: inset 0 1px 0 #ffffff1c, 0 1px 3px #000b; }
   .sbx:hover { border-color: var(--gold); color: #fff3cf; } .sbx:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
   @media (prefers-reduced-motion: no-preference) { .chap { transition: border-color .12s, box-shadow .12s; } }
+  /* sound controls (audio.js fills them in), fixed in the corner */
+  #audioCtl { position: fixed; right: 12px; bottom: 10px; display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 4px 10px; max-width: 520px; padding: 6px 10px; font: 600 11px var(--head); letter-spacing: .06em; color: var(--dim);
+    background: #120d09cc; border: 1px solid #3a2b15; border-radius: 3px; }
+  #audioCtl button { padding: 0 8px; line-height: 1.7; font-size: 14px; cursor: pointer; color: #e9d6a6; background: linear-gradient(180deg, #3b2e20, #221911); border: 1px solid var(--bronze); border-radius: 3px; }
+  #audioCtl button.on { border-color: #ffd36b; } #audioCtl label { display: flex; align-items: center; gap: 6px; } #audioCtl input[type=range] { width: 76px; }
+  #audioHint { font: italic 400 13px var(--prose); letter-spacing: 0; color: var(--dim); }
+  #audioCtl input[type=range] { -webkit-appearance: none; appearance: none; height: 16px; margin: 0; background: transparent; cursor: pointer; }
+  #audioCtl input[type=range]::-webkit-slider-runnable-track { height: 5px; border-radius: 3px; border: 1px solid #5a4424; background: linear-gradient(#0b0805, #2a2016); }
+  #audioCtl input[type=range]::-moz-range-track { height: 5px; border-radius: 3px; border: 1px solid #5a4424; background: linear-gradient(#0b0805, #2a2016); }
+  #audioCtl input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; width: 12px; height: 12px; margin-top: -5px; border: 1px solid #2a1a05; border-radius: 2px; transform: rotate(45deg); background: radial-gradient(circle at 35% 30%, #ffeab0, #c98d22 60%, #6d4a0e); }
+  #audioCtl input[type=range]::-moz-range-thumb { width: 10px; height: 10px; border: 1px solid #2a1a05; border-radius: 2px; transform: rotate(45deg); background: radial-gradient(circle at 35% 30%, #ffeab0, #c98d22 60%, #6d4a0e); }
 </style>
 </head>
 <body>
+<div id="audioCtl"><button id="bMute" title="Mute / unmute (M)" aria-label="Mute">🔇</button><input id="vol" type="range" min="0" max="100" value="70" aria-label="Master volume" title="Master volume"><label>Music <input id="musVol" type="range" min="0" max="100" value="100" aria-label="Music volume" title="Music volume"></label><label>Effects <input id="sfxVol" type="range" min="0" max="100" value="100" aria-label="Effects volume" title="Effects volume"></label><small id="audioHint">click anywhere to start sound</small></div>
 <main>
   <h1>Dungeon Master</h1>
   <div class="sub">Choose your chapter, Keeper</div>
@@ -65,6 +77,7 @@
   <div class="foot"><a class="sbx" id="sandbox" href="sandbox.html">Sandbox &amp; Endless Mode ▸</a></div>
   <div class="foot" style="margin-top:8px">Progress is saved in this browser. <button class="link" id="reset">Erase saved progress</button></div>
 </main>
+<script src="audio.js"></script>
 <script src="levels.js"></script>
 <script src="chapters.js"></script>
 <script src="progress.js"></script>
@@ -86,7 +99,7 @@
       b.className = 'chap' + (ok ? '' : ' locked') + (id === sel ? ' sel' : ''); b.dataset.id = id; b.setAttribute('aria-disabled', ok ? 'false' : 'true');
       b.innerHTML = '<span class="no">' + (roman[i] || i + 1) + '</span><span class="nm"></span><span class="tg"></span>' + (ok ? stars(rec ? rec.stars : 0) : '<span class="st" title="Win the previous chapter">🔒</span>');
       b.querySelector('.nm').textContent = lv.name; b.querySelector('.tg').textContent = ok ? (lv.tagline || '') : 'Locked: win the previous chapter';
-      b.onclick = () => { if (ok) { sel = id; render(); } };
+      b.onclick = () => { if (ok) { sel = id; render(); } else if (window.Sound) Sound.play('deny'); };
       li.appendChild(b); $('list').appendChild(li);
     });
     const lv = window.LEVELS[sel], rec = Progress.level(sel), idx = order.indexOf(sel);

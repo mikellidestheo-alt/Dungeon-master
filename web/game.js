@@ -711,12 +711,14 @@ const objText = (o) => o.text || COND[o.type].label(o);
 function updateObjectives() {
   OBJECTIVES.forEach((o, i) => {
     if (G.objDone[i]) return; const st = G.objProg[i] = condState(o);
-    if (st.done) { G.objDone[i] = true; if (!o.quiet) { say('✔ ' + objText(o)); sfx('levelup'); } }
+    if (st.done) { G.objDone[i] = true; if (!o.quiet) { say('✔ ' + objText(o)); sfx('objective'); } }
   });
   if (!G.over && !WV.endless && OBJECTIVES.every((o, i) => o.optional || G.objDone[i])) {
     say(LV.victory || (VAR.WAVES ? 'All invaders are defeated — the dungeon is yours!' : 'Well done, Keeper — the dungeon is yours!')); finishGame('victory');
   }
+  const was = G.guideStep;
   while (G.guideStep < GUIDE.length && GUIDE[G.guideStep].when && condState(GUIDE[G.guideStep].when).done) G.guideStep++;     // steps with a condition move on by themselves
+  if (G.guideStep > was && G.guideStep < GUIDE.length && !G.over) sfx('guide');                                                // a new hint appeared
 }
 /* The end of a run: freezes the result, judges the stars, and saves it (progress.js). `?nosave=1` skips saving (bots, experiments). */
 const SB = LV.sandbox || null;                       // the sandbox's options ({ diff, endless }) when this is the generated sandbox level
@@ -1195,7 +1197,7 @@ function renderObjectives() {
 function renderGuide() {
   const g = guideNow(), show = !!g && !G.guideHidden && !G.over, el = $('guide');
   const html = show ? g.text + (g.when ? '' : ' <button id="guideNext">Got it</button>') : '';
-  if (html !== guideHtml) { guideHtml = html; $('guideText').innerHTML = html; const nb = $('guideNext'); if (nb) nb.onclick = () => { G.guideStep++; }; }
+  if (html !== guideHtml) { guideHtml = html; $('guideText').innerHTML = html; const nb = $('guideNext'); if (nb) nb.onclick = () => { G.guideStep++; if (G.guideStep < GUIDE.length) sfx('guide'); }; }
   el.style.display = show ? 'flex' : 'none';
   const tl = show && g.tool ? g.tool : null;                                  // pulse the tool button the step talks about
   if (tl !== guideTool) { if (guideTool && $('b_' + guideTool)) $('b_' + guideTool).classList.remove('hint'); if (tl && $('b_' + tl)) $('b_' + tl).classList.add('hint'); guideTool = tl; }
@@ -1218,6 +1220,9 @@ function renderEnd() {
   $('endRetry').onclick = () => { const p = new URLSearchParams(location.search); p.set('brief', '1'); location.href = 'index.html?' + p; };            // same level, same options, same seed
   $('endMenu').textContent = SB ? 'Sandbox' : 'Chapters'; $('endMenu').onclick = () => { location.href = SB ? 'sandbox.html' : 'menu.html'; };
   $('endscreen').style.display = 'flex'; (win && nextId ? $('endNext') : $('endRetry')).focus();
+  const earned = win && r.starList ? r.starList.filter(x => x.ok).length : 0;                          // the stars ring in one by one once the fanfare has played, then "new best"
+  for (let i = 0; i < earned; i++) setTimeout(() => sfx('star', undefined, undefined, { pitch: [1, 1.26, 1.5][i] }), 1500 + i * 450);
+  if (rec && rec.newBest) setTimeout(() => sfx('newbest'), 1500 + earned * 450 + 250);
 }
 $('bRetire').style.display = WV.endless ? '' : 'none';
 $('bRetire').onclick = () => { if (!G.over && confirm('Retire now and bank ' + wavesSurvived() + ' waves?')) finishGame('retired'); };
@@ -1227,8 +1232,8 @@ function showBriefing(onBegin) {                          // the chapter screen:
   const el = $('briefing'), was = G.speed || 1; G.speed = 0; refreshButtons();
   $('briefTitle').textContent = LV.name || LV.id; $('briefText').textContent = LV.briefing || LV.start.welcome || '';
   $('briefGoals').innerHTML = WV.endless ? '<li>Survive as many waves as you can</li><li>A boss leads every 5th wave</li>' : OBJECTIVES.map(o => '<li>' + objText(o) + (o.optional ? ' <i>(bonus)</i>' : '') + '</li>').join('');
-  el.style.display = 'flex';
-  $('briefGo').onclick = () => { el.style.display = 'none'; G.speed = was; refreshButtons(); if (onBegin) onBegin(); };
+  el.style.display = 'flex'; sfx('scroll');
+  $('briefGo').onclick = () => { el.style.display = 'none'; G.speed = was; refreshButtons(); sfx('begin'); if (onBegin) onBegin(); };
 }
 
 function applyStart() {                                                              // what the level hands you at the start
@@ -1253,7 +1258,8 @@ function audioMood() {
     tension = 0.4 + 0.2 * Math.min(1, live.length / 6) + 0.4 * (1 - Math.min(1, Math.max(0, (near - 4) / 28)));
     if (live.some(h => h.boss)) { boss = 1; tension = Math.max(tension, 0.8); }
   } else if (G.gateOpen && G.wave < VAR.WAVES && G.nextWave - G.time < 12) tension = 0.25;
-  return { tension, boss, over: G.over };
+  if (G.over) { tension = 0; boss = 0; }                                       // the run is over: the music settles into the drone under the end screen
+  return { tension, boss, over: G.over === 'defeat' && G.result && G.result.outcome === 'retired' ? 'retired' : G.over };
 }
 let last = performance.now(), acc = 0; const DT = 1 / 20;           // ticksPerSec analogue
 let lastFrame = performance.now(); const DT_FRAME = (now) => { const d = Math.min(0.1, (now - lastFrame) / 1000); lastFrame = now; return d; };

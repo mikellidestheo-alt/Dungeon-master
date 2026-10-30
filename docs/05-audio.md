@@ -63,6 +63,23 @@ audio.js   voices (V)  ->  per-play gain + stereo pan  ->  sfx bus ----+
 | `gong` | the tunnel reaches the Hero Gate |
 | `horn` / `boss_horn` | a hero wave / the boss wave (stingers, also `Sound.stinger`) |
 | `victory` / `defeat` | game over (fired from `setMood`) |
+| `retire` | you retire an endless run: a single low bell instead of the defeat sting (`setMood` sees `over = 'retired'`) |
+| `objective` | an objective is completed (its own chime; the creature `levelup` is no longer reused) |
+| `guide` | the tutorial guide moves to a new hint |
+| `scroll` / `begin` | the briefing card unrolls / you press Begin |
+| `star` / `newbest` | on the end screen, once the fanfare has played: one `star` per star earned (pitch ×1, ×1.26, ×1.5, 450 ms apart), then the `newbest` flourish for a first victory or a new best |
+| `dice` | the sandbox's random-seed button |
+
+## The menus
+
+`menu.html` and `sandbox.html` load the same module and show the same speaker button and three sliders in the bottom-right corner, so
+volume, mute and `?sound=0` behave as in the game, and the settings are shared through `dm.audio`. Sound starts on the first click.
+The ambient score plays under the menus (drone, pads, sparse bells, tension 0). A locked chapter plays `deny` instead of `click`
+(the global button click skips `aria-disabled` buttons); the sandbox sliders tick with `tag`, rising in pitch as the slider moves, and the
+dice rattles. The game page opened from a menu has no click yet, so the briefing's `scroll` is counted but silent until your first click
+(browsers refuse audio before a gesture).
+
+When a run is over the music settles: `audioMood()` reports tension 0 under the end screen, so the score drops back to the drone.
 
 ## Music
 

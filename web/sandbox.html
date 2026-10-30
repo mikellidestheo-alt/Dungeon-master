@@ -45,9 +45,16 @@
   #best tr.cur td { color: #fff3cf; }
   .go { display: block; width: 100%; padding: 12px; cursor: pointer; font: 600 17px var(--head); letter-spacing: .1em; color: #f6e6b8; background: linear-gradient(180deg, #98661c, #55380e); border: 1px solid #2a1a05; border-radius: 3px; text-shadow: 0 1px 0 #000; box-shadow: inset 0 1px 0 #ffffff33, inset 0 -2px 0 #0008, 0 1px 3px #000c; }
   .go:hover { color: #fff; box-shadow: inset 0 1px 0 #ffffff33, inset 0 -2px 0 #0008, 0 0 12px #f2c14ecc; }
+  /* sound controls (audio.js fills them in), fixed in the corner */
+  #audioCtl { position: fixed; right: 12px; bottom: 10px; display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 4px 10px; max-width: 520px; padding: 6px 10px; font: 600 11px var(--head); letter-spacing: .06em; color: var(--dim);
+    background: #120d09cc; border: 1px solid #3a2b15; border-radius: 3px; }
+  #audioCtl button { padding: 0 8px; line-height: 1.7; font-size: 14px; cursor: pointer; color: #e9d6a6; background: linear-gradient(180deg, #3b2e20, #221911); border: 1px solid var(--bronze); border-radius: 3px; }
+  #audioCtl button.on { border-color: #ffd36b; } #audioCtl label { display: flex; align-items: center; gap: 6px; } #audioCtl input[type=range] { width: 76px; }
+  #audioHint { font: italic 400 13px var(--prose); letter-spacing: 0; color: var(--dim); }
 </style>
 </head>
 <body>
+<div id="audioCtl"><button id="bMute" title="Mute / unmute (M)" aria-label="Mute">🔇</button><input id="vol" type="range" min="0" max="100" value="70" aria-label="Master volume" title="Master volume"><label>Music <input id="musVol" type="range" min="0" max="100" value="100" aria-label="Music volume" title="Music volume"></label><label>Effects <input id="sfxVol" type="range" min="0" max="100" value="100" aria-label="Effects volume" title="Effects volume"></label><small id="audioHint">click anywhere to start sound</small></div>
 <main>
   <a class="back" href="menu.html">← Chapters</a>
   <h1>Sandbox</h1>
@@ -73,6 +80,7 @@
     </div>
   </div>
 </main>
+<script src="audio.js"></script>
 <script src="levels.js"></script>
 <script src="progress.js"></script>
 <script>
@@ -83,14 +91,14 @@
   try { Object.assign(st, JSON.parse(localStorage.getItem(STORE)) || {}); } catch (e) { /* storage blocked: defaults */ }
   const clamp = (v, k) => Math.max(L[k][0], Math.min(L[k][1], Number.isFinite(+v) ? Math.round(+v) : L[k][2]));
   const fmt = (s) => Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0');
-  for (const k of ['waves', 'gold', 'mana']) { const el = $(k); el.min = L[k][0]; el.max = L[k][1]; el.oninput = () => { st[k] = +el.value; render(); }; }
+  for (const k of ['waves', 'gold', 'mana']) { const el = $(k); el.min = L[k][0]; el.max = L[k][1]; el.oninput = () => { st[k] = +el.value; render(); if (window.Sound) Sound.play('tag', undefined, undefined, { pitch: 0.8 + 0.5 * (el.value - L[k][0]) / (L[k][1] - L[k][0]) }); }; }      /* a tick that rises with the slider */
   const dEl = $('diff'); for (const id in D) { const b = document.createElement('button'); b.className = 'opt'; b.dataset.v = id; b.innerHTML = D[id].name + '<small>×' + D[id].heroMult + ' heroes</small>'; b.onclick = () => { st.diff = id; render(); }; dEl.appendChild(b); }
   for (const b of $('mode').children) b.onclick = () => { st.mode = b.dataset.v; render(); };
   for (const b of $('gates').children) b.onclick = () => { st.gates = +b.dataset.v; render(); };
   $('unlocks').onchange = () => { st.unlocks = $('unlocks').checked; render(); };
   $('seed').oninput = () => { st.seed = clamp2($('seed').value); render(true); };
   const clamp2 = (v) => Math.max(0, Math.min(999999, Number.isFinite(parseInt(v, 10)) ? parseInt(v, 10) : 7));
-  $('dice').onclick = () => { st.seed = Math.floor(Math.random() * 1000000); render(); };
+  $('dice').onclick = () => { st.seed = Math.floor(Math.random() * 1000000); render(); if (window.Sound) Sound.play('dice'); };
 
   function params() {
     const p = new URLSearchParams(); p.set('level', 'sandbox'); p.set('diff', st.diff); p.set('gold', st.gold); p.set('mana', st.mana); p.set('unlocks', st.unlocks ? 'all' : 'none'); p.set('seed', st.seed);

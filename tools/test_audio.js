@@ -185,7 +185,77 @@ const sleep = (ms) => new Promise(r => setTimeout(r, ms));
     check('event -> convert', !!more.req.convert); check('event -> gong (tunnel reaches the Hero Gate)', more.open && !!more.req.gong);
     const over = await page.evaluate(() => { const G = __game.G; G.over = 'defeat'; Sound.setMood(__game.audioMood()); G.over = 'victory'; Sound.setMood(__game.audioMood()); return { ...Sound.stats.requested }; });
     check('game over triggers the defeat stinger', !!over.defeat);
-    const notYet = await page.evaluate((ids) => Object.keys(Sound.voices).filter(id => !ids.includes(id)), Object.keys({ ...req, ...more.req, ...over }));
+    await page.context().close();
+
+    /* the new screens: briefing, guide, objectives, the end screen with its stars, retiring, the menus */
+    const heard = {};                                                                  // every voice id the screens asked for, from all pages below
+    const note = (r) => { for (const k in r) heard[k] = (heard[k] || 0) + r[k]; };
+    const spy = (pg) => pg.evaluate(() => { window.__heard = []; const E = Sound.engine, orig = E.play.bind(E); E.play = (id, x, y, o) => { window.__heard.push([id, o && o.pitch]); return orig(id, x, y, o); }; });
+    const clickAway = async (pg) => { await pg.mouse.click(300, 600); await sleep(300); await spy(pg); };
+    page = await open('index.html?level=lesson&view=2d&brief=1');                     // the render loop runs (it draws the hints); the simulation is stepped by hand
+    await clickAway(page);
+    await page.click('#briefGo'); await page.evaluate(() => { __game.G.speed = 0; }); await sleep(300);
+    const flow = await page.evaluate(async () => {
+      const g = __game, G = g.G, run = (until) => { for (let s = 0; s < 400 && !G.over; s += 0.05) { g.step(0.05); if (until()) return; } };
+      document.getElementById('guideNext').click();                                    // "Got it": the first hint
+      g.tagRect(9, 5, 12, 5, true); run(() => G.stats.dug >= 4); g.tagRect(13, 5, 13, 5, true); run(() => G.stats.dug >= 5 && G.stats.claimed >= 3);
+      g.build(g.T.TREASURY, 2, 3, 3, 3); g.build(g.T.LAIR, 2, 7, 3, 7); run(() => G.over === 'victory');
+      Sound.setMood(g.audioMood()); g.renderEnd();                                      // the loop is frozen: do by hand what a frame does
+      await new Promise(r => setTimeout(r, 3800));                                      // the stars ring in, then "new best"
+      return { over: G.over, heard: window.__heard.slice(), requested: { ...Sound.stats.requested }, played: { ...Sound.stats.played } };
+    });
+    const ids = flow.heard.map(h => h[0]);
+    note(flow.requested);
+    check('the briefing card unrolls (scroll) and Begin sounds (begin)', flow.requested.scroll >= 1 && flow.requested.begin >= 1, 'scroll ' + flow.requested.scroll + ', begin ' + flow.requested.begin);
+    check('hints chime when they change (guide)', ids.filter(i => i === 'guide').length >= 3, ids.filter(i => i === 'guide').length + ' chimes');
+    check('each finished objective has its own sound (objective ×5), not the creature level-up', ids.filter(i => i === 'objective').length === 5 && !ids.includes('levelup'), ids.filter(i => i === 'objective').length + '');
+    check('victory fanfare, then three stars rising in pitch, then the new-best flourish', (() => { const v = ids.indexOf('victory'), st = ids.map((x, i) => x === 'star' ? i : -1).filter(i => i >= 0), nb = ids.indexOf('newbest'); return v >= 0 && st.length === 3 && st[0] > v && nb > st[2]; })(), ids.filter(i => ['victory', 'star', 'newbest'].includes(i)).join(' '));
+    check('star pitches are 1, 1.26, 1.5 (a rising major arpeggio)', JSON.stringify(flow.heard.filter(h => h[0] === 'star').map(h => h[1])) === '[1,1.26,1.5]', JSON.stringify(flow.heard.filter(h => h[0] === 'star').map(h => h[1])));
+    check('the stars and the flourish really played (not only requested)', flow.played.star === 3 && flow.played.newbest === 1 && flow.played.objective >= 1, JSON.stringify([flow.played.star, flow.played.newbest, flow.played.objective]));      // the 5 objectives fall in one real second here, so the 0.3 s rate limit lets one through
+    check('no defeat sting on a victory', !ids.includes('defeat'));
+    await page.context().close();
+
+    page = await open('index.html?level=sandbox&endless=1&view=2d', { freeze: true });
+    await clickAway(page); page.on('dialog', d => d.accept());
+    const ret = await page.evaluate(async () => {
+      const g = __game, G = g.G; G.speed = 0; G.gateOpen = true; G.nextWave = G.time; g.step(0.05); G.heroes.forEach(h => { h.dead = true; }); g.step(0.05);
+      const calm = g.audioMood(); G.heroes.length = 0;
+      document.getElementById('bRetire').click(); const m = g.audioMood(); Sound.setMood(m); g.renderEnd(); await new Promise(r => setTimeout(r, 500));
+      return { calm, over: m, heard: window.__heard.map(h => h[0]), requested: { ...Sound.stats.requested } };
+    });
+    note(ret.requested);
+    check('Retire plays the quiet retire bell, not the defeat sting', ret.over.over === 'retired' && ret.heard.includes('retire') && !ret.heard.includes('defeat'), ret.heard.filter(i => ['retire', 'defeat'].includes(i)).join() + ' / ' + ret.over.over);
+    await page.context().close();
+    page = await open('index.html?level=classic&view=2d', { freeze: true });
+    const calmDown = await page.evaluate(() => { const g = __game, G = g.G, kind = g.HEROES[0]; G.heroes.push(new g.Hero(G.heart.x + 2, G.heart.y, kind, 1, [])); const live = g.audioMood().tension; g.hurt({ heart: true, dead: false, x: G.heart.x, y: G.heart.y }, 99999, {}); return { live, after: g.audioMood() }; });
+    check('once the run is over the music settles (tension 0) under the end screen', calmDown.live > 0.4 && calmDown.after.tension === 0 && calmDown.after.over === 'defeat', JSON.stringify(calmDown));
+    await page.context().close();
+
+    page = await open('menu.html');
+    const menu = await page.evaluate(() => ({ sound: typeof Sound !== 'undefined', hint: document.getElementById('audioHint').textContent, ctl: getComputedStyle(document.getElementById('audioCtl')).display }));
+    check('the chapter menu has the sound controls and the sound module', menu.sound && /click/.test(menu.hint) && menu.ctl !== 'none', JSON.stringify(menu));
+    await page.mouse.click(600, 100); await sleep(300); await spy(page);
+    await page.click('.chap[data-id="tutorial"]'); await page.click('.chap[data-id="portal"]', { force: true }); await sleep(100);
+    const mh = await page.evaluate(() => ({ heard: window.__heard.map(h => h[0]), ctx: Sound.ctx && Sound.ctx.state, gain: Sound.engine.master.gain.value }));
+    note(await page.evaluate(() => ({ ...Sound.stats.requested })));
+    check('a chapter click clicks; a locked chapter denies (and does not also click)', mh.heard.filter(i => i === 'click').length === 1 && mh.heard.filter(i => i === 'deny').length === 1, mh.heard.join());
+    check('the menu runs the ambient score (the audio context is running)', mh.ctx === 'running');
+    await page.keyboard.press('m'); await sleep(300);
+    check('M mutes the menu too', await page.evaluate(() => Sound.muted && Sound.engine.master.gain.value < 0.001));
+    await page.context().close();
+
+    page = await open('sandbox.html');
+    await page.mouse.click(600, 60); await sleep(300); await spy(page);
+    await page.fill('#gold', '3000'); await page.fill('#waves', '12'); await page.click('#dice'); await sleep(100);
+    const sb = await page.evaluate(() => window.__heard);
+    note(await page.evaluate(() => ({ ...Sound.stats.requested })));
+    check('sandbox sliders tick (pitch follows the slider) and the dice rattle', sb.filter(h => h[0] === 'tag').length >= 2 && sb.some(h => h[0] === 'dice') && sb.filter(h => h[0] === 'tag').every(h => h[1] > 0.79 && h[1] < 1.31), JSON.stringify(sb.slice(0, 5)));
+    await page.context().close();
+    page = await open('menu.html?sound=0');
+    check('?sound=0 silences the menu pages too', await page.evaluate(() => typeof Sound === 'undefined' && getComputedStyle(document.getElementById('audioCtl')).display === 'none'));
+    await page.context().close();
+    page = await open('?unlock=1&view=2d', { freeze: true });
+    const notYet = await page.evaluate((ids) => Object.keys(Sound.voices).filter(id => !ids.includes(id)), Object.keys({ ...req, ...more.req, ...over, ...heard }));
     check('every voice was reached by some game event', notYet.length === 0, notYet.join(', '));
     await page.context().close();
 
