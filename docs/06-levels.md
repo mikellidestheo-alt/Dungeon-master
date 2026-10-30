@@ -106,12 +106,50 @@ joins it to your Heart. Rules:
 - 3D: every Gate has its own sprite and light, dim until linked, glowing once linked.
 - Sandbox: `&gates=2` adds a second hero cavern and Gate in the north of the classic map (the sandbox page has a "Two Gates" switch).
 
+## The campaign
+
+The ten chapters live in `web/chapters.js` (loaded after `levels.js`), which also sets `window.CAMPAIGN`, their order. Each teaches one
+thing, and the difficulty rises through data alone:
+
+| # | id | chapter | new | waves | hero x | prep | gap | Gates | unlocked at the start |
+|---|---|---|---|---|---|---|---|---|---|
+| 1 | `tutorial` | The Awakening | dig, mine, claim, Treasury, Lair, Portal; one weak Knight | 1 | 0.50 | 180 | 110 | 1 | nothing |
+| 2 | `portal` | Creatures of the Dark | the Portal, beds, wages | 3 | 0.70 | 160 | 110 | 1 | nothing |
+| 3 | `hatchery` | Mouths to Feed | hunger, the Hatchery | 4 | 0.75 | 150 | 110 | 1 | nothing |
+| 4 | `library` | The Library | research (you study Gas Trap and Heal) | 4 | 0.80 | 140 | 105 | 1 | nothing |
+| 5 | `traps` | Doors and Snares | doors, traps; **Dwarf** | 5 | 0.90 | 125 | 100 | 1 | Gas, Lightning traps |
+| 6 | `prison` | The Dungeon Below | Prison, Torture Chamber; **Monk** | 5 | 1.00 | 110 | 100 | 1 | + Prison, Torture |
+| 7 | `temple` | Prayers and Power | Temple, spells; **Fairy** | 6 | 1.05 | 100 | 95 | 1 | + Temple, every spell |
+| 8 | `gates` | Two Gates | two entrances; **Giant** | 6 | 1.10 | 90 | 90 | 2 | everything |
+| 9 | `siege` | The Siege | **Prince**, **Stone Knight** | 8 | 1.25 | 75 | 85 | 2 | everything |
+| 10 | `crusade` | The King's Crusade | the **King**; three entrances | 10 | 1.40 | 60 | 80 | 3 | everything |
+
+"hero x" is `waves.heroMult`, "prep" the seconds from the first linked Gate to wave 1, "gap" the seconds between waves. Starting gold rises
+from 800 to 2500 and the extra strength per wave (`waves.scale`) from 0 to 0.10. Chapters 5 onwards also shrink the Heart from 3000 to 2500
+(the Tutorial and chapters 2-3 are more forgiving). Parties never exceed the Gate pad's nine heroes. **Design target** (to be confirmed by
+the bots of step 7): the Tutorial 5-8 minutes, chapters 2-4 10-12, 5-7 12-16, 8-9 16-22, the finale 22-28, about 2.5-3 hours in all.
+
+Things every chapter shares:
+
+- **The maps** are text grids from 30x17 to 52x32. Rock ridges (`#`) with gaps cut each map into chambers, so any tunnel to a Gate must pass
+  a gap: those are the choke points for doors and traps. Gold seams are scattered (each is worth 2000), a few gem seams give a trickle
+  late on. The Heart is always at the west, the Portal at the east, the Gates south and north (chapter 10: south-west, north, south-east).
+- **Objectives** are always "claim the Portal ... tunnel to a Gate ... defeat every wave" plus what the chapter teaches (a room, research,
+  doors and traps, spells, creatures, `gate` with `n: 2`). Nothing required depends on luck: a prisoner, for example, is only a bonus.
+- Every chapter after the Tutorial has a **bonus objective** (the third star): more creatures, more traps, more spells, a research
+  extra, kills, banked gold.
+- **Guides** introduce the chapter's new thing as it comes up; the Tutorial's has eleven steps with markers and pulsing buttons and
+  carries you from the first dig to the Knight. `?guide=0` turns them off.
+- In chapters 9 and 10 you need only **one** Gate linked to start the clock: link one and fight on a single front, or open more and
+  every wave is split between them.
+- `lesson`, `classic` and `tiny` stay in `levels.js` as fixtures and the sandbox's base map; they are not part of the campaign.
+
 ## Chapters, stars and saves
 
-The campaign is the ordered list `window.CAMPAIGN = ['lesson', 'classic', ...]` at the top of `levels.js`. **`menu.html`** is the front door:
+**`menu.html`** is the front door:
 it lists those chapters with their `tagline`, shows stars and the best time, and opens a chapter at `index.html?level=<id>&brief=1`. A
 chapter is unlocked when the one before it has been won (the first always is). `menu.html?unlock=all` opens every chapter for testing.
-Levels that are not in `CAMPAIGN` (`tiny`) still play from the URL; they are saved too, but not listed.
+Levels that are not in `CAMPAIGN` (`tiny`, `classic`, `lesson`) still play from the URL; they are saved too, but not listed.
 
 **Three stars**, judged when you win (rules in `web/progress.js`):
 
@@ -212,7 +250,7 @@ Put each marker inside a cavern at least 3x3 wide so the room pad fits. Several 
    and plays `tiny` from start to victory. `node tools/test_objectives.js` covers objectives, the guide, the briefing and gate-less levels
    (it plays `lesson`, a no-Portal, no-Gate level won by objectives, from start to victory). `node tools/test_campaign.js` covers the star
    rules, saves, the menu, and the Victory / Defeat screens. `node tools/test_sandbox.js` covers the wave generator, the sandbox options,
-   endless mode and the sandbox page. `node tools/test_gates.js` covers several Hero Gates.
+   endless mode and the sandbox page. `node tools/test_gates.js` covers several Hero Gates. `node tools/test_chapters.js` checks the ten chapters (maps, curve, teaching, guides) and plays the Tutorial for real.
 
 ## What a level cannot express yet (planned)
 

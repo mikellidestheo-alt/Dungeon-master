@@ -89,17 +89,17 @@ const sleep = (ms) => new Promise(r => setTimeout(r, ms));
     const m = async () => page.evaluate(() => ({ chaps: [...document.querySelectorAll('.chap')].map(b => ({ id: b.dataset.id, locked: b.classList.contains('locked'), sel: b.classList.contains('sel'), stars: b.querySelectorAll('.st .on').length, tag: b.querySelector('.tg').textContent })),
       total: document.getElementById('total').textContent.replace(/\s+/g, ' '), title: document.querySelector('#detail h2').textContent, play: document.getElementById('play').textContent, best: document.querySelector('#detail .best').textContent.replace(/\s+/g, ' ').trim() }));
     let mm = await m();
-    check('first run: chapter I open and selected, the rest locked', mm.chaps[0].id === 'lesson' && !mm.chaps[0].locked && mm.chaps[0].sel && mm.chaps.slice(1).every(x => x.locked), JSON.stringify(mm.chaps.map(x => [x.id, x.locked])));
-    check('locked chapters say why; total is 0 stars', /Locked/.test(mm.chaps[1].tag) && /Stars 0 \/ 6/.test(mm.total), mm.chaps[1].tag + ' | ' + mm.total);
-    check('detail shows the chapter and "Begin chapter"', mm.title === 'First Steps' && mm.play === 'Begin chapter' && /Not yet attempted/.test(mm.best), mm.title + ' / ' + mm.play);
-    await page.click('.chap[data-id="classic"]', { force: true }); mm = await m();
+    check('first run: chapter I open and selected, the rest locked', mm.chaps[0].id === 'tutorial' && !mm.chaps[0].locked && mm.chaps[0].sel && mm.chaps.slice(1).every(x => x.locked), JSON.stringify(mm.chaps.map(x => [x.id, x.locked])));
+    check('locked chapters say why; total is 0 stars', /Locked/.test(mm.chaps[1].tag) && /Stars 0 \/ 30/.test(mm.total), mm.chaps[1].tag + ' | ' + mm.total);
+    check('detail shows the chapter and "Begin chapter"', mm.title === 'The Awakening' && mm.play === 'Begin chapter' && /Not yet attempted/.test(mm.best), mm.title + ' / ' + mm.play);
+    await page.click('.chap[data-id="portal"]', { force: true }); mm = await m();
     check('clicking a locked chapter does nothing', mm.chaps[0].sel && !mm.chaps[1].sel);
-    await page.evaluate(() => Progress.record('lesson', { outcome: 'victory', time: 83, kills: 0, heart: 1, stars: 3 })); await page.reload({ waitUntil: 'load' }); await sleep(300); mm = await m();
-    check('after a win the next chapter opens and is selected; chapter I shows 3 stars', !mm.chaps[1].locked && mm.chaps[1].sel && mm.chaps[0].stars === 3 && /Stars 3 \/ 6/.test(mm.total), JSON.stringify(mm.chaps.map(x => [x.id, x.locked, x.sel, x.stars])));
-    await page.click('.chap[data-id="lesson"]'); mm = await m();
+    await page.evaluate(() => Progress.record('tutorial', { outcome: 'victory', time: 83, kills: 0, heart: 1, stars: 3 })); await page.reload({ waitUntil: 'load' }); await sleep(300); mm = await m();
+    check('after a win the next chapter opens and is selected; chapter I shows 3 stars', !mm.chaps[1].locked && mm.chaps[1].sel && mm.chaps[0].stars === 3 && /Stars 3 \/ 30/.test(mm.total), JSON.stringify(mm.chaps.map(x => [x.id, x.locked, x.sel, x.stars])));
+    await page.click('.chap[data-id="tutorial"]'); mm = await m();
     check('chapter I details: best time 1:23, 1 victory, "Play again"', /1:23/.test(mm.best) && /1 victory/.test(mm.best) && mm.play === 'Play again', mm.best + ' / ' + mm.play);
-    await Promise.all([page.waitForURL(/index\.html\?level=lesson&brief=1/), page.click('#play')]);
-    check('Play opens the chapter with its briefing', /level=lesson&brief=1/.test(page.url()), page.url());
+    await Promise.all([page.waitForURL(/index\.html\?level=tutorial&brief=1/), page.click('#play')]);
+    check('Play opens the chapter with its briefing', /level=tutorial&brief=1/.test(page.url()), page.url());
     await sleep(500);
     check('...and the briefing card is up, game paused', await page.evaluate(() => getComputedStyle(document.getElementById('briefing')).display === 'flex' && window.__game.G.speed === 0));
     await page.goto(ROOT + 'menu.html', { waitUntil: 'load' }); await sleep(200);
@@ -110,11 +110,10 @@ const sleep = (ms) => new Promise(r => setTimeout(r, ms));
     await ctx.close();
 
     console.log('4. winning a chapter');
-    ctx = await fresh(); page = await game(ctx, 'level=lesson&brief=0', '3d');
+    ctx = await fresh(); page = await game(ctx, 'level=tutorial', '3d');
     check('no end screen while playing', await page.evaluate(() => getComputedStyle(document.getElementById('endscreen')).display === 'none'));
-    await page.evaluate(() => { const g = window.__game; g.tagRect(9, 5, 13, 5, true); });
-    await run(page, 60, 'G.stats.claimed >= 3 && G.stats.dug >= 5'); await page.evaluate(() => { const g = window.__game; g.build(g.T.TREASURY, 2, 3, 3, 3); g.build(g.T.LAIR, 2, 7, 3, 7); });
-    const won = await run(page, 400, 'G.over === "victory"'); await sleep(900);
+    await page.evaluate(() => { const g = window.__game, G = g.G; for (let s = 0; s < 20; s += 0.05) g.step(0.05); g.OBJECTIVES.forEach((o, i) => { G.objDone[i] = true; }); g.updateObjectives(); });       // test_chapters.js plays the tutorial for real; here we only need a win
+    const won = await page.evaluate(() => window.__game.G.over === 'victory'); await sleep(900);
     const e = await page.evaluate(() => ({ title: document.getElementById('endTitle').textContent, cls: document.getElementById('endTitle').className, shown: getComputedStyle(document.getElementById('endscreen')).display, stats: document.getElementById('endStats').textContent.replace(/\s+/g, ' '),
       stars: [...document.querySelectorAll('#endStars li')].map(li => [li.classList.contains('got'), li.textContent]), best: document.getElementById('endBest').textContent, next: getComputedStyle(document.getElementById('endNext')).display, result: window.__game.G.result,
       saved: JSON.parse(localStorage.getItem('dm.save.v1')) }));
@@ -123,10 +122,10 @@ const sleep = (ms) => new Promise(r => setTimeout(r, ms));
     check('three stars: win, Heart >= 50%, Heart >= 90%', e.stars.length === 3 && e.stars.every(s => s[0]) && /Heart at 90%/.test(e.stars[2][1]), JSON.stringify(e.stars));
     check('"First victory!" is announced', e.best === 'First victory!', e.best);
     check('Next chapter button is offered', e.next !== 'none');
-    check('the result is saved: 3 stars, 1 win, best time', e.saved.levels.lesson && e.saved.levels.lesson.stars === 3 && e.saved.levels.lesson.wins === 1 && e.saved.levels.lesson.bestTime === e.result.time, JSON.stringify(e.saved.levels.lesson));
+    check('the result is saved: 3 stars, 1 win, best time', e.saved.levels.tutorial && e.saved.levels.tutorial.stars === 3 && e.saved.levels.tutorial.wins === 1 && e.saved.levels.tutorial.bestTime === e.result.time, JSON.stringify(e.saved.levels.tutorial));
     await page.screenshot({ path: process.env.SHOT || '/dev/null', fullPage: true }).catch(() => {});
-    await Promise.all([page.waitForURL(/level=classic&brief=1/), page.click('#endNext')]);
-    check('Next chapter opens the next chapter (with its briefing)', /index\.html\?level=classic&brief=1/.test(page.url()), page.url());
+    await Promise.all([page.waitForURL(/level=portal&brief=1/), page.click('#endNext')]);
+    check('Next chapter opens the next chapter (with its briefing)', /index\.html\?level=portal&brief=1/.test(page.url()), page.url());
     await ctx.close();
 
     console.log('5. losing');
@@ -142,8 +141,8 @@ const sleep = (ms) => new Promise(r => setTimeout(r, ms));
     await ctx.close();
 
     console.log('6. last chapter, ?nosave=1, the Chapters button');
-    ctx = await fresh(); page = await game(ctx, 'level=classic');
-    await page.evaluate(() => { const g = window.__game, G = g.G; G.gateOpen = true; G.wave = g.VAR.WAVES; g.step(0.05); }); await sleep(900);
+    ctx = await fresh(); page = await game(ctx, 'level=crusade');
+    await page.evaluate(() => { const g = window.__game, G = g.G; g.OBJECTIVES.forEach((o, i) => { G.objDone[i] = true; }); g.updateObjectives(); }); await sleep(900);
     const l = await page.evaluate(() => ({ title: document.getElementById('endTitle').textContent, next: getComputedStyle(document.getElementById('endNext')).display, stars: document.querySelectorAll('#endStars li.got').length }));
     check('winning the last chapter shows no Next button', l.title === 'Victory' && l.next === 'none' && l.stars === 3, JSON.stringify(l));
     await Promise.all([page.waitForURL(/menu\.html/), page.click('#endMenu')]);

@@ -18,7 +18,7 @@
  *               H Dungeon Heart centre   P Portal centre   X Hero Gate centre   (each marker becomes a 3x3 room)
  */
 window.DEFAULT_LEVEL = 'classic';
-window.CAMPAIGN = ['lesson', 'classic'];     // the chapters in order, as listed by menu.html; each unlocks when the one before it is won (grows to ten chapters)
+// the campaign itself (the ten chapters and window.CAMPAIGN, their order) is in chapters.js
 window.LEVELS = {
 
   // The original single level, reproduced from data. Same seed, same map, same invasion as before levels existed.

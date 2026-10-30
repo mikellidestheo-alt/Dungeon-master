@@ -144,7 +144,8 @@ function validateLevel(lv) {
     if (d.needs === 'waves') need(plan.length, where + ': "' + c.type + '" needs waves.plan'); if (d.needs === 'gate') need(gates.length >= (c.n || 1), where + ': "' + c.type + '" needs ' + (c.n > 1 ? c.n + ' Hero Gates' : 'a Hero Gate')); if (d.needs === 'portal') need(pos.portal, where + ': "' + c.type + '" needs a Portal');
   };
   objs.forEach((o, i) => cond(o, 'objective ' + (i + 1)));
-  (lv.guide || []).forEach((g, i) => { need(g && g.text, 'guide step ' + (i + 1) + ' needs text'); if (g && g.when) cond(g.when, 'guide step ' + (i + 1)); if (g && g.tool) need(TOOLS.some(t => t[0] === g.tool), 'guide step ' + (i + 1) + ': no tool called ' + g.tool); });
+  (lv.guide || []).forEach((g, i) => { need(g && g.text, 'guide step ' + (i + 1) + ' needs text'); if (g && g.when) cond(g.when, 'guide step ' + (i + 1)); if (g && g.tool) need(TOOLS.some(t => t[0] === g.tool), 'guide step ' + (i + 1) + ': no tool called ' + g.tool);
+    if (g && g.at) need((g.at.length === 2 || g.at.length === 4) && g.at.every((v, k) => v >= 0 && v < (k % 2 ? h : w)), 'guide step ' + (i + 1) + ': `at` must be [x, y] or [x0, y0, x1, y1] inside the map'); });
   return errs;
 }
 

@@ -92,6 +92,7 @@ const sleep = (ms) => new Promise(r => setTimeout(r, ms));
     check('the pulse moved on (still Dig for the seam)', await page.evaluate(() => document.getElementById('b_dig').classList.contains('hint')));
     await page.evaluate(() => window.__game.tagRect(13, 5, 13, 5, true)); await run(120, 'G.stats.dug >= 5 && G.stats.claimed >= 3'); s = await info();
     check('mined the seam and claimed floor: guide is at the Treasury step', s.step === 4 && /Treasury/.test(s.text) && s.stats.mined > 0 && s.done === 2, `step ${s.step} done ${s.done} stats ${JSON.stringify(s.stats)}`);
+    await sleep(250);                                                          // the pulse is applied on the next frame
     check('the Treasury button pulses', await page.evaluate(() => document.getElementById('b_treasury').classList.contains('hint') && !document.getElementById('b_dig').classList.contains('hint')));
     await page.evaluate(() => { const g = window.__game; g.build(g.T.TREASURY, 2, 3, 3, 3); }); await run(1); s = await info();
     check('building the Treasury advances to the Lair step', s.step === 5 && /Lair/.test(s.text) && s.done === 3, `step ${s.step} done ${s.done}`);
