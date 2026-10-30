@@ -85,6 +85,8 @@ Prototype hatchery/temple (`Chicken`, `updateHatchery`, the `eat`/`pray` creatur
 
 Creature tricks in the prototype (`ambush`, `cleave`, `armor`, `heals`, `torturer`, `flying` on the `KINDS` entries in `web/game.js`) are loosely inspired by DK2's creature specials (`Creature.SpecialAbility`, `JobType.TORTURE`); the numbers are my own tuning, not OpenKeeper's.
 
+Hero counters in the prototype (`disarms`, `flying`, `stunImmune`, `gasImmune`, `armor`, `doorBreaker` on the `HEROES` entries in `web/game.js`, and the scripted `WAVE_PLAN`) are my own design to make traps, doors and spells matter in different ways; they are not OpenKeeper behaviour.
+
 ## 8. Player verbs (the "hand" & spells) `[src: GameWorldController, PlayerState, KeeperSpellCastValidator]`
 Tag/untag dig · build/sell room · place door/trap · pick up creature/object (`InHand`, `Placeable`) · drop · slap · cast keeper spell (mana cost, research state `UNAVAILABLE/RESEARCHABLE/AVAILABLE`) · possess creature (`PossessedSystem`, mana per second).
 Research states per item type `ROOM, DOOR, TRAP, SPELL, CREATURE`.

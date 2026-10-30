@@ -40,8 +40,10 @@ the time), **Assassin** (first blow on an unhurt target does double), **Black Kn
 and fragile), **Reaper** (rare; its scythe also hits whoever stands next to the target) and **Dark Angel** (rare; flies and heals
 wounded creatures). Skeletons rise from starved prisoners and imps dig. At **level 3** a creature's sprite changes to its elite
 form (e.g. the runic Troll, the green-flame Goblin, the Rogue, the Fire Knight, the Firefly). Heroes: Knight, Archer, Mage, Thief (fast), Royal Guard (tank), Monk (heals
-wounded allies) and the **Prince**, who leads the final wave and never flees. Art not used yet: king, giant, dwarf, stone knight
-and fairy (all would suit more hero types). The `wall` sprite is processed but not used yet: walls are textured
+wounded allies), and five that each counter something: the **Dwarf** (disarms traps instead of setting them off, chews through
+doors 2.5× faster), the **Giant** (slow, huge, immune to lightning stuns, smashes doors 3×), the **Stone Knight** (25 % armour and
+immune to gas), the **Fairy** (flies over closed doors and floor traps and heals allies) and two bosses: the **Prince** (leads wave 4)
+and the **King** (leads the last wave); neither flees. All the character art is now in use. The `wall` sprite is processed but not used yet: walls are textured
 blocks so they can be dug away tile by tile. To tune where a sprite sits on its tile, edit the `SPR` table at the top of
 `web/render3d.js` (`w` = width in tiles, `ay` = how far up the image the ground contact point is); character heights are in the `USIZE` table.
 
@@ -53,8 +55,9 @@ The prototype implements: terrain-health state machine (`damageTile`/`healTile`)
 per-tile tasks and assignee caps, A* with no corner-cutting, imp work/deliver loop, gold-proportional mining, gem
 seams, room building, lair assignment, mood/anger, sleep and payday, free-imp spawning, plus **combat and heroes**:
 
-* **Hero Gate** (red-tinted cavern, south): dig a tunnel to it and invasion waves start (5 waves, growing parties of
-  Knights, Archers and Mages that follow a party leader and hunt your Dungeon Heart; ranged heroes shoot).
+* **Hero Gate** (red-tinted cavern, south): dig a tunnel to it and invasion waves start (5 scripted waves; parties
+  follow a leader and hunt your Dungeon Heart, ranged heroes shoot): **1** Knight, Archer · **2** Knight, Mage, Thief · **3** Knight, Dwarf,
+  Guard, Monk · **4** Prince, Giant, Fairy, Archer, Thief · **5** King, Stone Knight, Guard, Fairy, Mage, Archer; each wave is 12 % stronger).
 * **Fight AI** modelled on `CreatureState.IDLE`'s "flee or attack first": sense (sight + line of sight; keepers also
   "hear" intruders on their own land) → flee when below 25 % hp → chase until in range → strike on recharge.
   Imps never fight, they run to the Heart. Heroes that get weak run back to the Gate and escape.
@@ -64,13 +67,13 @@ seams, room building, lair assignment, mood/anger, sleep and payday, free-imp sp
   **Door** (100g, 400 hp), they stop and smash it while your units pass freely and imps repair it. **Gas Traps** (150g,
   poison cloud) and **Lightning Traps** (200g, burst + stun) are hidden from heroes, fire when stepped on, hold a few
   charges, and imps re-arm them for gold. With the same 8 creatures and 3 lair tiles, one door plus three traps in the
-  tunnel to the Hero Gate turned a lost game into a win in my bot test (8 heroes killed, Heart untouched).
+  tunnel to the Hero Gate turned a lost game into a win in my bot test (9 heroes killed, Heart untouched), even though the Dwarf disarms traps and the Fairy flies over the door.
 * **Mana and spells** (hotkeys `1`–`5`, click to cast; mana comes from your claimed floor, about 5.7/s at the start,
   1000 max, and every spell has a cooldown): **⚡ Lightning** (120 – 70 damage to the hero under the cursor, 35 chained to
   two nearby ones, with a stun), **✚ Heal** (80 – +60 hp to creatures and imps in range), **» Speed** (90 – creatures move
   and recharge 1.6× faster for 12 s), **⚑ Call to Arms** (150 – creatures drop everything and gather at a flag for 25 s),
-  **✦ Create Imp** (100 – on claimed floor). A failed cast costs nothing. In my bot test the same weak defence that
-  lost without spells won with them (13 heroes killed, Heart at 2488/2500).
+  **✦ Create Imp** (100 – on claimed floor). A failed cast costs nothing. In my bot tests spells turned a lost game into a
+  win with a solid defence of 9 lair tiles (15 heroes killed, Heart untouched), but could not save the weakest one (3 lair tiles).
 * **Knock-out, Prison and Torture Chamber:** a unit that loses its last hit points to an enemy attacker is knocked out
   instead of killed (traps and spells, which have no attacker, still kill). Imps rush to carry your own fallen creatures
   to a lair (or the Heart) to recover, and knocked-out heroes to a **Prison** (100g/tile, one prisoner per tile). Anyone

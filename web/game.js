@@ -193,7 +193,7 @@ class Mover {
     let left = this.speed * dt * mult * (this.haste > 0 ? 1.6 : 1); this.blocker = null;
     while (this.path && this.path.length && left > 0) {
       const n = this.path[0];
-      if (this.team === 'h' && this.state !== 'flee') {       // a closed door stops invaders until it is smashed; keepers walk through
+      if (this.team === 'h' && this.state !== 'flee' && !this.flying) {       // a closed door stops invaders until it is smashed; keepers walk through
         const door = doorAt(n.x, n.y); if (door && !door.dead && !(this.tx === n.x && this.ty === n.y)) { this.blocker = door; break; } }
       const dx = n.x + 0.5 - this.x, dy = n.y + 0.5 - this.y, d = Math.hypot(dx, dy);
       if (d <= left) { this.x = n.x + 0.5; this.y = n.y + 0.5; left -= d; this.path.shift(); }
@@ -479,7 +479,8 @@ function hurt(t, dmg, src) {
   if (t.dead) return;
   if (t.unconscious && !src) { kill(t, null); return; }                   // traps and spells finish the helpless
   if (t.unconscious || t.imprisoned) return;
-  if (t.armor && src) dmg *= 1 - t.armor;                                   // Black Knight
+  if (t.armor && src) dmg *= 1 - t.armor;
+  if (t.door && src && src.doorBreaker) dmg *= src.doorBreaker;           // Dwarf and Giant                                   // Black Knight
   G.fx.push({ x: t.x, y: t.y - 0.4, txt: Math.round(dmg), life: 0.7, color: t.team === 'k' || t.heart ? '#ff8080' : '#fff' });
   if (t.heart) {
     G.heartHp = Math.max(0, G.heartHp - dmg); G.heartFlash = 0.2;
@@ -544,9 +545,17 @@ const HEROES = [
   { name: 'Thief',  letter: 'T', color: '#5a6578', hp: 55,  dmg: 9,  range: 1.2, cdMax: 0.8, ranged: 0, speed: 2.4, sprite: 'thief' },
   { name: 'Guard',  letter: 'G', color: '#4a6ac0', hp: 230, dmg: 9,  range: 1.2, cdMax: 1.3, ranged: 0, speed: 1.4, sprite: 'guard' },
   { name: 'Monk',   letter: 'H', color: '#c8a060', hp: 70,  dmg: 5,  range: 4.5, cdMax: 1.4, ranged: 1, speed: 1.7, sprite: 'monk', heals: true },   // heals wounded allies
-  { name: 'Prince', letter: 'P', color: '#e8c050', hp: 360, dmg: 16, range: 1.2, cdMax: 1.0, ranged: 0, speed: 1.6, sprite: 'prince', fearless: true, boss: true },   // leads the last wave
-  // art on hand but not used yet: king, giant, dwarf, stone_knight, fairy (heroes); reaper, dark_angel, mistress, assassin, rogue, wasp, firefly, fire_knight, black_knight (keepers); chicken (hatchery)
+  { name: 'Prince', letter: 'P', color: '#e8c050', hp: 300, dmg: 15, range: 1.2, cdMax: 1.0, ranged: 0, speed: 1.6, sprite: 'prince', fearless: true, boss: true },   // leads the last wave
+  // added with the last unused character art, each countering something different
+  { name: 'Dwarf',        letter: 'D', color: '#c07838', hp: 120, dmg: 10, range: 1.2, cdMax: 1.0, ranged: 0, speed: 1.5, sprite: 'dwarf', disarms: true, doorBreaker: 2.5 },                  // sets off nothing: it disarms traps; chews through doors
+  { name: 'Giant',        letter: 'N', color: '#7a5a40', hp: 250, dmg: 20, range: 1.3, cdMax: 2.0, ranged: 0, speed: 1.1, sprite: 'giant', stunImmune: true, doorBreaker: 3, fearless: true },       // slow, huge, shrugs off lightning stuns
+  { name: 'Stone Knight', letter: 'S', color: '#8a9080', hp: 190, dmg: 12, range: 1.2, cdMax: 1.3, ranged: 0, speed: 1.2, sprite: 'stone_knight', armor: 0.25, gasImmune: true },            // a statue: no breathing, thick skin
+  { name: 'Fairy',        letter: 'F', color: '#70e0c0', hp: 45,  dmg: 4,  range: 4,   cdMax: 1.1, ranged: 1, speed: 2.2, sprite: 'fairy', flying: true, heals: true, healAmt: 16, healEvery: 2 },  // flies over doors and floor traps
+  { name: 'King',         letter: 'Y', color: '#f0d060', hp: 330, dmg: 16, range: 1.2, cdMax: 1.0, ranged: 0, speed: 1.5, sprite: 'king', fearless: true, boss: true, armor: 0.1 },                // leads the final wave
 ];
+// the invasion is scripted so the new types debut in a sensible order (wave 1 .. 5)
+const WAVE_PLAN = [['Knight', 'Archer'], ['Knight', 'Mage', 'Thief'], ['Knight', 'Dwarf', 'Guard', 'Monk'],
+  ['Prince', 'Giant', 'Fairy', 'Archer', 'Thief'], ['King', 'Stone Knight', 'Guard', 'Fairy', 'Mage', 'Archer']];
 class Hero extends Mover {
   constructor(x, y, kind, scale, party) { super(x, y, kind.speed); Object.assign(this, kind);
     this.hp = this.maxHp = Math.round(kind.hp * scale); this.dmg = kind.dmg * scale; this.team = 'h'; this.cd = 0; this.sight = 7;
@@ -559,7 +568,7 @@ class Hero extends Mover {
     if (this.heals) {                                                                               // the Monk patches up wounded allies
       this.healCd = Math.max(0, (this.healCd || 0) - dt);
       const ally = this.healCd <= 0 && G.heroes.find(h => h !== this && !h.dead && !h.unconscious && h.hp < h.maxHp * 0.7 && dist(this, h) <= 5 && los(this.x, this.y, h.x, h.y));
-      if (ally) { ally.hp = Math.min(ally.maxHp, ally.hp + 22); this.healCd = 2.5; G.fx.push({ x: ally.x, y: ally.y - 0.4, txt: '+22', life: 0.7, color: '#8fffa0' }); G.fx.push({ x: ally.x, y: ally.y, ring: true, r: 0.9, color: '#8fffa0', life: 0.5, max: 0.5 }); }
+      if (ally) { const amt = this.healAmt || 22; ally.hp = Math.min(ally.maxHp, ally.hp + amt); this.healCd = this.healEvery || 2.5; G.fx.push({ x: ally.x, y: ally.y - 0.4, txt: '+' + amt, life: 0.7, color: '#8fffa0' }); G.fx.push({ x: ally.x, y: ally.y, ring: true, r: 0.9, color: '#8fffa0', life: 0.5, max: 0.5 }); }
     }
     if (fightBrain(this, dt)) return;
     if (dist(this, heartTarget) <= this.range + 1.5 && los(this.x, this.y, heartTarget.x, heartTarget.y)) {   // the objective: KILL_PLAYER
@@ -573,15 +582,14 @@ class Hero extends Mover {
   }
 }
 function spawnWave() {
-  const n = G.wave, size = 2 + n, scale = 1 + 0.12 * n, party = [];
-  const kinds = []; if (n === VAR.WAVES - 1) kinds.push(HEROES[6]);                       // the Prince leads the final wave
-  for (let i = 0; i < size; i++) kinds.push(HEROES[i === 0 ? 0 : (i + n) % 6]);
+  const n = G.wave, scale = 1 + 0.12 * n, party = [];
+  const kinds = WAVE_PLAN[Math.min(n, WAVE_PLAN.length - 1)].map(nm => HEROES.find(h => h.name === nm));
   for (let i = 0; i < kinds.length; i++) {
     const kind = kinds[i];
     const h = new Hero(G.gate.x - 1 + (i % 3), G.gate.y - 1 + ((i / 3) | 0), kind, scale, party); party.push(h); G.heroes.push(h);
   }
   G.wave++; G.nextWave = G.wave < VAR.WAVES ? G.time + VAR.WAVE_INTERVAL : Infinity;
-  say('⚔ Wave ' + G.wave + '/' + VAR.WAVES + ': ' + kinds.length + ' heroes pour out of the Hero Gate' + (kinds[0].boss ? ', led by the Prince!' : '!'));
+  say('⚔ Wave ' + G.wave + '/' + VAR.WAVES + ': ' + kinds.length + ' heroes pour out of the Hero Gate' + (kinds[0].boss ? ', led by the ' + kinds[0].name + '!' : '!'));
 }
 function heroLogic(dt) {
   if (!G.gateOpen) {
@@ -632,18 +640,22 @@ function fireTrap(tr) {
   if (tr.kind === 'gas') { G.clouds.push({ x: tr.x, y: tr.y, r: 2.2, life: 5, dps: 10, tick: 0 }); say('A Gas Trap hisses!'); }
   else {
     G.fx.push({ x: tr.x, y: tr.y, bolt: true, life: 0.35 }); say('A Lightning Trap discharges!');
-    for (const h of G.heroes) if (!h.dead && dist(h, tr) <= 2.2) { hurt(h, 45, null); h.stun = 1.5; G.fx.push({ x: h.x, y: h.y, bolt: true, life: 0.3 }); }
+    for (const h of G.heroes) if (!h.dead && dist(h, tr) <= 2.2) { hurt(h, 45, null); if (!h.stunImmune) h.stun = 1.5; G.fx.push({ x: h.x, y: h.y, bolt: true, life: 0.3 }); }
   }
 }
 function updateTraps(dt) {
   for (const d of G.doors) d.flash = Math.max(0, d.flash - dt);
   for (const tr of G.traps) {
     tr.cd = Math.max(0, tr.cd - dt);
-    if (tr.charges > 0 && tr.cd <= 0 && G.heroes.some(h => !h.dead && !h.unconscious && Math.hypot(h.x - tr.x, h.y - tr.y) <= 0.9)) fireTrap(tr);
+    const stepper = tr.charges > 0 && tr.cd <= 0 && G.heroes.find(h => !h.dead && !h.unconscious && !h.flying && Math.hypot(h.x - tr.x, h.y - tr.y) <= 0.9);   // flyers glide over
+    if (stepper) {
+      if (stepper.disarms) { tr.charges = 0; say('A Dwarf disarms the ' + TRAPS[tr.kind].name + '!'); G.fx.push({ x: tr.x, y: tr.y - 0.5, txt: 'Disarmed', life: 0.9, color: '#ffd080' }); }
+      else fireTrap(tr);
+    }
   }
   for (const c of G.clouds) {
     c.life -= dt; c.tick -= dt;
-    if (c.tick <= 0) { c.tick = 0.5; for (const h of G.heroes) if (!h.dead && dist(h, c) <= c.r) hurt(h, c.dps * 0.5, null); }
+    if (c.tick <= 0) { c.tick = 0.5; for (const h of G.heroes) if (!h.dead && !h.gasImmune && dist(h, c) <= c.r) hurt(h, c.dps * 0.5, null); }
   }
   G.clouds = G.clouds.filter(c => c.life > 0);
 }
@@ -791,8 +803,8 @@ function castSpell(id, f) {                      // f = {fx, fy} world position 
     const foes = unitsNear(G.heroes.filter(h => !h.unconscious), f, sp.r).sort((a, b) => Math.hypot(a.x - f.fx, a.y - f.fy) - Math.hypot(b.x - f.fx, b.y - f.fy));
     if (!foes.length) return fail('Lightning needs a hero under the cursor.');
     const first = foes[0], chain = G.heroes.filter(h => !h.dead && !h.unconscious && h !== first && dist(h, first) <= 3.5).slice(0, 2);
-    G.fx.push({ x: first.x, y: first.y, bolt: true, life: 0.35 }); first.stun = Math.max(first.stun || 0, 1.2); hurt(first, 70, null);
-    for (const h of chain) { G.fx.push({ x: h.x, y: h.y, bolt: true, life: 0.3 }); h.stun = Math.max(h.stun || 0, 0.6); hurt(h, 35, null); }
+    G.fx.push({ x: first.x, y: first.y, bolt: true, life: 0.35 }); if (!first.stunImmune) first.stun = Math.max(first.stun || 0, 1.2); hurt(first, 70, null);
+    for (const h of chain) { G.fx.push({ x: h.x, y: h.y, bolt: true, life: 0.3 }); if (!h.stunImmune) h.stun = Math.max(h.stun || 0, 0.6); hurt(h, 35, null); }
   } else if (id === 'heal') {
     const us = unitsNear(G.creatures.concat(G.imps), f, sp.r).filter(u => u.hp < u.maxHp);
     if (!us.length) return fail('Nobody nearby needs healing.');

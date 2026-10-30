@@ -221,7 +221,8 @@ function start() {
   const USIZE = { imp: .9, goblin: 1.0, goblin_elite: 1.15, troll: 1.45, troll_elite: 1.55, warlock: 1.25, darkelf: 1.3, darkelf_elite: 1.35, bile: 1.5, bile_elite: 1.6,
     vampire: 1.35, vampire_elite: 1.4, salamander: 1.0, salamander_elite: 1.15, spider: .95, skeleton: 1.2, skeleton_knight: 1.3,
     knight: 1.3, archer: 1.2, mage: 1.3, thief: 1.15, guard: 1.4, monk: 1.05, prince: 1.6, chicken: .55,
-    mistress: 1.45, reaper: 1.6, dark_angel: 1.7, dark_angel_elite: 1.75, assassin: 1.15, rogue: 1.2, black_knight: 1.4, fire_knight: 1.45, wasp: .8, firefly: .85 };
+    mistress: 1.45, reaper: 1.6, dark_angel: 1.7, dark_angel_elite: 1.75, assassin: 1.15, rogue: 1.2, black_knight: 1.4, fire_knight: 1.45, wasp: .8, firefly: .85,
+    dwarf: 1.0, giant: 1.75, stone_knight: 1.5, fairy: .95, king: 1.55 };
   const { KINDS, HEROES, SKELETON, spriteOf } = window.__game;
   for (const k of [...KINDS, ...HEROES, SKELETON, { sprite: 'imp' }, { sprite: 'chicken' }]) for (const n of [k.sprite, k.elite]) if (n && !TEXS[n]) TEXS[n] = loader.load('assets/sprites/' + n + '.png', t => { t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 4; });
   /* Animation strips (tools/make_frames.py): assets/anim/<name>.png holds idle(4) walk(6) attack(5) frames side by side; anim.json lists their sizes.
