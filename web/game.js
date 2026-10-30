@@ -14,7 +14,7 @@ const LEVEL_TABLE = window.LEVELS || {};
 const LV = LEVEL_TABLE[new URLSearchParams(location.search).get('level')] || LEVEL_TABLE[window.DEFAULT_LEVEL] || Object.values(LEVEL_TABLE)[0];
 function levelSize(lv) { const g = lv.terrain.grid; return g ? [g[0].length, g.length] : lv.terrain.size; }
 function levelPos(lv) {                                // centres of the Heart, Portal and Gate(s): explicit, or read off a grid's H / P / X markers
-  const g = lv.terrain.grid; if (!g) return { heart: lv.heart, portal: lv.portal, gates: lv.gates };
+  const g = lv.terrain.grid; if (!g) return { heart: lv.heart, portal: lv.portal || null, gates: lv.gates || [] };
   const find = (c) => { const out = []; g.forEach((row, y) => { for (let x = 0; x < row.length; x++) if (row[x] === c) out.push([x, y]); }); return out; };
   return { heart: find('H')[0], portal: find('P')[0] || null, gates: find('X') };
 }
@@ -65,7 +65,8 @@ const TERRAIN = [
 /* ---- tiny seeded RNG so levels are reproducible (?seed=123) ---- */
 function rng(seed) { return function () { seed |= 0; seed = seed + 0x6D2B79F5 | 0; let t = Math.imul(seed ^ seed >>> 15, 1 | seed);
   t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
-Object.assign(VAR, { HEART_HEALTH: LV.rules.heartHp, WAVES: LV.waves.plan.length, FIRST_WAVE_DELAY: LV.waves.prep, WAVE_INTERVAL: LV.waves.interval });   // the level sets the invasion's pace
+const WV = LV.waves || {};
+Object.assign(VAR, { HEART_HEALTH: LV.rules.heartHp, WAVES: (WV.plan || []).length, FIRST_WAVE_DELAY: WV.prep === undefined ? 75 : WV.prep, WAVE_INTERVAL: WV.interval || 110 });   // the level sets the invasion's pace
 const qs = new URLSearchParams(location.search);
 const rand = rng(parseInt(qs.get('seed') || LV.seed || '7', 10));
 
@@ -74,9 +75,10 @@ const G = {
   map: [], time: 0, speed: 1, gold: LV.start.gold, imps: [], creatures: [], tasks: new Map(),
   nextImp: 0, nextSpawn: 20, nextPay: VAR.PAY_DAY_FREQUENCY_SECONDS, scanT: 0, log: [],
   portalOwned: false, heart: { x: POS.heart[0], y: POS.heart[1] }, portal: POS.portal && { x: POS.portal[0], y: POS.portal[1] },
-  gates: POS.gates.map(g => ({ x: g[0], y: g[1] })), gate: { x: POS.gates[0][0], y: POS.gates[0][1] },
+  gates: POS.gates.map(g => ({ x: g[0], y: g[1] })), gate: POS.gates.length ? { x: POS.gates[0][0], y: POS.gates[0][1] } : null,
   heroes: [], prisoners: [], shots: [], fx: [], doors: [], traps: [], clouds: [], mana: LV.start.mana, maxMana: 1000, manaRate: 3, spellCd: {}, rally: null, ownedTiles: 0, manaT: 0, research: { current: LV.start.research || null, points: {}, done: {} }, chickens: [], hatchT: 0, hatchTiles: [], hatchScan: 0, heartHp: VAR.HEART_HEALTH, heartFlash: 0, gateOpen: false, gateT: 0,
   wave: 0, nextWave: Infinity, over: null, kills: 0, held: null, nextId: 0,
+  stats: { dug: 0, mined: 0, claimed: 0, spells: 0 }, objDone: {}, objProg: {}, guideStep: 0, guideHidden: false,   // counters the objectives read; which objectives are done; where the tutorial guide is
 };
 const idx = (x, y) => y * W + x;
 const inb = (x, y) => x >= 0 && y >= 0 && x < W && y < H;
@@ -117,17 +119,30 @@ function buildMap() {
   for (const [x, y] of LV.start.pretag || []) { const t = tile(x, y); if (t && TERRAIN[t.t].tag) t.tag = 1; }    // a few first tiles are already tagged for the lazy
 }
 
-/* Checks a level's data and returns a list of problems (empty = fine). Used at start-up and by the tests. */
+/* Checks a level's data and returns a list of problems (empty = fine). Used at start-up and by the tests.
+ * The Portal and the Hero Gate(s) are optional: a level without a Gate has no invasion and is won by its objectives. */
 function validateLevel(lv) {
   const errs = [], need = (c, m) => { if (!c) errs.push(m); };
   need(lv && lv.id, 'missing id'); if (!lv || !lv.terrain) return errs.concat('missing terrain');
   need(lv.terrain.grid || (lv.terrain.size && lv.terrain.generate), 'terrain needs a grid, or size + generate');
   const [w, h] = levelSize(lv), pos = levelPos(lv), inside = (p, m) => need(p && p[0] >= 2 && p[1] >= 2 && p[0] <= w - 3 && p[1] <= h - 3, m + ' must lie inside the map with room for its 3x3 pad');
   if (lv.terrain.grid) need(lv.terrain.grid.every(r => r.length === w), 'every grid row must be as long as the first');
-  inside(pos.heart, 'the Heart'); inside(pos.portal, 'the Portal'); need(pos.gates && pos.gates.length, 'at least one Hero Gate'); (pos.gates || []).forEach((g, i) => inside(g, 'Hero Gate ' + (i + 1)));
-  need(lv.waves && lv.waves.plan && lv.waves.plan.length, 'waves.plan needs at least one wave');
-  ((lv.waves && lv.waves.plan) || []).forEach((wv, i) => wv.forEach(nm => need(HEROES.some(k => k.name === nm), 'wave ' + (i + 1) + ': no hero called ' + nm)));
-  need(lv.waves && lv.waves.prep >= 0 && lv.waves.interval > 0, 'waves.prep and waves.interval'); need(lv.start && typeof lv.start.gold === 'number', 'start.gold'); need(lv.rules && lv.rules.heartHp > 0, 'rules.heartHp');
+  const plan = (lv.waves && lv.waves.plan) || [], objs = lv.objectives || [], gates = pos.gates || [];
+  inside(pos.heart, 'the Heart'); if (pos.portal) inside(pos.portal, 'the Portal'); gates.forEach((g, i) => inside(g, 'Hero Gate ' + (i + 1)));
+  need(plan.length || objs.some(o => !o.optional), 'the level needs a way to win: a non-empty waves.plan or some objectives');
+  need(!plan.length || gates.length, 'waves need at least one Hero Gate for the heroes to arrive from');
+  plan.forEach((wv, i) => wv.forEach(nm => need(HEROES.some(k => k.name === nm), 'wave ' + (i + 1) + ': no hero called ' + nm)));
+  need(!lv.waves || (lv.waves.prep >= 0 && lv.waves.interval > 0), 'waves.prep and waves.interval'); need(lv.start && typeof lv.start.gold === 'number', 'start.gold'); need(lv.rules && lv.rules.heartHp > 0, 'rules.heartHp');
+  const cond = (c, where) => {                                   // an objective or a guide condition
+    const d = c && COND[c.type]; if (!d) { errs.push(where + ': unknown condition type "' + (c && c.type) + '"'); return; }
+    for (const k of d.params || []) need(c[k] !== undefined, where + ': "' + c.type + '" needs ' + k);
+    if (d.params && d.params.includes('n')) need(c.n > 0, where + ': n must be positive');
+    if (c.room) need(ROOM_TOOLS[c.room], where + ': no room called ' + c.room); if (c.item) need(RESEARCH[c.item], where + ': nothing to research called ' + c.item);
+    if (c.kind) need(KINDS.some(k => k.name === c.kind), where + ': no creature called ' + c.kind);
+    if (d.needs === 'waves') need(plan.length, where + ': "' + c.type + '" needs waves.plan'); if (d.needs === 'gate') need(gates.length, where + ': "' + c.type + '" needs a Hero Gate'); if (d.needs === 'portal') need(pos.portal, where + ': "' + c.type + '" needs a Portal');
+  };
+  objs.forEach((o, i) => cond(o, 'objective ' + (i + 1)));
+  (lv.guide || []).forEach((g, i) => { need(g && g.text, 'guide step ' + (i + 1) + ' needs text'); if (g && g.when) cond(g.when, 'guide step ' + (i + 1)); if (g && g.tool) need(TOOLS.some(t => t[0] === g.tool), 'guide step ' + (i + 1) + ': no tool called ' + g.tool); });
   return errs;
 }
 
@@ -168,16 +183,16 @@ function damageTile(x, y, dt, eff) {            // returns gold released
   if (t.gold > 0 && !tr.imp) {                   // TileWork.mine: gold comes out in proportion to health lost
     const nh = Math.max(0, t.hp - dmg);
     const ng = Math.min(t.gold, tr.goldValue - goldReleased(tr.goldValue, tr.maxHealth, nh));
-    released = t.gold - ng; t.gold = ng; t.hp = nh; destroyed = nh === 0;
+    released = t.gold - ng; t.gold = ng; t.hp = nh; destroyed = nh === 0; G.stats.mined += released;
   } else if (tr.imp) {                           // gems never run out: collapse, refill, pay a little
     t.hp -= dmg; if (t.hp <= 0) { t.hp = tr.maxHealth; released = VAR.GOLD_MINED_FROM_GEMS; sfx('coin', x + .5, y + .5); }
   } else { t.hp -= dmg; destroyed = t.hp <= 0; }
-  if (destroyed) { setTerrain(t, tr.destroyedTo); t.gold = 0; G.dirty = true; sfx('crumble', x + .5, y + .5); }
+  if (destroyed) { setTerrain(t, tr.destroyedTo); t.gold = 0; G.dirty = true; G.stats.dug++; sfx('crumble', x + .5, y + .5); }
   return released;
 }
 function claimable(x, y) {                       // ClaimTileTask: unowned floor next to our territory
   const t = tile(x, y); if (!t || TERRAIN[t.t].solid || t.owner === 1 || t.owner === HERO_LAND) return false;
-  if (t.t === T.PORTAL && !(x === G.portal.x && y === G.portal.y)) return false;
+  if (t.t === T.PORTAL && !(G.portal && x === G.portal.x && y === G.portal.y)) return false;
   return [[1,0],[-1,0],[0,1],[0,-1]].some(([dx, dy]) => { const n = tile(x + dx, y + dy); return n && n.owner === 1 && !TERRAIN[n.t].solid; })
     || (t.t === T.PORTAL && [[2,0],[-2,0],[0,2],[0,-2],[1,1],[-1,1],[1,-1],[-1,-1],[2,1],[2,-1],[-2,1],[-2,-1],[1,2],[-1,2],[1,-2],[-1,-2]].some(([dx,dy]) => { const n = tile(x+dx, y+dy); return n && n.owner === 1 && !TERRAIN[n.t].solid; }));
 }
@@ -185,7 +200,7 @@ function healClaim(x, y, dt, eff) {
   const t = tile(x, y); t.hp = Math.min(TERRAIN[t.t].maxHealth, t.hp + perApplication(VAR.CLAIM_TILE_HEALTH, eff) * dt);
   if (t.hp >= TERRAIN[t.t].maxHealth) {
     if (t.t === T.PORTAL) { for (const q of G.map) if (q.t === T.PORTAL) q.owner = 1; G.portalOwned = true; say('Portal claimed — creatures will arrive.'); sfx('portal', x + .5, y + .5); }
-    else { t.owner = 1; sfx('claim', x + .5, y + .5); }
+    else { t.owner = 1; G.stats.claimed++; sfx('claim', x + .5, y + .5); }
     G.dirty = true;
   }
 }
@@ -549,7 +564,7 @@ function gainXp(c) {                              // CreatureExperienceSystem, r
   }
 }
 function startFlee(u) {                           // weak and in danger: run to the Heart (keepers) or back to the Gate (heroes)
-  const goal = u.team === 'k' ? { x: G.heart.x, y: G.heart.y + 2 } : { x: G.gate.x, y: G.gate.y };
+  const goal = u.team === 'k' || !G.gate ? { x: G.heart.x, y: G.heart.y + 2 } : { x: G.gate.x, y: G.gate.y };
   const p = findPath(u.tx, u.ty, goal.x, goal.y); if (!p || !p.length) return false;
   u.state = 'flee'; u.go(p); return true;
 }
@@ -598,7 +613,7 @@ const HEROES = [
   { name: 'King',         letter: 'Y', color: '#f0d060', hp: 330, dmg: 16, range: 1.2, cdMax: 1.0, ranged: 0, speed: 1.5, sprite: 'king', fearless: true, boss: true, armor: 0.1 },                // leads the final wave
 ];
 // the invasion is scripted so the new types debut in a sensible order (wave 1 .. 5)
-const WAVE_PLAN = LV.waves.plan;                                                  // one list of hero names per wave, from the level
+const WAVE_PLAN = WV.plan || [];                                                  // one list of hero names per wave, from the level
 class Hero extends Mover {
   constructor(x, y, kind, scale, party) { super(x, y, kind.speed); Object.assign(this, kind);
     this.hp = this.maxHp = Math.round(kind.hp * scale); this.dmg = kind.dmg * scale; this.team = 'h'; this.cd = 0; this.sight = 7;
@@ -636,6 +651,7 @@ function spawnWave() {
   say('⚔ Wave ' + G.wave + '/' + VAR.WAVES + ': ' + kinds.length + ' heroes pour out of the Hero Gate' + (kinds[0].boss ? ', led by the ' + kinds[0].name + '!' : '!'));
 }
 function heroLogic(dt) {
+  if (!G.gate) return;
   if (!G.gateOpen) {
     G.gateT -= dt; if (G.gateT > 0) return; G.gateT = 2;
     if (findPath(G.gate.x, G.gate.y, G.heart.x, G.heart.y)) { G.gateOpen = true; sfx('gong'); G.nextWave = G.time + VAR.FIRST_WAVE_DELAY;
@@ -643,7 +659,49 @@ function heroLogic(dt) {
     return;
   }
   if (G.time >= G.nextWave && G.wave < VAR.WAVES) spawnWave();
-  if (G.wave >= VAR.WAVES && !G.heroes.length && !G.over) { G.over = 'victory'; say('All invaders are defeated — the dungeon is yours!'); }
+}
+
+/* ===================================================================================== objectives & the guide
+ * A level lists objectives (docs/06-levels.md); it is won when every one that is not `optional` is done. Without a list the level is
+ * the original "beat every wave". Objectives and guide steps share one table of named conditions: each returns [value, goal] and is met
+ * once value >= goal. A finished objective stays finished (a room you later lose does not un-win the level). The tutorial guide is a
+ * list of steps shown one at a time; a step moves on when its `when` condition is met (or when the player presses "Got it"). */
+const roomCount = (room) => { const id = ROOM_TOOLS[room]; let n = 0; for (const t of G.map) if (t.t === id && t.owner === 1) n++; return n; };
+const COND = {
+  survive:   { needs: 'waves',  f: () => [G.wave >= VAR.WAVES && !G.heroes.length ? 1 : 0, 1], label: () => 'Defeat every wave of invaders' },
+  portal:    { needs: 'portal', f: () => [G.portalOwned ? 1 : 0, 1], label: () => 'Claim the Portal' },
+  gate:      { needs: 'gate',   f: () => [G.gateOpen ? 1 : 0, 1], label: () => 'Link a tunnel to the Hero Gate' },
+  wave:      { needs: 'waves',  params: ['n'], f: (c) => [G.wave, c.n], label: (c) => 'Withstand ' + c.n + ' wave' + (c.n > 1 ? 's' : '') },
+  dug:       { params: ['n'], f: (c) => [G.stats.dug, c.n], label: (c) => 'Dig out ' + c.n + ' tiles' },
+  mined:     { params: ['n'], f: (c) => [G.stats.mined, c.n], label: (c) => 'Mine ' + c.n + ' gold' },
+  claimed:   { params: ['n'], f: (c) => [G.stats.claimed, c.n], label: (c) => 'Claim ' + c.n + ' floor tiles' },
+  gold:      { params: ['n'], f: (c) => [Math.floor(G.gold), c.n], label: (c) => 'Hold ' + c.n + ' gold' },
+  room:      { params: ['room'], f: (c) => [roomCount(c.room), c.n || 1], label: (c) => 'Build a ' + c.room[0].toUpperCase() + c.room.slice(1) + ((c.n || 1) > 1 ? ' of ' + c.n + ' tiles' : '') },
+  creatures: { params: ['n'], f: (c) => [G.creatures.filter(u => !u.dead && (!c.kind || u.name === c.kind)).length, c.n], label: (c) => 'Keep ' + c.n + ' ' + (c.kind || 'creature') + (c.n > 1 ? 's' : '') },
+  kills:     { params: ['n'], f: (c) => [G.kills, c.n], label: (c) => 'Slay ' + c.n + ' heroes' },
+  research:  { params: ['item'], f: (c) => [G.research.done[c.item] ? 1 : 0, 1], label: (c) => 'Research ' + RESEARCH[c.item].name },
+  doors:     { params: ['n'], f: (c) => [G.doors.length, c.n], label: (c) => 'Place ' + c.n + ' door' + (c.n > 1 ? 's' : '') },
+  traps:     { params: ['n'], f: (c) => [G.traps.length, c.n], label: (c) => 'Place ' + c.n + ' trap' + (c.n > 1 ? 's' : '') },
+  prisoners: { params: ['n'], f: (c) => [G.prisoners.length, c.n], label: (c) => 'Hold ' + c.n + ' prisoner' + (c.n > 1 ? 's' : '') },
+  spells:    { params: ['n'], f: (c) => [G.stats.spells, c.n], label: (c) => 'Cast ' + c.n + ' spell' + (c.n > 1 ? 's' : '') },
+};
+const OBJECTIVES = LV.objectives || [{ type: 'survive' }];
+const GUIDE = qs.get('guide') === '0' ? [] : (LV.guide || []);
+const condState = (c) => { const [v, goal] = COND[c.type].f(c); return { v: Math.min(v, goal), goal, done: v >= goal }; };
+const objText = (o) => o.text || COND[o.type].label(o);
+function updateObjectives() {
+  OBJECTIVES.forEach((o, i) => {
+    if (G.objDone[i]) return; const st = G.objProg[i] = condState(o);
+    if (st.done) { G.objDone[i] = true; if (!o.quiet) { say('✔ ' + objText(o)); sfx('levelup'); } }
+  });
+  if (!G.over && OBJECTIVES.every((o, i) => o.optional || G.objDone[i])) {
+    G.over = 'victory'; G.overAt = G.time; say(LV.victory || (VAR.WAVES ? 'All invaders are defeated — the dungeon is yours!' : 'Well done, Keeper — the dungeon is yours!'));
+  }
+  while (G.guideStep < GUIDE.length && GUIDE[G.guideStep].when && condState(GUIDE[G.guideStep].when).done) G.guideStep++;     // steps with a condition move on by themselves
+}
+const guideNow = () => G.guideStep < GUIDE.length ? GUIDE[G.guideStep] : null;
+function guideTarget() {                                  // the map area the current step points at: { x0, y0, x1, y1 } in tiles, or null
+  const g = guideNow(), a = g && g.at; return a ? { x0: a[0], y0: a[1], x1: a.length > 3 ? a[2] : a[0], y1: a.length > 3 ? a[3] : a[1] } : null;
 }
 
 /* ===================================================================================== doors & traps
@@ -867,7 +925,7 @@ function castSpell(id, f) {                      // f = {fx, fy} world position 
     if (G.imps.length >= 14) return fail('Too many imps already.');
     G.imps.push(new Imp(tx, ty)); ring(f, sp.color, 0.8);
   }
-  G.mana -= sp.cost; G.spellCd[id] = sp.cd; sfx(SPELL_SND[id], f.fx, f.fy); return true;
+  G.mana -= sp.cost; G.spellCd[id] = sp.cd; G.stats.spells++; sfx(SPELL_SND[id], f.fx, f.fy); return true;
 }
 
 /* ===================================================================================== player actions */
@@ -909,6 +967,7 @@ function step(dt) {
   updateMana(dt); updateHatchery(dt); for (const c of G.creatures) if (c.haste > 0) c.haste -= dt;
   updateTraps(dt); updateJail(dt); updateShots(dt); heroLogic(dt);
   G.heroes = G.heroes.filter(h => !h.dead); G.creatures = G.creatures.filter(c => !c.dead); G.imps = G.imps.filter(i => !i.dead);
+  updateObjectives();
   // payday
   G.nextPay -= dt;
   if (G.nextPay <= 0) {
@@ -958,9 +1017,9 @@ function draw() {
     if (t.t === T.LAIR) { ctx.fillStyle = '#8a70c0'; ctx.fillRect(px + 4, py + 6, TS - 8, TS - 12); if (t.bed && t.bed.occupant) { ctx.fillStyle = t.bed.occupant.color; ctx.fillRect(px + 6, py + 7, 5, 5); } }
     if (t.t === T.HEART && (x === G.heart.x && y === G.heart.y)) { ctx.fillStyle = '#ff4a4a'; ctx.beginPath(); ctx.arc(px + TS / 2, py + TS / 2, 7 + Math.sin(G.time * 4) * 1.2, 0, 7); ctx.fill(); }
     if (!tr.solid && t.owner === HERO_LAND) { ctx.fillStyle = 'rgba(190,70,50,.22)'; ctx.fillRect(px, py, TS, TS); }
-    if (t.t === T.GATE && (x === G.gate.x && y === G.gate.y)) { ctx.strokeStyle = G.gateOpen ? '#ff8a50' : '#8a5a4a'; ctx.lineWidth = 2; ctx.strokeRect(px + 3, py + 3, TS - 6, TS - 6); ctx.lineWidth = 1; }
+    if (t.t === T.GATE && G.gate && (x === G.gate.x && y === G.gate.y)) { ctx.strokeStyle = G.gateOpen ? '#ff8a50' : '#8a5a4a'; ctx.lineWidth = 2; ctx.strokeRect(px + 3, py + 3, TS - 6, TS - 6); ctx.lineWidth = 1; }
     if (t.t === T.HEART && (x === G.heart.x && y === G.heart.y) && G.heartFlash > 0) { ctx.fillStyle = 'rgba(255,255,255,.5)'; ctx.fillRect(px - TS, py - TS, TS * 3, TS * 3); }
-    if (t.t === T.PORTAL && (x === G.portal.x && y === G.portal.y)) { ctx.strokeStyle = G.portalOwned ? '#c090ff' : '#7a5aa0'; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(px + TS / 2, py + TS / 2, 7, 0, 7); ctx.stroke(); ctx.lineWidth = 1; }
+    if (t.t === T.PORTAL && G.portal && (x === G.portal.x && y === G.portal.y)) { ctx.strokeStyle = G.portalOwned ? '#c090ff' : '#7a5aa0'; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(px + TS / 2, py + TS / 2, 7, 0, 7); ctx.stroke(); ctx.lineWidth = 1; }
     if (t.tag && tr.solid) { ctx.strokeStyle = '#ffe070'; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.moveTo(px + 3, py + 3); ctx.lineTo(px + TS - 3, py + TS - 3); ctx.moveTo(px + TS - 3, py + 3); ctx.lineTo(px + 3, py + TS - 3); ctx.stroke(); ctx.lineWidth = 1; }
     if (tr.solid && !tr.imp && t.hp < tr.maxHealth && t.hp > 0) { ctx.fillStyle = 'rgba(0,0,0,.6)'; ctx.fillRect(px + 2, py + TS - 5, TS - 4, 3); ctx.fillStyle = '#e0624f'; ctx.fillRect(px + 2, py + TS - 5, (TS - 4) * t.hp / tr.maxHealth, 3); }
     if (!tr.solid && t.owner !== 1 && t.hp > 0 && t.hp < tr.maxHealth) { ctx.fillStyle = 'rgba(70,110,220,.8)'; ctx.fillRect(px + 2, py + TS - 5, (TS - 4) * t.hp / tr.maxHealth, 3); }
@@ -1001,6 +1060,9 @@ function draw() {
   if (G.over) { ctx.fillStyle = 'rgba(0,0,0,.65)'; ctx.fillRect(0, 0, cv.width, cv.height); ctx.textAlign = 'center';
     ctx.fillStyle = G.over === 'victory' ? '#f0c040' : '#e0624f'; ctx.font = FONT_BANNER; ctx.shadowColor = G.over === 'victory' ? '#f2a93a' : '#c0392b'; ctx.shadowBlur = 18; ctx.fillText(G.over === 'victory' ? 'VICTORY' : 'DEFEAT', cv.width / 2, cv.height / 2 - 6); ctx.shadowBlur = 0;
     ctx.fillStyle = '#e8dcc8'; ctx.font = FONT_SUB; ctx.fillText(G.kills + ' heroes slain · ' + Math.floor(G.time) + 's · reload to play again', cv.width / 2, cv.height / 2 + 24); }
+  const gt = guideTarget(); if (gt && !G.guideHidden && !G.over) {         // the tutorial guide's pulsing marker
+    const k = 0.5 + 0.5 * Math.sin(G.time * 5); ctx.strokeStyle = 'rgba(255,211,107,' + (0.5 + 0.5 * k) + ')'; ctx.lineWidth = 3;
+    ctx.strokeRect(gt.x0 * TS + 1, gt.y0 * TS + 1, (gt.x1 - gt.x0 + 1) * TS - 2, (gt.y1 - gt.y0 + 1) * TS - 2); ctx.lineWidth = 1; }
   if (mouse.down && tool !== 'hand') {                        // drag preview
     const x0 = Math.min(mouse.sx, mouse.x), x1 = Math.max(mouse.sx, mouse.x), y0 = Math.min(mouse.sy, mouse.y), y1 = Math.max(mouse.sy, mouse.y);
     ctx.fillStyle = mouse.down === 3 ? 'rgba(255,80,80,.25)' : 'rgba(255,230,120,.25)'; ctx.fillRect(x0 * TS, y0 * TS, (x1 - x0 + 1) * TS, (y1 - y0 + 1) * TS);
@@ -1063,9 +1125,9 @@ function renderHud() {
   $('hMana').textContent = Math.floor(G.mana) + '/' + G.maxMana;
   for (const id of SPELL_ORDER) $('b_' + id).style.opacity = G.mana >= SPELLS[id].cost && !(G.spellCd[id] > 0) ? 1 : 0.45;
   for (const id in RESEARCH) { const b = $('b_' + id); if (!isAvail(id)) { b.style.opacity = 0.3; b.title = 'Locked — research it in a Library'; } else { b.title = ''; if (!SPELLS[id]) b.style.opacity = ''; } }
-  renderResearch();
-  $('hHeart').textContent = Math.ceil(G.heartHp); $('hHeroes').textContent = G.heroes.length; $('hWave').textContent = G.wave + '/' + VAR.WAVES;
-  $('hNext').textContent = !G.gateOpen ? 'tunnel to Gate' : G.nextWave === Infinity ? '—' : Math.max(0, Math.ceil(G.nextWave - G.time)) + 's';
+  renderResearch(); renderObjectives(); renderGuide();
+  $('hHeart').textContent = Math.ceil(G.heartHp); $('hHeroes').textContent = G.heroes.length; $('hWave').textContent = VAR.WAVES ? G.wave + '/' + VAR.WAVES : '—';
+  $('hNext').textContent = !VAR.WAVES ? '—' : !G.gateOpen ? 'tunnel to Gate' : G.nextWave === Infinity ? '—' : Math.max(0, Math.ceil(G.nextWave - G.time)) + 's';
   let dig = 0, claim = 0, busy = 0, upkeep = 0; for (const t of G.tasks.values()) { if (t.type === 'DIG') dig++; else if (t.type === 'CLAIM') claim++; else upkeep++; if (t.who.size) busy++; }
   const mood = G.creatures.map(c => c.name + ' #' + c.id + ' Lv' + c.level + ' ' + Math.ceil(c.hp) + '/' + c.maxHp + 'hp: ' + c.mood + (c.lair || c.noLair ? '' : ' (no bed)')).join('<br>');
   $('tasks').innerHTML = 'Dig tiles <b>' + dig + '</b> · Claim tiles <b>' + claim + '</b> · Repair/rearm <b>' + upkeep + '</b> · in progress <b>' + busy + '</b><br>' +
@@ -1093,6 +1155,30 @@ function renderResearch() {
     : studying + ' studying at ' + libTiles + ' desk(s), +' + rate.toFixed(1) + ' pts/s' + (r.current ? '' : ' — nothing selected');
 }
 
+/* Objectives panel, tutorial guide and briefing: three overlays inside #stage (see index.html). They only rewrite the DOM when the text changes. */
+let objHtml = '', guideHtml = '', guideTool = null;
+function renderObjectives() {
+  const html = OBJECTIVES.map((o, i) => { const st = G.objDone[i] ? { done: true, goal: 1, v: 1 } : (G.objProg[i] || { v: 0, goal: 1 });
+    return '<li class="' + (st.done ? 'done' : '') + (o.optional ? ' opt' : '') + '"><span class="tick">' + (st.done ? '✔' : '◇') + '</span>' + objText(o) + (o.optional ? ' <i>(bonus)</i>' : '') + (!st.done && st.goal > 1 ? ' <em>' + Math.floor(st.v) + '/' + st.goal + '</em>' : '') + '</li>'; }).join('');
+  if (html !== objHtml) { objHtml = html; $('objList').innerHTML = html; }
+}
+function renderGuide() {
+  const g = guideNow(), show = !!g && !G.guideHidden && !G.over, el = $('guide');
+  const html = show ? g.text + (g.when ? '' : ' <button id="guideNext">Got it</button>') : '';
+  if (html !== guideHtml) { guideHtml = html; $('guideText').innerHTML = html; const nb = $('guideNext'); if (nb) nb.onclick = () => { G.guideStep++; }; }
+  el.style.display = show ? 'flex' : 'none';
+  const tl = show && g.tool ? g.tool : null;                                  // pulse the tool button the step talks about
+  if (tl !== guideTool) { if (guideTool && $('b_' + guideTool)) $('b_' + guideTool).classList.remove('hint'); if (tl && $('b_' + tl)) $('b_' + tl).classList.add('hint'); guideTool = tl; }
+}
+$('guideX').onclick = () => { G.guideHidden = true; };
+function showBriefing(onBegin) {                          // the chapter screen: name, briefing, what you must do. Pauses the game until "Begin".
+  const el = $('briefing'), was = G.speed || 1; G.speed = 0; refreshButtons();
+  $('briefTitle').textContent = LV.name || LV.id; $('briefText').textContent = LV.briefing || LV.start.welcome || '';
+  $('briefGoals').innerHTML = OBJECTIVES.map(o => '<li>' + objText(o) + (o.optional ? ' <i>(bonus)</i>' : '') + '</li>').join('');
+  el.style.display = 'flex';
+  $('briefGo').onclick = () => { el.style.display = 'none'; G.speed = was; refreshButtons(); if (onBegin) onBegin(); };
+}
+
 function applyStart() {                                                              // what the level hands you at the start
   const st = LV.start;
   if (st.unlock === 'all' || qs.get('unlock') === '1') unlockAll();
@@ -1103,6 +1189,7 @@ function applyStart() {                                                         
 buildMap(); scanTasks(); applyStart();
 const LEVEL_ERRORS = validateLevel(LV); if (LEVEL_ERRORS.length) console.warn('Level "' + LV.id + '" has problems:\n - ' + LEVEL_ERRORS.join('\n - '));
 refreshButtons();
+if (qs.get('brief') === '1') showBriefing();
 
 /* What the score should feel: calm until invaders are alive and awake, then tension grows with their number and their distance to the
  * Heart; a boss alive pins it high and brings the brass and timpani in (see Music in audio.js). A quiet dread precedes each wave. */
@@ -1126,5 +1213,5 @@ function frame(now) {
   renderHud(); requestAnimationFrame(frame);
 }
 requestAnimationFrame(frame);
-window.__ui = { get mouse() { return mouse; }, get tool() { return tool; }, inputDown, inputMove, inputUp };
-window.__game = { LV, LEVEL_TABLE, validateLevel, buildMap, levelSize, levelPos, strike, Chicken, updateHatchery, prayRate, spriteOf, pickKind, RESEARCH, isAvail, unlockAll, addResearch, SKELETON, freeSlot, updateJail, knockOut, KO_SECONDS, TORTURE_SECONDS, SPELLS, SPELL_ORDER, castSpell, TRAPS, DOOR, placeThings, removeThings, doorAt, trapAt, HERO_LAND, W, H, G, HEROES, KINDS, spawnWave, Creature, Imp, Hero, hurt, los, T, TERRAIN, step, tagRect, build, scanTasks, findPath, capacity, goldReleased, damageTile, perApplication, VAR, audioMood, SPELL_SND, release };
+window.__ui = { get mouse() { return mouse; }, get tool() { return tool; }, inputDown, inputMove, inputUp, guideTarget };
+window.__game = { LV, LEVEL_TABLE, COND, OBJECTIVES, GUIDE, condState, updateObjectives, guideNow, guideTarget, showBriefing, validateLevel, buildMap, levelSize, levelPos, strike, Chicken, updateHatchery, prayRate, spriteOf, pickKind, RESEARCH, isAvail, unlockAll, addResearch, SKELETON, freeSlot, updateJail, knockOut, KO_SECONDS, TORTURE_SECONDS, SPELLS, SPELL_ORDER, castSpell, TRAPS, DOOR, placeThings, removeThings, doorAt, trapAt, HERO_LAND, W, H, G, HEROES, KINDS, spawnWave, Creature, Imp, Hero, hurt, los, T, TERRAIN, step, tagRect, build, scanTasks, findPath, capacity, goldReleased, damageTile, perApplication, VAR, audioMood, SPELL_SND, release };

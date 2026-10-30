@@ -10,6 +10,8 @@
  *   waves                     prep (seconds from linking the Hero Gate to the first wave), interval, scale (extra strength per wave),
  *                             heroMult (all heroes), plan: one list of hero names per wave
  *   rules                     heartHp
+ *   objectives                list of { type, ...params, text?, optional? }: the level is won when every non-optional one is done (default: beat every wave)
+ *   guide                     list of { text, when?, at?, tool? }: tutorial hints shown one at a time
  *
  * Grid legend:  # rock   . earth   g gold seam   G gem seam   _ bare floor   o your floor   h hero land
  *               H Dungeon Heart centre   P Portal centre   X Hero Gate centre   (each marker becomes a 3x3 room)
@@ -69,6 +71,46 @@ window.LEVELS = {
     ] },
     start: { gold: 1500, mana: 400, imps: 4, unlock: 'all', research: null, pretag: [[8, 7], [9, 7]], welcome: 'A small test hall. Dig east.' },
     waves: { prep: 30, interval: 50, scale: 0.1, heroMult: 1, plan: [['Knight'], ['Knight', 'Archer']] },
+    rules: { heartHp: 2000 },
+  },
+
+  // A lesson with no Portal, no Hero Gate and no heroes: it is won by its objectives alone, and a guide walks the player through it.
+  // It proves objectives, the guide and gate-less levels; the Tutorial chapter will use the same pieces.
+  lesson: {
+    id: 'lesson', name: 'First Steps', seed: 3,
+    briefing: 'Your Dungeon Heart beats in the cavern at the left. Dig east through the earth, mine the gold seam, bank the gold in a Treasury and give your future creatures a Lair.',
+    terrain: { grid: [
+      '########################',
+      '#......................#',
+      '#......................#',
+      '#.ooooooo..............#',
+      '#.ooooooo..............#',
+      '#.oooHooo....g.........#',
+      '#.ooooooo..............#',
+      '#.ooooooo..............#',
+      '#......................#',
+      '#......................#',
+      '#......................#',
+      '#......................#',
+      '########################'
+    ] },
+    start: { gold: 600, mana: 200, imps: 3, unlock: 'none', research: null, pretag: [], welcome: 'Welcome, Keeper. Follow the hints at the bottom of the view.' },
+    objectives: [
+      { type: 'dug', n: 5, text: 'Dig out 5 tiles of earth and gold' },
+      { type: 'claimed', n: 3, text: 'Let your imps claim 3 new floor tiles' },
+      { type: 'room', room: 'treasury', n: 2, text: 'Build a Treasury of 2 tiles' },
+      { type: 'room', room: 'lair', n: 2, text: 'Build a Lair of 2 tiles' },
+      { type: 'gold', n: 1500, text: 'Bank 1500 gold in your Treasury' },
+    ],
+    guide: [
+      { text: 'Welcome, Keeper! These hints will show you the basics. You command <b>imps</b>; they dig, mine, claim and carry. Press <b>Got it</b> to begin.' },
+      { text: 'Choose <b>Dig (tag)</b>, then drag a box over the earth just east of your Heart. Imps dig whatever is tagged. Right-drag untags.', tool: 'dig', at: [9, 5, 12, 5], when: { type: 'dug', n: 4 } },
+      { text: 'Gold! Tag the glittering <b>gold seam</b> too. Imps mine it and carry the gold home.', tool: 'dig', at: [13, 5], when: { type: 'dug', n: 5 } },
+      { text: 'Imps turn bare floor into your territory by <b>claiming</b> it. Watch them work, or keep digging.', at: [9, 5, 13, 5], when: { type: 'claimed', n: 3 } },
+      { text: 'Gold needs somewhere to live. Choose <b>Treasury</b> and drag over two floor tiles inside your cavern.', tool: 'treasury', at: [2, 3, 3, 3], when: { type: 'room', room: 'treasury', n: 2 } },
+      { text: 'Creatures need beds. Choose <b>Lair</b> and drag over two more tiles of your floor.', tool: 'lair', at: [2, 7, 3, 7], when: { type: 'room', room: 'lair', n: 2 } },
+      { text: 'Almost there: wait for your imps to bank 1500 gold in the Treasury.', when: { type: 'gold', n: 1500 } },
+    ],
     rules: { heartHp: 2000 },
   },
 };

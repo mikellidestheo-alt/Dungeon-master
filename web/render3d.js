@@ -51,8 +51,8 @@ function start() {
   scene.add(new THREE.HemisphereLight(0xb0a8c0, 0x2a2430, 0.95));
   const sun = new THREE.DirectionalLight(0xfff0d8, 1.25); sun.position.set(4, 12, 9); scene.add(sun);
   const heartLight = new THREE.PointLight(0xff3020, 2.2, 9, 1.6); heartLight.position.set(G.heart.x + .5, 1.3, G.heart.y + .5); scene.add(heartLight);
-  const portalLight = new THREE.PointLight(0xff5030, 0, 9, 1.6); portalLight.position.set(G.portal.x + .5, 1.2, G.portal.y + .5); scene.add(portalLight);
-  const gateLight = new THREE.PointLight(0xffd070, 1.0, 8, 1.6); gateLight.position.set(G.gate.x + .5, 1.2, G.gate.y + .5); scene.add(gateLight);
+  const portalLight = new THREE.PointLight(0xff5030, 0, 9, 1.6); if (G.portal) portalLight.position.set(G.portal.x + .5, 1.2, G.portal.y + .5); scene.add(portalLight);      // levels may have no Portal or no Gate
+  const gateLight = new THREE.PointLight(0xffd070, 1.0, 8, 1.6); if (G.gate) gateLight.position.set(G.gate.x + .5, 1.2, G.gate.y + .5); else gateLight.intensity = 0; scene.add(gateLight);
 
   /* ------------------------------------------------------------------ procedural pixel-art textures (grey; tinted per tile) */
   const hash = (x, y, k = 0) => { let h = x * 374761393 + y * 668265263 + k * 2246822519; h = (h ^ (h >> 13)) * 1274126177; return ((h ^ (h >> 16)) >>> 0) / 4294967295; };
@@ -367,6 +367,14 @@ function start() {
   /* hover / drag-selection highlight */
   const sel = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: .25, depthWrite: false }));
   sel.rotation.x = -Math.PI / 2; sel.renderOrder = 5; scene.add(sel);
+  const mark = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), new THREE.MeshBasicMaterial({ color: 0xffd36b, transparent: true, opacity: .3, depthWrite: false }));
+  mark.rotation.x = -Math.PI / 2; mark.visible = false; scene.add(mark);
+  function syncGuide() {                                              // the tutorial guide's target (game.js guideTarget)
+    const t = UI.guideTarget(); mark.visible = !!t && !G.guideHidden && !G.over; if (!mark.visible) return;
+    const tl = G.map[t.y0 * W + t.x0], top = tl && TERRAIN[tl.t].solid ? (tl.t === T.ROCK ? ROCK_H : WALL_H) : 0;
+    mark.scale.set(t.x1 - t.x0 + 1, t.y1 - t.y0 + 1, 1); mark.position.set((t.x0 + t.x1 + 1) / 2, top + .08, (t.y0 + t.y1 + 1) / 2);
+    mark.material.opacity = .22 + .22 * Math.sin(G.time * 5);
+  }
   function syncSelection() {
     const m = UI.mouse, tool = UI.tool; sel.visible = m.x >= 0;
     flag.visible = !!(G.rally && G.time < G.rally.until); if (flag.visible) { flag.position.set(G.rally.x, 0, G.rally.y); cloth.rotation.y = Math.sin(G.time * 4) * .25; }
@@ -425,13 +433,14 @@ function start() {
     if (keys.has('a') || keys.has('arrowleft')) mv(r, -sp); if (keys.has('d') || keys.has('arrowright')) mv(r, sp);
     cam.x = Math.max(0, Math.min(W, cam.x)); cam.z = Math.max(0, Math.min(H, cam.z)); placeCamera();
     if (window.Sound) Sound.setListener(cam.x, cam.z, cam.dist * 0.28, r.x, r.z);     // effects get quieter and pan with distance from the camera
-    updateTiles(); syncProps(); syncUnits(); syncEffects(); syncSelection();
+    updateTiles(); syncProps(); syncUnits(); syncEffects(); syncSelection(); syncGuide();
     // landmarks
     const pulse = 1 + Math.sin(G.time * 4) * .035 + (G.heartFlash > 0 ? .1 : 0);
     placeSprite(heartSpr, G.heart.x + .5, 0, G.heart.y + .5, pulse); heartSpr.material.color.setScalar(G.heartFlash > 0 ? 2.4 : 1);
-    placeSprite(portalSpr, G.portal.x + .5, 0, G.portal.y + .5); portalSpr.material.color.setScalar(G.portalOwned ? 1 + Math.sin(G.time * 3) * .12 : 0.55);
-    placeSprite(gateSpr, G.gate.x + .5, 0, G.gate.y + .5); gateSpr.material.color.setScalar(G.gateOpen ? 1.05 + Math.sin(G.time * 2) * .1 : 0.5);
-    heartLight.intensity = 2.0 + Math.sin(G.time * 4) * .5; portalLight.intensity = G.portalOwned ? 1.6 : 0; gateLight.intensity = G.gateOpen ? 1.8 : .6;
+    portalSpr.visible = !!G.portal; gateSpr.visible = !!G.gate;
+    if (G.portal) { placeSprite(portalSpr, G.portal.x + .5, 0, G.portal.y + .5); portalSpr.material.color.setScalar(G.portalOwned ? 1 + Math.sin(G.time * 3) * .12 : 0.55); }
+    if (G.gate) { placeSprite(gateSpr, G.gate.x + .5, 0, G.gate.y + .5); gateSpr.material.color.setScalar(G.gateOpen ? 1.05 + Math.sin(G.time * 2) * .1 : 0.5); }
+    heartLight.intensity = 2.0 + Math.sin(G.time * 4) * .5; portalLight.intensity = G.portalOwned ? 1.6 : 0; gateLight.intensity = !G.gate ? 0 : G.gateOpen ? 1.8 : .6;
     renderer.render(scene, camera);
     const show = !!G.over; if (show) { const msg = bannerHtml(G.over) + '<div style="font:italic 19px \'EB Garamond\',Georgia,serif;font-variant-numeric:lining-nums;color:#eadfc6;margin-top:8px">' + G.kills + ' heroes slain · ' + Math.floor(G.time) + 's · reload to play again</div>'; if (banner.innerHTML !== msg) banner.innerHTML = msg; }
     banner.style.display = show ? 'flex' : 'none';
