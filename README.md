@@ -107,7 +107,7 @@ seams, room building, lair assignment, mood/anger, sleep and payday, free-imp sp
   a lunge), not hand-drawn. To use real frames, replace a strip with the same layout (see the script's header) and update
   `anim.json`; no code change is needed. Units without a strip (chickens) still hop and squash.
 * **Sound and music** (`web/audio.js`, `docs/05-audio.md`): nothing plays until your first click; then a speaker button (or `M`) and a
-  volume slider in the HUD control it, and your choice is remembered. Effects are synthesised in code: sword, bow and spell hits, claws
+  master, music and effects volume sliders in the HUD control it, and your choice is remembered. Effects are synthesised in code: sword, bow and spell hits, claws
   and clubs, lightning, gas, coins, digging and crumbling rock, doors, traps, prayer chimes, chicken clucks, imp chatter, knock-outs,
   level-ups, research and the UI. In the 3D view they get quieter and pan with distance from the camera (zoom out to hear more of the
   dungeon). The score is a dark-ambient drone with pads and sparse bells that gains a heartbeat and a driving bass as heroes close

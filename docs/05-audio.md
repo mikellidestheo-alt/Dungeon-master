@@ -21,8 +21,10 @@ audio.js   voices (V)  ->  per-play gain + stereo pan  ->  sfx bus ----+
 
 * **Start:** nothing is created until the first `pointerdown` or `keydown` (browsers refuse audio before a gesture). Until then
   `Sound.play` only counts the request. `?sound=0` removes the module and the HUD controls entirely.
-* **HUD:** a speaker button (also the `M` key) and a volume slider (squared, so it feels linear). Both persist in `localStorage`
-  (`dm.audio`). The context is suspended while the tab is hidden.
+* **HUD:** a speaker button (also the `M` key), a master volume slider and separate **Music** and **Effects** sliders. Each is squared
+  so it feels linear; Music and Effects scale their own bus (base gains 0.5 and 0.9) before the master and the shared reverb send, so
+  turning one to 0 silences that category and its reverb tail without touching the other. All of it persists in `localStorage`
+  (`dm.audio`: `vol`, `mute`, `music`, `sfx`). The context is suspended while the tab is hidden.
 * **The sim never depends on it.** `game.js` calls a tiny `sfx()` wrapper that is a no-op without the module, uses fixed timers or
   `Math.random` (never the seeded `rand()`), and `Sound.play` catches its own errors, so audio can neither change a run nor stop the loop.
   `tools/test_audio.js` checks this by playing the same seeded run with sound off and on and comparing the final state.
@@ -97,7 +99,7 @@ Every effect is a function in `Sound.voices[id](kit, dest, t, {pitch})` that sch
 
 `node tools/test_audio.js` (needs Playwright with Chromium; it starts and stops its own server) renders every voice and the music
 offline and checks the samples (finite, audible, not clipping, silent before and after), then drives the page: no context before the
-first click, HUD mute/volume/persistence, a scripted run that fires every voice from real game events, realtime output, the
+first click, HUD mute, master/music/effects volume and persistence, a scripted run that fires every voice from real game events, realtime output, the
 determinism comparison, distance, and swapping a recording in. It cannot judge how anything *sounds*; that needs ears.
 `SHOT=/path/hud.png node tools/test_audio.js` also saves a screenshot of the HUD.
 
@@ -108,4 +110,4 @@ determinism comparison, distance, and swapping a recording in. It cannot judge h
   `SFFile` formats from `docs/02-file-formats.md`, decoding in the browser, and registering the result through the same
   `samples` table. Nothing of that is written.
 * Weights I would revisit by ear: effect volumes (`DEF`), the drone level, the tension curve in `audioMood()`, and whether imp chatter is charming or tiring.
-* No per-category sliders (music vs effects), no sound for imps repairing/re-arming, torture screams, slapping or possession (those systems are not in the prototype yet).
+* No finer categories than music and effects (for example separate imp chatter or ambience), no sound for imps repairing/re-arming, torture screams, slapping or possession (those systems are not in the prototype yet).

@@ -284,6 +284,7 @@
     E.sfxBus.connect(sendS); sendS.connect(conv); E.musicBus.connect(sendM); sendM.connect(conv);
 
     E.setLevel = (v, muted) => { master.gain.setTargetAtTime(muted ? 0 : v * v, ctx.currentTime, 0.03); };
+    E.setMix = (sfx, music) => { E.sfxBus.gain.setTargetAtTime(0.9 * sfx * sfx, ctx.currentTime, 0.03); E.musicBus.gain.setTargetAtTime(0.5 * music * music, ctx.currentTime, 0.03); };     // per-category level, squared like the master
     E.play = (id, x, y, o) => {
       o = o || {}; const def = DEF[id] || DEFAULT, now = ctx.currentTime;
       let g = def[1] * (o.vol || 1), pan = 0;
@@ -310,13 +311,14 @@
   const Sound = window.Sound = {
     engine: null, voices: V, DEF, stats: { requested: {}, played: {} }, failed: false, over: null,
     volume: typeof saved.vol === 'number' ? saved.vol : 0.7, muted: !!saved.mute, createEngine,
+    musicVolume: typeof saved.music === 'number' ? saved.music : 1, sfxVolume: typeof saved.sfx === 'number' ? saved.sfx : 1,
     get ctx() { return this.engine && this.engine.ctx; },
     /* Start audio. Called by the first pointerdown / keydown, because browsers refuse to make sound before a gesture. */
     unlock() {
       if (this.engine || this.failed) return;
       try {
         const AC = window.AudioContext || window.webkitAudioContext; if (!AC) throw new Error('WebAudio unsupported');
-        const E = this.engine = createEngine(new AC()); E.ctx.resume(); E.setLevel(this.volume, this.muted); E.music.start();
+        const E = this.engine = createEngine(new AC()); E.ctx.resume(); E.setLevel(this.volume, this.muted); E.setMix(this.sfxVolume, this.musicVolume); E.music.start();
         document.addEventListener('visibilitychange', () => { if (document.hidden) E.ctx.suspend(); else E.ctx.resume(); });
         this.loadPack(); hud.refresh();
       } catch (err) { this.failed = true; console.warn('Sound unavailable:', err); hud.refresh(); }
@@ -336,9 +338,11 @@
     },
     stinger(kind) { this.play(kind === 'boss' ? 'boss_horn' : 'horn'); },
     setVolume(v) { this.volume = Math.max(0, Math.min(1, v)); if (this.engine) this.engine.setLevel(this.volume, this.muted); this.save(); },
+    setMusicVolume(v) { this.musicVolume = Math.max(0, Math.min(1, v)); if (this.engine) this.engine.setMix(this.sfxVolume, this.musicVolume); this.save(); },
+    setSfxVolume(v) { this.sfxVolume = Math.max(0, Math.min(1, v)); if (this.engine) this.engine.setMix(this.sfxVolume, this.musicVolume); this.save(); },
     setMuted(m) { this.muted = !!m; if (this.engine) this.engine.setLevel(this.volume, this.muted); this.save(); hud.refresh(); },
     toggleMute() { this.setMuted(!this.muted); },
-    save() { store.set({ vol: this.volume, mute: this.muted }); },
+    save() { store.set({ vol: this.volume, mute: this.muted, music: this.musicVolume, sfx: this.sfxVolume }); },
     /* RMS of what is leaving the master bus right now (for tests). */
     level() { const E = this.engine; if (!E) return 0; const a = new Float32Array(E.analyser.fftSize); E.analyser.getFloatTimeDomainData(a); let s = 0; for (const v of a) s += v * v; return Math.sqrt(s / a.length); },
     /* Real recordings: assets/audio/sounds.json maps a voice id to a file, a list of files or {files, gain, rate:[lo,hi]}; paths are
@@ -367,19 +371,20 @@
   };
 
   /* ---------------------------------------------------------------- HUD: mute button, volume slider, unlock on first gesture */
-  const $ = (id) => document.getElementById(id), btn = $('bMute'), vol = $('vol'), hint = $('audioHint');
+  const $ = (id) => document.getElementById(id), btn = $('bMute'), vol = $('vol'), mus = $('musVol'), fx = $('sfxVol'), hint = $('audioHint');
   const hud = {
     refresh() {
       if (!btn) return;
       btn.textContent = Sound.muted || Sound.volume === 0 ? '🔇' : Sound.volume < 0.4 ? '🔈' : '🔊'; btn.classList.toggle('on', Sound.muted);
-      vol.value = Math.round(Sound.volume * 100); vol.disabled = false;
+      vol.value = Math.round(Sound.volume * 100); mus.value = Math.round(Sound.musicVolume * 100); fx.value = Math.round(Sound.sfxVolume * 100);
       hint.textContent = Sound.failed ? 'sound unavailable' : Sound.engine ? '' : 'click anywhere to start sound';
     },
   };
   if (btn) {
     btn.onclick = () => Sound.toggleMute();
     vol.oninput = () => { Sound.setVolume(vol.value / 100); if (Sound.muted && vol.value > 0) Sound.setMuted(false); hud.refresh(); };
-    vol.onchange = () => vol.blur();                                                             // keep WASD / hotkeys working after a drag
+    mus.oninput = () => Sound.setMusicVolume(mus.value / 100); fx.oninput = () => Sound.setSfxVolume(fx.value / 100);
+    for (const s of [vol, mus, fx]) s.onchange = () => s.blur();                                   // keep WASD / hotkeys working after a drag
   }
   hud.refresh();
   const first = () => { Sound.unlock(); removeEventListener('pointerdown', first); removeEventListener('keydown', first); };
