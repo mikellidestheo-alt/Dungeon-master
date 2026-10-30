@@ -90,7 +90,7 @@ function start() {
     heart:     { w: 4.2, ay: 0.05 }, portal:   { w: 4.0, ay: -0.04 }, hero_gate: { w: 4.3, ay: -0.02 },
     treasure:  { w: 1.5, ay: 0.30 }, cage:     { w: 1.05, ay: 0.12 }, bookshelf: { w: 1.35, ay: 0.14 },
     bed:       { w: 1.2, ay: 0.45 }, rack:     { w: 1.45, ay: 0.20 }, door:      { w: 1.4, ay: 0.04 },
-    trap_gas:  { w: 1.5, ay: 0.36 }, trap_bolt: { w: 1.5, ay: 0.36 }, temple: { w: 1.5, ay: 0.3 },       // temple.png is a placeholder (tools/make_temple_placeholder.py)
+    trap_gas:  { w: 1.5, ay: 0.36 }, trap_bolt: { w: 1.5, ay: 0.36 }, temple: { w: 1, ay: 0.38 },        // one big building per Temple room: width is set from the room's size (see syncRooms)
   };
   /* Sprites are flat quads facing the camera, so the lower part of a tall sprite lies "in front of" the floor tile it stands on and gets
    * clipped by it. This offsets a sprite's depth towards the camera (by `uBias` world units) without moving it on screen. */
@@ -136,11 +136,35 @@ function start() {
     [T.TREASURY]: 0xb09848, [T.LAIR]: 0x7a68a0, [T.HEART]: 0xa04040, [T.PORTAL]: 0x80509a, [T.GATE]: 0xb0a070, [T.PRISON]: 0x7a8490, [T.TORTURE]: 0x8a3c3c, [T.LIBRARY]: 0x5a6aa0, [T.HATCHERY]: 0x9a8450, [T.TEMPLE]: 0x8a7ab0 };
   const tmpOwned = new THREE.Color(COL.owned);
   const ownedFloor = (x, y) => { const t = G.map[y * W + x]; return !!t && t.owner === 1 && !TERRAIN[t.t].solid; };
-  const tileSprites = { treasure: new Map(), bed: new Map(), bookshelf: new Map(), cage: new Map(), rack: new Map(), nest: new Map(), altar: new Map() };
-  const SPRITE_OF_KIND = { nest: 'bed', altar: 'temple' };                         // tile-sprite kinds that reuse another picture
+  const tileSprites = { treasure: new Map(), bed: new Map(), bookshelf: new Map(), cage: new Map(), rack: new Map(), nest: new Map() };
+  const SPRITE_OF_KIND = { nest: 'bed' };                         // tile-sprite kinds that reuse another picture
+
+  /* A Temple is drawn as ONE building per connected group of Temple tiles: scaled to the group's footprint, centred on its bounding box. */
+  const roomSprites = new Map();
+  function groupRooms(list) {
+    const set = new Set(list.map(p => p.y * W + p.x)), seen = new Set(), out = [];
+    for (const p of list) {
+      const k0 = p.y * W + p.x; if (seen.has(k0)) continue;
+      const st = [k0], comp = []; seen.add(k0);
+      while (st.length) { const c = st.pop(), cx = c % W, cy = (c / W) | 0; comp.push([cx, cy]);
+        for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) { const nx = cx + dx, ny = cy + dy, nk = ny * W + nx; if (nx >= 0 && nx < W && set.has(nk) && !seen.has(nk)) { seen.add(nk); st.push(nk); } } }
+      const xs = comp.map(c => c[0]), ys = comp.map(c => c[1]);
+      out.push({ key: Math.min(...comp.map(c => c[1] * W + c[0])), x0: Math.min(...xs), x1: Math.max(...xs), y0: Math.min(...ys), y1: Math.max(...ys) });
+    }
+    return out;
+  }
+  function syncRooms(templeTiles) {
+    const live = new Set();
+    for (const r of groupRooms(templeTiles)) {
+      live.add(r.key); let s = roomSprites.get(r.key); if (!s) { s = makeSprite('temple'); roomSprites.set(r.key, s); }
+      const rw = r.x1 - r.x0 + 1, rh = r.y1 - r.y0 + 1;
+      placeSprite(s, (r.x0 + r.x1 + 1) / 2, 0, (r.y0 + r.y1 + 1) / 2, Math.max(3.4, (rw + rh) * 0.65 * 1.02));            // a tile's diamond is ~1.3 wide on screen
+    }
+    for (const [k, s] of roomSprites) if (!live.has(k)) { disposeSprite(s); roomSprites.delete(k); }
+  }
 
   function updateTiles() {
-    let nGold = 0, nGem = 0, nTag = 0; const used = {}; for (const k in tileSprites) used[k] = new Set();
+    let nGold = 0, nGem = 0, nTag = 0; const templeTiles = [], used = {}; for (const k in tileSprites) used[k] = new Set();
     const fill = Math.min(1, G.gold / Math.max(1, capacity()));
     const sprite = (kind, i, x, y, k = 1, lift = 0, opacity = 1) => {
       used[kind].add(i); let s = tileSprites[kind].get(i); if (!s) { s = makeSprite(SPRITE_OF_KIND[kind] || kind); tileSprites[kind].set(i, s); }
@@ -178,11 +202,12 @@ function start() {
         else if (t.t === T.LAIR) sprite('bed', i, x, y);
         else if (t.t === T.LIBRARY) sprite('bookshelf', i, x, y);
         else if (t.t === T.HATCHERY) sprite('nest', i, x, y, 0.8);
-        else if (t.t === T.TEMPLE) sprite('altar', i, x, y);
+        else if (t.t === T.TEMPLE) templeTiles.push({ x, y });
         else if (t.t === T.PRISON) sprite('cage', i, x, y, 1, 0, t.occ ? 0.5 : 1);
         else if (t.t === T.TORTURE) sprite('rack', i, x, y, 1, 0, t.occ ? 0.7 : 1);
       }
     }
+    syncRooms(templeTiles);
     for (const kind in tileSprites) for (const [i, s] of tileSprites[kind]) if (!used[kind].has(i)) { disposeSprite(s); tileSprites[kind].delete(i); }
     for (const [m, c] of [[goldBits, nGold], [gemBits, nGem], [tags, nTag]]) { m.count = c; m.instanceMatrix.needsUpdate = true; }
     for (const m of [floorMesh, wallDirt, wallBrick]) { m.instanceMatrix.needsUpdate = true; m.instanceColor.needsUpdate = true; }
@@ -195,7 +220,8 @@ function start() {
   /* screen height of each character in tiles-diamond units (a floor tile's diamond is about 1.3 wide). Default 1.2. */
   const USIZE = { imp: .9, goblin: 1.0, goblin_elite: 1.15, troll: 1.45, troll_elite: 1.55, warlock: 1.25, darkelf: 1.3, darkelf_elite: 1.35, bile: 1.5, bile_elite: 1.6,
     vampire: 1.35, vampire_elite: 1.4, salamander: 1.0, salamander_elite: 1.15, spider: .95, skeleton: 1.2, skeleton_knight: 1.3,
-    knight: 1.3, archer: 1.2, mage: 1.3, thief: 1.15, guard: 1.4, monk: 1.05, prince: 1.6, chicken: .55 };
+    knight: 1.3, archer: 1.2, mage: 1.3, thief: 1.15, guard: 1.4, monk: 1.05, prince: 1.6, chicken: .55,
+    mistress: 1.45, reaper: 1.6, dark_angel: 1.7, dark_angel_elite: 1.75, assassin: 1.15, rogue: 1.2, black_knight: 1.4, fire_knight: 1.45, wasp: .8, firefly: .85 };
   const { KINDS, HEROES, SKELETON, spriteOf } = window.__game;
   for (const k of [...KINDS, ...HEROES, SKELETON, { sprite: 'imp' }, { sprite: 'chicken' }]) for (const n of [k.sprite, k.elite]) if (n && !TEXS[n]) TEXS[n] = loader.load('assets/sprites/' + n + '.png', t => { t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 4; });
   /* Animation strips (tools/make_frames.py): assets/anim/<name>.png holds idle(4) walk(6) attack(5) frames side by side; anim.json lists their sizes.
@@ -240,7 +266,7 @@ function start() {
       if (strip) {
         N = meta.attack[1]; const ph = d.phase, spd = (u.speed || 1.6) * (u.haste > 0 ? 1.6 : 1);
         if (u.cdMax && u.cd > u.cdMax - 0.5) f = meta.attack[0] + Math.min(4, Math.floor((u.cdMax - u.cd) / 0.5 * 5));            // the swing starts the moment the blow lands
-        else if (u.isImp && u.state === 'work') f = meta.attack[0] + Math.floor(G.time * 5 + ph) % 5;                              // imps dig with the swing loop
+        else if ((u.isImp && u.state === 'work') || u.state === 'torture') f = meta.attack[0] + Math.floor(G.time * 5 + ph) % 5;                              // imps dig with the swing loop
         else if (moving) f = meta.walk[0] + Math.floor(G.time * spd * 0.9 * 6 + ph * 6) % 6;
         else f = meta.idle[0] + Math.floor(G.time * (u.state === 'sleep' ? 1.5 : 3.5) + ph * 4) % 4;
       }
@@ -248,7 +274,8 @@ function start() {
       const hgt = (USIZE[name] || 1.2) * (u.state === 'sleep' ? .88 : 1);
       const bw = strip ? meta.bw : srcTex.image.width, bh = strip ? meta.bh : srcTex.image.height, upp = hgt / bh, wid = bw * upp;       // wid = the character's own width on screen
       const qw = strip ? meta.fw * upp : wid, qh = strip ? meta.fh * upp : hgt;                                                    // the quad is the whole padded frame
-      const hop = !strip && moving ? Math.abs(Math.sin(G.time * 9 + d.phase * 5)) * .09 : 0;                                       // single poses hop instead of striding
+      const fly = u.flying && !lying ? 0.42 + Math.sin(G.time * 6 + d.phase * 6) * .07 : 0;                                         // flyers hover above their shadow
+      const hop = (!strip && moving ? Math.abs(Math.sin(G.time * 9 + d.phase * 5)) * .09 : 0) + fly;                                       // single poses hop instead of striding
       const lunge = !strip && u.cdMax && u.cd > u.cdMax - 0.16 ? 1.1 : 1;
       const wob = !strip && u.isImp && u.state === 'work' ? 1 + Math.sin(G.time * 18) * .07 : 1;
       g.position.set(held ? mouse.fx : u.x, held ? 1.4 : 0, held ? mouse.fy : u.y);

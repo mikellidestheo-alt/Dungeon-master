@@ -258,5 +258,10 @@
   "w": 309,
   "h": 320,
   "source": "Wizard_game_sprite_isolated_6d1d1761.jpg"
+ },
+ "temple": {
+  "w": 640,
+  "h": 506,
+  "source": "Temple_complex.jpg"
  }
 }

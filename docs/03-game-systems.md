@@ -83,6 +83,8 @@ Prototype research (`RESEARCH`, `addResearch`, Library desks and the `research` 
 
 Prototype hatchery/temple (`Chicken`, `updateHatchery`, the `eat`/`pray` creature states in `web/game.js`): chickens hatch per tile, hungry creatures run `GoToEat` and feed `REASON_NO_FOOD`, temple prayer converts `manaGenPrayer` into mana. Not modelled: creatures dying of hunger, chickens as a spell target, the Temple's sacrifice mechanic, and heroes attacking chickens.
 
+Creature tricks in the prototype (`ambush`, `cleave`, `armor`, `heals`, `torturer`, `flying` on the `KINDS` entries in `web/game.js`) are loosely inspired by DK2's creature specials (`Creature.SpecialAbility`, `JobType.TORTURE`); the numbers are my own tuning, not OpenKeeper's.
+
 ## 8. Player verbs (the "hand" & spells) `[src: GameWorldController, PlayerState, KeeperSpellCastValidator]`
 Tag/untag dig · build/sell room · place door/trap · pick up creature/object (`InHand`, `Placeable`) · drop · slap · cast keeper spell (mana cost, research state `UNAVAILABLE/RESEARCHABLE/AVAILABLE`) · possess creature (`PossessedSystem`, mana per second).
 Research states per item type `ROOM, DOOR, TRAP, SPELL, CREATURE`.

@@ -18,7 +18,8 @@ import numpy as np
 from PIL import Image
 
 UNITS = ['imp', 'goblin', 'goblin_elite', 'troll', 'troll_elite', 'warlock', 'darkelf', 'darkelf_elite', 'bile', 'bile_elite', 'vampire', 'vampire_elite',
-         'salamander', 'salamander_elite', 'spider', 'skeleton', 'skeleton_knight', 'knight', 'archer', 'mage', 'thief', 'guard', 'monk', 'prince']
+         'salamander', 'salamander_elite', 'spider', 'skeleton', 'skeleton_knight', 'knight', 'archer', 'mage', 'thief', 'guard', 'monk', 'prince',
+         'mistress', 'reaper', 'dark_angel', 'dark_angel_elite', 'assassin', 'rogue', 'black_knight', 'fire_knight', 'wasp', 'firefly']
 IDLE, WALK, ATTACK = 4, 6, 5
 
 

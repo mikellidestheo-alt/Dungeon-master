@@ -17,7 +17,7 @@ NAMES = {
     'Dungeon_wall': 'wall', 'Gas_trap': 'trap_gas', 'Glowing_dungeon_heart': 'heart', 'Glowing_portal': 'hero_gate',
     'Gold_treasure_pile': 'treasure', 'Iron_prison_cage': 'cage', 'Library_bookshelf': 'bookshelf',
     'Lightning_trap': 'trap_bolt', 'Red_dungeon_portal': 'portal', 'Straw_bed': 'bed', 'Torture_rack': 'rack',
-    'Wooden_iron_dungeon_door': 'door',
+    'Wooden_iron_dungeon_door': 'door', 'Temple': 'temple',
 }
 
 

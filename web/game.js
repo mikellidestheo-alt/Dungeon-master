@@ -319,8 +319,15 @@ const KINDS = [
   { name: 'Vampire',    color: '#a02040', pay: 160, hp: 90,  dmg: 18, range: 4.5, cdMax: 1.7, ranged: 1, research: 1.0, weight: 1,   speed: 1.5, sprite: 'vampire', elite: 'vampire_elite' },
   { name: 'Salamander', color: '#e07a30', pay: 130, hp: 130, dmg: 14, range: 1.2, cdMax: 1.1, ranged: 0, research: 0.3, weight: 1,   speed: 1.6, sprite: 'salamander', elite: 'salamander_elite' },
   { name: 'Spider',     color: '#4a3a5a', pay: 100, hp: 75,  dmg: 9,  range: 1.2, cdMax: 0.8, ranged: 0, research: 0.3, weight: 1,   speed: 2.2, sprite: 'spider' },
+  // second batch, each with a trick of its own
+  { name: 'Mistress',     color: '#c03070', pay: 140, hp: 85,  dmg: 10, range: 1.6, cdMax: 0.9, ranged: 0, research: 0.3, weight: 1,   speed: 1.8, sprite: 'mistress', torturer: true },      // speeds up the rack
+  { name: 'Assassin',     color: '#40455a', pay: 120, hp: 55,  dmg: 12, range: 1.2, cdMax: 0.7, ranged: 0, research: 0.2, weight: 1,   speed: 2.5, sprite: 'assassin', elite: 'rogue', ambush: true },   // double damage on a healthy target
+  { name: 'Black Knight', color: '#555a70', pay: 170, hp: 200, dmg: 12, range: 1.2, cdMax: 1.2, ranged: 0, research: 0.3, weight: 1,   speed: 1.3, sprite: 'black_knight', elite: 'fire_knight', armor: 0.25 },   // takes a quarter less damage
+  { name: 'Fly',          color: '#d0a030', pay: 70,  hp: 40,  dmg: 6,  range: 4,   cdMax: 0.7, ranged: 1, research: 0.1, weight: 1.5, speed: 2.8, sprite: 'wasp', elite: 'firefly', flying: true },     // hovers; fast and fragile
+  { name: 'Reaper',       color: '#b02828', pay: 200, hp: 220, dmg: 20, range: 1.3, cdMax: 1.4, ranged: 0, research: 0.1, weight: 0.5, speed: 1.5, sprite: 'reaper', cleave: true },       // scythe hits the neighbours too
+  { name: 'Dark Angel',   color: '#4a3a8a', pay: 220, hp: 150, dmg: 15, range: 5,   cdMax: 1.4, ranged: 1, research: 0.8, weight: 0.4, speed: 1.7, sprite: 'dark_angel', elite: 'dark_angel_elite', heals: true, flying: true },   // patches up wounded allies
 ];
-const PRAY = { Goblin: 0.5, Troll: 0.3, Warlock: 1.4, 'Dark Elf': 0.8, 'Bile Demon': 0.3, Vampire: 1.2, Salamander: 0.4, Spider: 0.3 };   // Attributes.manaGenPrayer
+const PRAY = { Goblin: 0.5, Troll: 0.3, Warlock: 1.4, 'Dark Elf': 0.8, 'Bile Demon': 0.3, Vampire: 1.2, Salamander: 0.4, Spider: 0.3, Mistress: 0.6, Assassin: 0.2, 'Black Knight': 0.3, Fly: 0.2, Reaper: 0.2, 'Dark Angel': 1.0 };   // Attributes.manaGenPrayer
 for (const k of KINDS) k.pray = PRAY[k.name];
 function pickKind() {                              // portal arrivals, weighted so the common kinds show up more
   let r = rand() * KINDS.reduce((s, k) => s + k.weight, 0);
@@ -331,22 +338,29 @@ const spriteOf = (u) => (u.level >= 3 && u.elite) ? u.elite : u.sprite;      // 
 class Creature extends Mover {                    // CreatureMoodSystem / CreatureSleepSystem: reduced to one lair + payday
   constructor(x, y, kind) { super(x, y, 1.6); Object.assign(this, kind); this.energy = 100 + (rand() * 0 | 0); this.anger = 0; this.lair = null; this.state = 'idle'; this.wait = 1;
     this.id = ++Creature.n; this.energy = 70 + rand() * 30;
-    Object.assign(this, { hunger: rand() * 30, chicken: null, eatT: 0, foodThink: 0, prayThink: 0, desk: null, studyT: 0, studyThink: 0, maxHp: kind.hp, team: 'k', cd: 0, haste: 0, sight: 7, level: 1, xp: 0, rep: 0, dead: false, flash: 0, held: false }); }
+    Object.assign(this, { hunger: rand() * 30, victim: null, tortureThink: 0, chicken: null, eatT: 0, foodThink: 0, prayThink: 0, desk: null, studyT: 0, studyThink: 0, maxHp: kind.hp, team: 'k', cd: 0, haste: 0, sight: 7, level: 1, xp: 0, rep: 0, dead: false, flash: 0, held: false }); }
   get mood() { return this.anger >= 1600 ? 'angry' : this.anger >= 800 ? 'unhappy' : 'content'; }
   releaseDesk() { if (this.desk) { this.desk.occ = null; this.desk = null; } }
+  releaseVictim() { if (this.victim) { if (this.victim.tormentor === this) this.victim.tormentor = null; this.victim = null; } }
   releaseChicken() { if (this.chicken) { this.chicken.claimedBy = null; this.chicken.frozen = false; this.chicken = null; } }
   update(dt) {
     if (this.dead || this.held) return;
     this.flash = Math.max(0, this.flash - dt);
     if (this.desk && !['research', 'toDesk', 'pray', 'toAltar'].includes(this.state)) this.releaseDesk();   // anything that interrupts studying or praying frees the seat
     if (this.chicken && this.state !== 'toFood' && this.state !== 'eat') this.releaseChicken();
+    if (this.victim && this.state !== 'toRack' && this.state !== 'torture') this.releaseVictim();
     if (this.unconscious) { if (!this.carriedBy) { this.uTime -= dt; if (this.uTime <= 0) { say(this.name + ' #' + this.id + ' bled out.'); kill(this, null); } } return; }
+    if (this.heals) {                                                     // Dark Angel: patch up wounded creatures nearby
+      this.healCd = Math.max(0, (this.healCd || 0) - dt);
+      const ally = this.healCd <= 0 && G.creatures.find(c => c !== this && !c.dead && !c.unconscious && c.hp < c.maxHp * 0.7 && dist(this, c) <= 5 && los(this.x, this.y, c.x, c.y));
+      if (ally) { ally.hp = Math.min(ally.maxHp, ally.hp + 20); this.healCd = 3; G.fx.push({ x: ally.x, y: ally.y - 0.4, txt: '+20', life: 0.7, color: '#8fffa0' }); G.fx.push({ x: ally.x, y: ally.y, ring: true, r: 0.9, color: '#8fffa0', life: 0.5, max: 0.5 }); }
+    }
     if (this.state !== 'sleep') this.energy -= 1.4 * dt;
     if (!this.noFood) { this.hunger += VAR.HUNGER_PER_SECOND * dt; if (this.hunger >= VAR.HUNGRY_AT) this.anger += VAR.HUNGER_ANGER_PER_SECOND * dt; }   // REASON_NO_FOOD
     if (!this.lair && !this.noLair) {             // REASON_NO_LAIR: anger accrues until a bed is assigned
       this.anger += 25 * dt; const bed = freeBed(); if (bed) { bed.occupant = this; this.lair = bed; say(this.name + ' #' + this.id + ' claimed a bed.'); }
     }
-    if (this.anger >= 3000) { say(this.name + ' #' + this.id + ' is furious and leaves your dungeon!'); if (this.lair) this.lair.occupant = null; this.releaseDesk(); this.releaseChicken(); return 'leave'; }
+    if (this.anger >= 3000) { say(this.name + ' #' + this.id + ' is furious and leaves your dungeon!'); if (this.lair) this.lair.occupant = null; this.releaseDesk(); this.releaseChicken(); this.releaseVictim(); return 'leave'; }
     if (fightBrain(this, dt)) return;                                     // CreatureState: shouldFleeOrAttack comes first
     if (this.hp < this.maxHp)                                             // own-land regen, much faster asleep in the lair
       this.hp = Math.min(this.maxHp, this.hp + (this.state === 'sleep' ? 8 : VAR.OWN_LAND_HEALTH_INCREASE_PER_SECOND) * dt);
@@ -375,6 +389,12 @@ class Creature extends Mover {                    // CreatureMoodSystem / Creatu
         if (ch) ch.dead = true; this.chicken = null; this.hunger = 0; this.hp = Math.min(this.maxHp, this.hp + this.maxHp * 0.15); this.anger = Math.max(0, this.anger - 300);
         G.fx.push({ x: this.x, y: this.y - 0.5, txt: 'Yum', life: 0.8, color: '#ffd080' }); this.state = 'idle'; this.wait = 1;
       }
+    } else if (this.state === 'toRack') {                                 // a Mistress goes to whoever is strapped to a rack
+      const b = this.victim; if (!b || b.dead || b.status !== 'torture' || b.carriedBy) { this.releaseVictim(); this.state = 'idle'; this.path = null; }
+      else if (this.stepMove(dt)) this.state = 'torture';
+    } else if (this.state === 'torture') {
+      const b = this.victim; if (!b || b.dead || b.status !== 'torture' || b.tormentor !== this || this.energy < 35 || this.hunger >= VAR.HUNGRY_AT) { this.releaseVictim(); this.state = 'idle'; this.wait = 1; }
+      else { this.face = Math.atan2(b.y - this.y, b.x - this.x); this.anger = Math.max(0, this.anger - 30 * dt); }
     } else if (this.state === 'toAltar') {
       if (this.stepMove(dt)) { this.state = 'pray'; this.studyT = VAR.PRAY_SECONDS; }
     } else if (this.state === 'pray') {                                   // Temple: prayer turns into mana and soothes the creature
@@ -394,6 +414,11 @@ class Creature extends Mover {                    // CreatureMoodSystem / Creatu
         let best = null, bd = Infinity; for (const ch of G.chickens) if (!ch.dead && !ch.claimedBy) { const d = dist(this, ch); if (d < bd) { bd = d; best = ch; } }
         const p = best && findPath(this.tx, this.ty, best.tx, best.ty);
         if (p) { best.claimedBy = this; this.chicken = best; this.state = 'toFood'; this.go(p); this.rep = 0.5; return; }
+      }
+      this.tortureThink -= dt;
+      if (this.torturer && !this.path && this.tortureThink <= 0 && this.hunger < VAR.HUNGRY_AT) {
+        this.tortureThink = 2; const b = G.prisoners.find(p => p.status === 'torture' && !p.carriedBy && (!p.tormentor || p.tormentor.dead)), pth = b && findPath(this.tx, this.ty, b.tx, b.ty);
+        if (pth) { b.tormentor = this; this.victim = b; this.state = 'toRack'; this.go(pth); return; }
       }
       this.studyThink -= dt; this.prayThink -= dt;
       if (this.research > 0 && G.research.current && !this.path && this.studyThink <= 0) {                // idle thinkers look for a free desk
@@ -442,14 +467,19 @@ function nearestFoe(u, maxD, needLos) {
 const heartTarget = { get x() { return G.heart.x + 0.5; }, get y() { return G.heart.y + 0.5; }, heart: true, dead: false };
 const roll = (d) => d * (0.85 + rand() * 0.3);
 function strike(u, t) {
-  u.cd = u.cdMax; u.face = Math.atan2(t.y - u.y, t.x - u.x); const dmg = roll(u.dmg);
+  u.cd = u.cdMax; u.face = Math.atan2(t.y - u.y, t.x - u.x); let dmg = roll(u.dmg);
+  if (u.ambush && !t.heart && !t.door && t.hp >= t.maxHp) { dmg *= 2; G.fx.push({ x: t.x, y: t.y - 0.8, txt: 'Backstab!', life: 0.9, color: '#ffb0b0' }); }        // Assassin: the opening blow
   if (u.ranged) G.shots.push({ x: u.x, y: u.y, tgt: t, dmg, src: u, speed: 11, color: u.team === 'k' ? '#d9a0ff' : '#ffe9a0' });
-  else hurt(t, dmg, u);
+  else {
+    hurt(t, dmg, u);
+    if (u.cleave) for (const o of foesOf(u)) if (o !== t && alive(o) && dist(o, t) < 1.4) hurt(o, dmg * 0.5, u);  // Reaper: the scythe sweeps
+  }
 }
 function hurt(t, dmg, src) {
   if (t.dead) return;
   if (t.unconscious && !src) { kill(t, null); return; }                   // traps and spells finish the helpless
   if (t.unconscious || t.imprisoned) return;
+  if (t.armor && src) dmg *= 1 - t.armor;                                   // Black Knight
   G.fx.push({ x: t.x, y: t.y - 0.4, txt: Math.round(dmg), life: 0.7, color: t.team === 'k' || t.heart ? '#ff8080' : '#fff' });
   if (t.heart) {
     G.heartHp = Math.max(0, G.heartHp - dmg); G.heartFlash = 0.2;
@@ -462,7 +492,7 @@ function kill(t, src) {
   if (t.door) { t.dead = true; G.doors = G.doors.filter(d => d !== t); const dt_ = tile(t.tx, t.ty); if (dt_) dt_.door = null; G.fx.push({ x: t.x, y: t.y, splat: true, life: 3 }); G.dirty = true; say('A door was smashed!'); return; }
   t.dead = true; G.fx.push({ x: t.x, y: t.y, splat: true, life: 6 });
   if (t.isImp) { t.drop(); say('An imp was slain.'); }
-  else if (t.team === 'k') { if (t.lair) t.lair.occupant = null; if (t.releaseDesk) { t.releaseDesk(); t.releaseChicken(); } say(t.name + ' #' + t.id + ' has fallen!'); }
+  else if (t.team === 'k') { if (t.lair) t.lair.occupant = null; if (t.releaseDesk) { t.releaseDesk(); t.releaseChicken(); t.releaseVictim(); } say(t.name + ' #' + t.id + ' has fallen!'); }
   else { G.kills++; say('A hero ' + t.name + ' is slain.'); }
   if (src && src.team === 'k' && src.level && !src.dead) gainXp(src);
 }
@@ -714,9 +744,10 @@ function updateJail(dt) {
     if (b.carriedBy) continue;
     const tort = b.status === 'torture';
     b.hp -= (tort ? TORTURE_DRAIN : PRISON_DRAIN) * dt;
-    if (tort) b.torment += dt;
+    const helper = tort && b.tormentor && !b.tormentor.dead && b.tormentor.state === 'torture';
+    if (tort) b.torment += dt * (helper ? 1.6 : 1);                       // a Mistress at the rack works 60% faster
     if (b.hp <= 0) release(b, tort ? 'break' : 'starve');
-    else if (tort && b.torment >= TORTURE_SECONDS) release(b, rand() < CONVERT_CHANCE ? 'convert' : 'break');
+    else if (tort && b.torment >= TORTURE_SECONDS) release(b, rand() < (helper ? 0.88 : CONVERT_CHANCE) ? 'convert' : 'break');
   }
 }
 function release(b, how) {
@@ -1012,4 +1043,4 @@ function frame(now) {
 }
 requestAnimationFrame(frame);
 window.__ui = { get mouse() { return mouse; }, get tool() { return tool; }, inputDown, inputMove, inputUp };
-window.__game = { Chicken, updateHatchery, prayRate, spriteOf, pickKind, RESEARCH, isAvail, unlockAll, addResearch, SKELETON, freeSlot, updateJail, knockOut, KO_SECONDS, TORTURE_SECONDS, SPELLS, SPELL_ORDER, castSpell, TRAPS, DOOR, placeThings, removeThings, doorAt, trapAt, HERO_LAND, W, H, G, HEROES, KINDS, spawnWave, Creature, Imp, Hero, hurt, los, T, TERRAIN, step, tagRect, build, scanTasks, findPath, capacity, goldReleased, damageTile, perApplication, VAR };
+window.__game = { strike, Chicken, updateHatchery, prayRate, spriteOf, pickKind, RESEARCH, isAvail, unlockAll, addResearch, SKELETON, freeSlot, updateJail, knockOut, KO_SECONDS, TORTURE_SECONDS, SPELLS, SPELL_ORDER, castSpell, TRAPS, DOOR, placeThings, removeThings, doorAt, trapAt, HERO_LAND, W, H, G, HEROES, KINDS, spawnWave, Creature, Imp, Hero, hurt, los, T, TERRAIN, step, tagRect, build, scanTasks, findPath, capacity, goldReleased, damageTile, perApplication, VAR };
