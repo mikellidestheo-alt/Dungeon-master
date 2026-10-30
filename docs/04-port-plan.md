@@ -35,6 +35,12 @@
 10. **3D renderer** *(started: `web/render3d.js` draws the sim isometrically with the project's own prop sprites, generated floor/wall textures and stand-in unit shapes; no DK2 art, no fog of war, wall pieces are plain textured blocks)* — slab meshes from `complete/side/top` art resources, wall-section selection by neighbour mask, lighting from terrain colours, water/lava planes, fog of war texture, minimap.
 11. **Audio** *(done for the prototype: synthesised effects driven by sim events, distance attenuation, procedural score that follows the invasion, HUD mute/volume, optional recordings through `web/assets/audio/sounds.json`; still to do: user-supplied music tracks, and reading a user's own DK2 SDT archives with `SdtFile`/`BankMapFile`/`SFFile`)* — see `05-audio.md`.
 
+## Status of the level system
+
+Levels are data (`web/levels.js`, format in `docs/06-levels.md`): terrain from random blobs or a text grid, starting resources, unlocks and
+the wave script. Still to build: objectives and briefings on screen, a chapter menu with saved progress, a sandbox menu with an endless
+mode, a second working Hero Gate, and the ten chapters themselves.
+
 ## Suggested module layout (TypeScript)
 ```
 src/

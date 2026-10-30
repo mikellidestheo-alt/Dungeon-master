@@ -9,7 +9,17 @@
  * Numbers marked VAR are the stock DK2 values logged in Variable.MiscType; the rest is tuning.
  * ===================================================================================== */
 
-const W = 40, H = 28, TS = 20;                       // map size in tiles, pixels per tile
+/* ---- the level: plain data from levels.js (docs/06-levels.md). Pick one with ?level=<id>. ---- */
+const LEVEL_TABLE = window.LEVELS || {};
+const LV = LEVEL_TABLE[new URLSearchParams(location.search).get('level')] || LEVEL_TABLE[window.DEFAULT_LEVEL] || Object.values(LEVEL_TABLE)[0];
+function levelSize(lv) { const g = lv.terrain.grid; return g ? [g[0].length, g.length] : lv.terrain.size; }
+function levelPos(lv) {                                // centres of the Heart, Portal and Gate(s): explicit, or read off a grid's H / P / X markers
+  const g = lv.terrain.grid; if (!g) return { heart: lv.heart, portal: lv.portal, gates: lv.gates };
+  const find = (c) => { const out = []; g.forEach((row, y) => { for (let x = 0; x < row.length; x++) if (row[x] === c) out.push([x, y]); }); return out; };
+  return { heart: find('H')[0], portal: find('P')[0] || null, gates: find('X') };
+}
+const POS = levelPos(LV);
+const W = levelSize(LV)[0], H = levelSize(LV)[1], TS = 20;     // map size in tiles, pixels per tile
 const VAR = {                                         // Variable.MiscVariable.MiscType
   DIG_ROCK_HEALTH: 5000, MINE_GOLD_HEALTH: 300, CLAIM_TILE_HEALTH: 825,
   GOLD_MINED_FROM_GEMS: 25, MAX_GOLD_PER_TREASURY_TILE: 3000,
@@ -55,15 +65,17 @@ const TERRAIN = [
 /* ---- tiny seeded RNG so levels are reproducible (?seed=123) ---- */
 function rng(seed) { return function () { seed |= 0; seed = seed + 0x6D2B79F5 | 0; let t = Math.imul(seed ^ seed >>> 15, 1 | seed);
   t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
+Object.assign(VAR, { HEART_HEALTH: LV.rules.heartHp, WAVES: LV.waves.plan.length, FIRST_WAVE_DELAY: LV.waves.prep, WAVE_INTERVAL: LV.waves.interval });   // the level sets the invasion's pace
 const qs = new URLSearchParams(location.search);
-const rand = rng(parseInt(qs.get('seed') || '7', 10));
+const rand = rng(parseInt(qs.get('seed') || LV.seed || '7', 10));
 
 /* ===================================================================================== world */
 const G = {
-  map: [], time: 0, speed: 1, gold: 1000, imps: [], creatures: [], tasks: new Map(),
+  map: [], time: 0, speed: 1, gold: LV.start.gold, imps: [], creatures: [], tasks: new Map(),
   nextImp: 0, nextSpawn: 20, nextPay: VAR.PAY_DAY_FREQUENCY_SECONDS, scanT: 0, log: [],
-  portalOwned: false, heart: { x: 6, y: H >> 1 }, portal: { x: W - 8, y: H >> 1 }, gate: { x: 22, y: H - 5 },
-  heroes: [], prisoners: [], shots: [], fx: [], doors: [], traps: [], clouds: [], mana: 300, maxMana: 1000, manaRate: 3, spellCd: {}, rally: null, ownedTiles: 0, manaT: 0, research: { current: 'prison', points: {}, done: {} }, chickens: [], hatchT: 0, hatchTiles: [], hatchScan: 0, heartHp: VAR.HEART_HEALTH, heartFlash: 0, gateOpen: false, gateT: 0,
+  portalOwned: false, heart: { x: POS.heart[0], y: POS.heart[1] }, portal: POS.portal && { x: POS.portal[0], y: POS.portal[1] },
+  gates: POS.gates.map(g => ({ x: g[0], y: g[1] })), gate: { x: POS.gates[0][0], y: POS.gates[0][1] },
+  heroes: [], prisoners: [], shots: [], fx: [], doors: [], traps: [], clouds: [], mana: LV.start.mana, maxMana: 1000, manaRate: 3, spellCd: {}, rally: null, ownedTiles: 0, manaT: 0, research: { current: LV.start.research || null, points: {}, done: {} }, chickens: [], hatchT: 0, hatchTiles: [], hatchScan: 0, heartHp: VAR.HEART_HEALTH, heartFlash: 0, gateOpen: false, gateT: 0,
   wave: 0, nextWave: Infinity, over: null, kills: 0, held: null, nextId: 0,
 };
 const idx = (x, y) => y * W + x;
@@ -74,29 +86,49 @@ function setTerrain(t, id) { t.t = id; t.hp = TERRAIN[id].maxHealth; t.tag = 0; 
 function say(msg) { G.log.unshift(msg); if (G.log.length > 40) G.log.pop(); renderLog(true); }
 const sfx = (id, x, y, o) => { if (window.Sound) Sound.play(id, x, y, o); };      // audio.js. Never touches rand(), so sound on/off cannot change a seeded run
 
-function genMap() {
-  for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
-    const border = x === 0 || y === 0 || x === W - 1 || y === H - 1;
-    G.map[idx(x, y)] = { t: border ? T.ROCK : T.EARTH, owner: 0, hp: border ? 1 : 12000, gold: 0, tag: 0, stored: 0, room: 0 };
-  }
-  const blob = (cx, cy, r, id) => { for (let y = cy - r; y <= cy + r; y++) for (let x = cx - r; x <= cx + r; x++) {
-      if (inb(x, y) && x > 0 && y > 0 && x < W - 1 && y < H - 1 && Math.hypot(x - cx, y - cy) <= r + rand() * 0.9 && G.map[idx(x, y)].t === T.EARTH) {
-        const t = G.map[idx(x, y)]; t.t = id; t.hp = TERRAIN[id].maxHealth; t.gold = TERRAIN[id].goldValue || 0; } } };
-  for (let i = 0; i < 6; i++) blob(4 + (rand() * (W - 8) | 0), 2 + (rand() * (H - 4) | 0), 1 + (rand() * 2 | 0), T.ROCK);
-  for (let i = 0; i < 7; i++) blob(12 + (rand() * (W - 24) | 0), 2 + (rand() * (H - 4) | 0), 1, T.GOLD);
-  blob(W - 14, 4, 1, T.GEM);
+/* ---- building the world from the level data (docs/06-levels.md). Two terrain sources: random blobs, or a hand-drawn text grid. ---- */
+const OWNER = { keeper: 1, none: 0, hero: HERO_LAND };
+function buildMap() {
+  const tl = LV.terrain, fresh = (t, owner = 0, hp = null) => ({ t, owner, hp: hp === null ? TERRAIN[t].maxHealth : hp, gold: TERRAIN[t].goldValue || 0, tag: 0, stored: 0, room: 0 });
   const carve = (x0, y0, x1, y1, owner) => { for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) {
     const t = G.map[idx(x, y)]; t.t = T.PATH; t.hp = owner ? 1000 : 0; t.owner = owner; t.gold = 0; } };
   const room = (cx, cy, id, owner) => { for (let y = cy - 1; y <= cy + 1; y++) for (let x = cx - 1; x <= cx + 1; x++) {
     const t = G.map[idx(x, y)]; t.t = id; t.hp = 1000; t.owner = owner; t.room = cx * 100 + cy; } };
-  const h = G.heart, p = G.portal;
-  carve(h.x - 4, h.y - 3, h.x + 4, h.y + 3, 1); room(h.x, h.y, T.HEART, 1);
-  carve(p.x - 3, p.y - 3, p.x + 3, p.y + 3, 0);          // portal cavern starts unclaimed
-  room(p.x, p.y, T.PORTAL, 0);
-  const gt = G.gate;                                      // hero land: not claimable, heroes arrive once a tunnel links it to you
-  carve(gt.x - 3, gt.y - 3, gt.x + 3, gt.y + 2, HERO_LAND); room(gt.x, gt.y, T.GATE, HERO_LAND);
-  // a few first tiles are already pre-tagged for the lazy
-  for (let x = h.x + 5; x < h.x + 9; x++) { const t = G.map[idx(x, h.y)]; if (TERRAIN[t.t].tag) t.tag = 1; }
+  if (tl.grid) {                                          // legend: # rock . earth g gold G gem _ floor o your floor h hero land, H P X room centres
+    const CH = { '#': () => fresh(T.ROCK), '.': () => fresh(T.EARTH), g: () => fresh(T.GOLD), G: () => fresh(T.GEM), _: () => fresh(T.PATH, 0, 0), o: () => fresh(T.PATH, 1, 1000), h: () => fresh(T.PATH, HERO_LAND, 1000) };
+    CH.H = CH.P = CH.X = CH._;
+    tl.grid.forEach((row, y) => { for (let x = 0; x < W; x++) { const mk = CH[row[x]]; if (!mk) console.warn('level grid: unknown character "' + row[x] + '" at ' + x + ',' + y); G.map[idx(x, y)] = (mk || CH['.'])(); } });
+  } else {                                                // random terrain: solid earth with a rock border, then blobs of rock, gold and gems (same call order as always, so seeds stay reproducible)
+    for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+      const border = x === 0 || y === 0 || x === W - 1 || y === H - 1;
+      G.map[idx(x, y)] = { t: border ? T.ROCK : T.EARTH, owner: 0, hp: border ? 1 : 12000, gold: 0, tag: 0, stored: 0, room: 0 };
+    }
+    const blob = (cx, cy, r, id) => { for (let y = cy - r; y <= cy + r; y++) for (let x = cx - r; x <= cx + r; x++) {
+        if (inb(x, y) && x > 0 && y > 0 && x < W - 1 && y < H - 1 && Math.hypot(x - cx, y - cy) <= r + rand() * 0.9 && G.map[idx(x, y)].t === T.EARTH) {
+          const t = G.map[idx(x, y)]; t.t = id; t.hp = TERRAIN[id].maxHealth; t.gold = TERRAIN[id].goldValue || 0; } } };
+    const gen = tl.generate, scatter = (o, id) => { for (let i = 0; i < o.count; i++) blob(o.x + (rand() * o.xSpan | 0), o.y + (rand() * o.ySpan | 0), o.rMin + (o.rSpan ? (rand() * o.rSpan | 0) : 0), id); };
+    scatter(gen.rock, T.ROCK); scatter(gen.gold, T.GOLD);
+    for (const gm of gen.gems || []) blob(gm.x, gm.y, gm.r, T.GEM);
+    for (const c of tl.caverns || []) carve(...c.rect, OWNER[c.owner]);
+  }
+  room(G.heart.x, G.heart.y, T.HEART, 1);
+  if (G.portal) room(G.portal.x, G.portal.y, T.PORTAL, 0);
+  for (const gt of G.gates) room(gt.x, gt.y, T.GATE, HERO_LAND);       // hero land: not claimable, heroes arrive once a tunnel links it to you
+  for (const [x, y] of LV.start.pretag || []) { const t = tile(x, y); if (t && TERRAIN[t.t].tag) t.tag = 1; }    // a few first tiles are already tagged for the lazy
+}
+
+/* Checks a level's data and returns a list of problems (empty = fine). Used at start-up and by the tests. */
+function validateLevel(lv) {
+  const errs = [], need = (c, m) => { if (!c) errs.push(m); };
+  need(lv && lv.id, 'missing id'); if (!lv || !lv.terrain) return errs.concat('missing terrain');
+  need(lv.terrain.grid || (lv.terrain.size && lv.terrain.generate), 'terrain needs a grid, or size + generate');
+  const [w, h] = levelSize(lv), pos = levelPos(lv), inside = (p, m) => need(p && p[0] >= 2 && p[1] >= 2 && p[0] <= w - 3 && p[1] <= h - 3, m + ' must lie inside the map with room for its 3x3 pad');
+  if (lv.terrain.grid) need(lv.terrain.grid.every(r => r.length === w), 'every grid row must be as long as the first');
+  inside(pos.heart, 'the Heart'); inside(pos.portal, 'the Portal'); need(pos.gates && pos.gates.length, 'at least one Hero Gate'); (pos.gates || []).forEach((g, i) => inside(g, 'Hero Gate ' + (i + 1)));
+  need(lv.waves && lv.waves.plan && lv.waves.plan.length, 'waves.plan needs at least one wave');
+  ((lv.waves && lv.waves.plan) || []).forEach((wv, i) => wv.forEach(nm => need(HEROES.some(k => k.name === nm), 'wave ' + (i + 1) + ': no hero called ' + nm)));
+  need(lv.waves && lv.waves.prep >= 0 && lv.waves.interval > 0, 'waves.prep and waves.interval'); need(lv.start && typeof lv.start.gold === 'number', 'start.gold'); need(lv.rules && lv.rules.heartHp > 0, 'rules.heartHp');
+  return errs;
 }
 
 /* ===================================================================================== path-finding
@@ -566,8 +598,7 @@ const HEROES = [
   { name: 'King',         letter: 'Y', color: '#f0d060', hp: 330, dmg: 16, range: 1.2, cdMax: 1.0, ranged: 0, speed: 1.5, sprite: 'king', fearless: true, boss: true, armor: 0.1 },                // leads the final wave
 ];
 // the invasion is scripted so the new types debut in a sensible order (wave 1 .. 5)
-const WAVE_PLAN = [['Knight', 'Archer'], ['Knight', 'Mage', 'Thief'], ['Knight', 'Dwarf', 'Guard', 'Monk'],
-  ['Prince', 'Giant', 'Fairy', 'Archer', 'Thief'], ['King', 'Stone Knight', 'Guard', 'Fairy', 'Mage', 'Archer']];
+const WAVE_PLAN = LV.waves.plan;                                                  // one list of hero names per wave, from the level
 class Hero extends Mover {
   constructor(x, y, kind, scale, party) { super(x, y, kind.speed); Object.assign(this, kind);
     this.hp = this.maxHp = Math.round(kind.hp * scale); this.dmg = kind.dmg * scale; this.team = 'h'; this.cd = 0; this.sight = 7;
@@ -594,7 +625,7 @@ class Hero extends Mover {
   }
 }
 function spawnWave() {
-  const n = G.wave, scale = 1 + 0.12 * n, party = [];
+  const n = G.wave, scale = (1 + LV.waves.scale * n) * (LV.waves.heroMult || 1), party = [];
   const kinds = WAVE_PLAN[Math.min(n, WAVE_PLAN.length - 1)].map(nm => HEROES.find(h => h.name === nm));
   for (let i = 0; i < kinds.length; i++) {
     const kind = kinds[i];
@@ -1062,10 +1093,15 @@ function renderResearch() {
     : studying + ' studying at ' + libTiles + ' desk(s), +' + rate.toFixed(1) + ' pts/s' + (r.current ? '' : ' — nothing selected');
 }
 
-genMap(); scanTasks();
-if (qs.get('unlock') === '1') unlockAll();
-for (let i = 0; i < 3; i++) G.imps.push(new Imp(G.heart.x - 1 + i, G.heart.y + 2));
-say('Welcome, Keeper. Tag earth near the Heart; dig east to the portal.');
+function applyStart() {                                                              // what the level hands you at the start
+  const st = LV.start;
+  if (st.unlock === 'all' || qs.get('unlock') === '1') unlockAll();
+  else if (Array.isArray(st.unlock)) for (const id of st.unlock) if (RESEARCH[id]) G.research.done[id] = true;
+  for (let i = 0; i < (st.imps === undefined ? 3 : st.imps); i++) G.imps.push(new Imp(G.heart.x - 1 + i, G.heart.y + 2));
+  say(st.welcome || 'Welcome, Keeper.');
+}
+buildMap(); scanTasks(); applyStart();
+const LEVEL_ERRORS = validateLevel(LV); if (LEVEL_ERRORS.length) console.warn('Level "' + LV.id + '" has problems:\n - ' + LEVEL_ERRORS.join('\n - '));
 refreshButtons();
 
 /* What the score should feel: calm until invaders are alive and awake, then tension grows with their number and their distance to the
@@ -1091,4 +1127,4 @@ function frame(now) {
 }
 requestAnimationFrame(frame);
 window.__ui = { get mouse() { return mouse; }, get tool() { return tool; }, inputDown, inputMove, inputUp };
-window.__game = { strike, Chicken, updateHatchery, prayRate, spriteOf, pickKind, RESEARCH, isAvail, unlockAll, addResearch, SKELETON, freeSlot, updateJail, knockOut, KO_SECONDS, TORTURE_SECONDS, SPELLS, SPELL_ORDER, castSpell, TRAPS, DOOR, placeThings, removeThings, doorAt, trapAt, HERO_LAND, W, H, G, HEROES, KINDS, spawnWave, Creature, Imp, Hero, hurt, los, T, TERRAIN, step, tagRect, build, scanTasks, findPath, capacity, goldReleased, damageTile, perApplication, VAR, audioMood, SPELL_SND, release };
+window.__game = { LV, LEVEL_TABLE, validateLevel, buildMap, levelSize, levelPos, strike, Chicken, updateHatchery, prayRate, spriteOf, pickKind, RESEARCH, isAvail, unlockAll, addResearch, SKELETON, freeSlot, updateJail, knockOut, KO_SECONDS, TORTURE_SECONDS, SPELLS, SPELL_ORDER, castSpell, TRAPS, DOOR, placeThings, removeThings, doorAt, trapAt, HERO_LAND, W, H, G, HEROES, KINDS, spawnWave, Creature, Imp, Hero, hurt, los, T, TERRAIN, step, tagRect, build, scanTasks, findPath, capacity, goldReleased, damageTile, perApplication, VAR, audioMood, SPELL_SND, release };
