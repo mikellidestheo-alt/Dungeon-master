@@ -14,7 +14,9 @@ keeper. Winning means beating every wave; losing means the Dungeon Heart falls.
 {
   id: 'classic',                 // the id used in ?level=
   name: 'The First Dungeon',     // shown on the briefing screen
-  briefing: '...',               // text for the briefing screen (open it with ?brief=1; the chapter menu will always show it)
+  tagline: 'One line for the menu.',
+  briefing: '...',               // text for the briefing card (the chapter menu always opens a level with it; ?brief=1 does the same by hand)
+  stars: { heart: 0.5, par: 300 },   // optional, tunes the three stars: see "Chapters, stars and saves"
   seed: 7,                       // default random seed; the URL's ?seed= wins
 
   terrain: { ... },              // EITHER random blobs OR a hand-drawn grid, see below
@@ -88,10 +90,31 @@ ticks them off, and the victory text is `LV.victory` if the level sets one.
 A step with `when` moves on by itself the moment its condition holds (even if it already held, so steps never get stuck behind things the
 player did early). The ✕ hides the guide for the session; `?guide=0` turns it off. The guide never blocks play.
 
+## Chapters, stars and saves
+
+The campaign is the ordered list `window.CAMPAIGN = ['lesson', 'classic', ...]` at the top of `levels.js`. **`menu.html`** is the front door:
+it lists those chapters with their `tagline`, shows stars and the best time, and opens a chapter at `index.html?level=<id>&brief=1`. A
+chapter is unlocked when the one before it has been won (the first always is). `menu.html?unlock=all` opens every chapter for testing.
+Levels that are not in `CAMPAIGN` (`tiny`) still play from the URL; they are saved too, but not listed.
+
+**Three stars**, judged when you win (rules in `web/progress.js`):
+
+1. win the chapter;
+2. the Dungeon Heart still has at least `stars.heart` of its health (default `0.5`);
+3. every bonus objective (`optional: true`) is done, **and** the chapter was won within `stars.par` seconds if it sets one. A level with
+   neither bonus objectives nor a par time asks for the Heart at 90% instead.
+
+**The end screen** replaces the old banner in both the 2D and the 3D view: Victory or Defeat, time, heroes slain, Heart, the stars with
+what each one asked, "First victory!" / "New best!", then **Next chapter** (when there is one), **Retry** and **Chapters**.
+
+**Saves** are one localStorage key, `dm.save.v1`: `{ v: 1, levels: { <id>: { stars, bestTime, bestKills, bestHeart, wins, defeats } } }`.
+Stars and the best time only ever improve; a defeat adds to `defeats`. If storage is blocked the game keeps progress in memory and never
+throws. `?nosave=1` skips saving (bots and experiments). The menu's "Erase saved progress" removes the key.
+
 ## Briefing
 
 `index.html?level=<id>&brief=1` opens the level behind a **briefing card**: name, `briefing` text and the list of goals, with the game
-paused until **Begin**. `showBriefing()` is the same card for the chapter menu to call.
+paused until **Begin**. The chapter menu, Next chapter and Retry always open levels this way; opening the page by hand does not.
 
 Hero names must match `HEROES` in `game.js`: Knight, Archer, Mage, Thief, Guard, Monk, Prince, Dwarf, Giant, Stone Knight, Fairy, King.
 The first hero in a wave is its leader. Heroes spawn on the Hero Gate pad, up to 9 per wave.
@@ -142,10 +165,11 @@ Put each marker inside a cavern at least 3x3 wide so the room pad fits. Several 
    step (known type, its parameters, real rooms/items/tools).
 3. `node tools/test_levels.js` runs the format's checks. It validates every level in the file, pins `classic` to the original level
    and plays `tiny` from start to victory. `node tools/test_objectives.js` covers objectives, the guide, the briefing and gate-less levels
-   (it plays `lesson`, a no-Portal, no-Gate level won by objectives, from start to victory).
+   (it plays `lesson`, a no-Portal, no-Gate level won by objectives, from start to victory). `node tools/test_campaign.js` covers the star
+   rules, saves, the menu, and the Victory / Defeat screens.
 
 ## What a level cannot express yet (planned)
 
 - **More than one working Hero Gate**: the rooms are built for each `X`, but heroes still spawn only at the first.
 - **Pre-placed creatures, doors and traps, per-level terrain tweaks, endless waves**: not in the format yet.
-- **A chapter menu and saved progress**: levels are chosen only by the URL for now (briefings, objectives and the guide are ready for it).
+- **A sandbox menu and endless mode** (the sandbox will pick waves, difficulty, resources, unlocks and seed, and save its own best).

@@ -1,7 +1,8 @@
 /* Level definitions. Each level is plain data that game.js turns into a map, starting resources, an invasion script and rules.
  * Add a level here and open it with  index.html?level=<id>.  See docs/06-levels.md for the full format.
  *
- *   id, name, briefing        text shown to the player
+ *   id, name, tagline, briefing   text shown to the player (tagline: one line on the chapter menu; briefing: the chapter screen)
+ *   stars                     optional { heart: 0.5, par: seconds }: tweaks the three-star rules (see docs/06-levels.md)
  *   seed                      default random seed (the URL's ?seed=N wins)
  *   terrain                   EITHER { generate: {...}, caverns: [...], size: [w, h] }  (random blobs of rock, gold and gems)
  *                             OR     { grid: [rows...] }                               (a hand-drawn text map, see below)
@@ -17,11 +18,12 @@
  *               H Dungeon Heart centre   P Portal centre   X Hero Gate centre   (each marker becomes a 3x3 room)
  */
 window.DEFAULT_LEVEL = 'classic';
+window.CAMPAIGN = ['lesson', 'classic'];     // the chapters in order, as listed by menu.html; each unlocks when the one before it is won (grows to ten chapters)
 window.LEVELS = {
 
   // The original single level, reproduced from data. Same seed, same map, same invasion as before levels existed.
   classic: {
-    id: 'classic', name: 'The First Dungeon', seed: 7,
+    id: 'classic', name: 'The First Dungeon', seed: 7, tagline: 'Five waves of heroes. Build well.',
     briefing: 'Tag earth near your Dungeon Heart and dig east to the purple Portal; claim it and creatures will come. Link a tunnel to the Hero Gate in the south only when you are ready for the invasion.',
     terrain: {
       size: [40, 28],
@@ -77,7 +79,7 @@ window.LEVELS = {
   // A lesson with no Portal, no Hero Gate and no heroes: it is won by its objectives alone, and a guide walks the player through it.
   // It proves objectives, the guide and gate-less levels; the Tutorial chapter will use the same pieces.
   lesson: {
-    id: 'lesson', name: 'First Steps', seed: 3,
+    id: 'lesson', name: 'First Steps', seed: 3, tagline: 'Dig, mine and build. No heroes yet.',
     briefing: 'Your Dungeon Heart beats in the cavern at the left. Dig east through the earth, mine the gold seam, bank the gold in a Treasury and give your future creatures a Lair.',
     terrain: { grid: [
       '########################',

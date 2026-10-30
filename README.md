@@ -14,6 +14,7 @@ study of [OpenKeeper](https://github.com/tonihele/OpenKeeper) (a Java re-impleme
 | `docs/05-audio.md` | The sound system: event-to-voice table, music layers and the mood function, distance model, how to swap in recordings, testing |
 | `docs/04-port-plan.md` | Stack choices (browser vs Linux-native), legal notes, milestone list, which Java files to read for each milestone |
 | `web/levels.js` | **The levels**, as plain data: `classic` (the original level, reproduced exactly) and `tiny` (a hand-drawn text-grid map used by the tests) |
+| `web/menu.html`, `web/progress.js` | The chapter menu (the front door), saved progress in localStorage and the three-star rules. See `docs/06-levels.md` |
 | `web/index.html`, `web/game.js` | **Playable prototype**: the headless-style simulation plus a 2D canvas view, no copyrighted assets |
 | `web/audio.js` | **Sound and music**, all synthesised with WebAudio (no audio files): 48 effect voices driven by game events, quieter and panned by distance from the camera, plus a procedural dark-ambient score that builds with the invasion. HUD mute/volume. See `docs/05-audio.md` |
 | `web/render3d.js` | **3D view** (three.js). Isometric camera, your prop sprites as billboards, pixel-art floor/wall textures generated in code, stand-in shapes for units. Only reads the sim state |
@@ -22,6 +23,7 @@ study of [OpenKeeper](https://github.com/tonihele/OpenKeeper) (a Java re-impleme
 | `web/assets/audio/` | Optional: `sounds.json` maps effect ids to your own recordings, which then replace the synthesised ones. Ships empty; its media files are git-ignored |
 | `tools/test_levels.js` | Headless Chromium checks for the level format and loader: `node tools/test_levels.js` |
 | `tools/test_audio.js` | Headless Chromium checks for the sound system: `node tools/test_audio.js` |
+| `tools/test_campaign.js` | Headless Chromium checks for the chapter menu, saved progress, stars and the Victory / Defeat screens: `node tools/test_campaign.js` |
 | `tools/test_objectives.js` | Headless Chromium checks for objectives, the tutorial guide, briefings and gate-less levels: `node tools/test_objectives.js` |
 | `tools/process_art.py` | Cuts the flat background (and the painted ground shadow of characters) out of the original JPGs: `python3 tools/process_art.py <folder> [--set units --max 320]` re-generates `web/assets/sprites/` |
 | `web/assets/ui/frame.jpg` | The carved-stone/parchment interface frame. The page is a fixed-size layout (about 1461 px wide) laid over this image and scaled to the window; HUD, toolbar, map, task/log scrolls, research panel and help sit at fixed mockup coordinates |
@@ -31,7 +33,7 @@ study of [OpenKeeper](https://github.com/tonihele/OpenKeeper) (a Java re-impleme
 ## Run the prototype
 
 ```sh
-python3 -m http.server -d web 8000     # then open http://localhost:8000   (?seed=123 gives another map)
+python3 -m http.server -d web 8000     # then open http://localhost:8000/menu.html (the chapter menu); index.html?level=classic&seed=123 plays a level directly
 # ?level=<id> opens a level from web/levels.js (default `classic`; `tiny` is a small test map).
 # ?sound=0 turns all audio off (and hides the HUD controls). Sound starts at your first click or key press.
 # ?view=2d forces the old flat canvas view. Opening index.html straight from disk (file://) also falls back to 2D,

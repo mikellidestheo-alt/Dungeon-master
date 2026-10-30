@@ -133,6 +133,7 @@ function validateLevel(lv) {
   need(!plan.length || gates.length, 'waves need at least one Hero Gate for the heroes to arrive from');
   plan.forEach((wv, i) => wv.forEach(nm => need(HEROES.some(k => k.name === nm), 'wave ' + (i + 1) + ': no hero called ' + nm)));
   need(!lv.waves || (lv.waves.prep >= 0 && lv.waves.interval > 0), 'waves.prep and waves.interval'); need(lv.start && typeof lv.start.gold === 'number', 'start.gold'); need(lv.rules && lv.rules.heartHp > 0, 'rules.heartHp');
+  if (lv.stars) { need(lv.stars.heart === undefined || (lv.stars.heart > 0 && lv.stars.heart <= 1), 'stars.heart must be between 0 and 1'); need(lv.stars.par === undefined || lv.stars.par > 0, 'stars.par must be positive seconds'); }
   const cond = (c, where) => {                                   // an objective or a guide condition
     const d = c && COND[c.type]; if (!d) { errs.push(where + ': unknown condition type "' + (c && c.type) + '"'); return; }
     for (const k of d.params || []) need(c[k] !== undefined, where + ': "' + c.type + '" needs ' + k);
@@ -543,7 +544,7 @@ function hurt(t, dmg, src, snd) {
   G.fx.push({ x: t.x, y: t.y - 0.4, txt: Math.round(dmg), life: 0.7, color: t.team === 'k' || t.heart ? '#ff8080' : '#fff' });
   if (t.heart) {
     G.heartHp = Math.max(0, G.heartHp - dmg); G.heartFlash = 0.2;
-    if (G.heartHp <= 0 && !G.over) { G.over = 'defeat'; say('Your Dungeon Heart has been destroyed!'); }
+    if (G.heartHp <= 0 && !G.over) { say('Your Dungeon Heart has been destroyed!'); finishGame('defeat'); }
     return;
   }
   t.hp -= dmg; t.flash = 0.15; if (t.hp <= 0) { if (canKnockOut(t, src)) knockOut(t, src); else kill(t, src); }
@@ -695,9 +696,17 @@ function updateObjectives() {
     if (st.done) { G.objDone[i] = true; if (!o.quiet) { say('✔ ' + objText(o)); sfx('levelup'); } }
   });
   if (!G.over && OBJECTIVES.every((o, i) => o.optional || G.objDone[i])) {
-    G.over = 'victory'; G.overAt = G.time; say(LV.victory || (VAR.WAVES ? 'All invaders are defeated — the dungeon is yours!' : 'Well done, Keeper — the dungeon is yours!'));
+    say(LV.victory || (VAR.WAVES ? 'All invaders are defeated — the dungeon is yours!' : 'Well done, Keeper — the dungeon is yours!')); finishGame('victory');
   }
   while (G.guideStep < GUIDE.length && GUIDE[G.guideStep].when && condState(GUIDE[G.guideStep].when).done) G.guideStep++;     // steps with a condition move on by themselves
+}
+/* The end of a run: freezes the result, judges the stars, and saves it (progress.js). `?nosave=1` skips saving (bots, experiments). */
+function finishGame(outcome) {
+  G.over = outcome; G.overAt = G.time;
+  const bonus = OBJECTIVES.map((o, i) => o.optional ? i : -1).filter(i => i >= 0), r = { outcome, time: Math.round(G.time), kills: G.kills, heart: Math.max(0, G.heartHp) / VAR.HEART_HEALTH,
+    bonusTotal: bonus.length, bonusDone: bonus.filter(i => G.objDone[i]).length };
+  if (outcome === 'victory') { const st = Progress.stars(LV.stars, r); r.stars = st.earned; r.starList = st.list; }
+  G.result = r; G.record = qs.get('nosave') === '1' ? null : Progress.record(LV.id, r);
 }
 const guideNow = () => G.guideStep < GUIDE.length ? GUIDE[G.guideStep] : null;
 function guideTarget() {                                  // the map area the current step points at: { x0, y0, x1, y1 } in tiles, or null
@@ -1057,9 +1066,7 @@ function draw() {
   for (const f of G.fx) if (!f.splat && !f.bolt && !f.ring) { ctx.globalAlpha = Math.min(1, f.life * 2); ctx.fillStyle = f.color; ctx.fillText(f.txt, f.x * TS, (f.y - (0.7 - f.life) * 0.8) * TS); ctx.globalAlpha = 1; }
   { const hp = G.heartHp / VAR.HEART_HEALTH, bx = (G.heart.x - 1) * TS, by = (G.heart.y + 2) * TS + 2;     // Heart health
     ctx.fillStyle = 'rgba(0,0,0,.7)'; ctx.fillRect(bx, by, TS * 3, 4); ctx.fillStyle = hp > .5 ? '#e05050' : '#ff9030'; ctx.fillRect(bx, by, TS * 3 * hp, 4); }
-  if (G.over) { ctx.fillStyle = 'rgba(0,0,0,.65)'; ctx.fillRect(0, 0, cv.width, cv.height); ctx.textAlign = 'center';
-    ctx.fillStyle = G.over === 'victory' ? '#f0c040' : '#e0624f'; ctx.font = FONT_BANNER; ctx.shadowColor = G.over === 'victory' ? '#f2a93a' : '#c0392b'; ctx.shadowBlur = 18; ctx.fillText(G.over === 'victory' ? 'VICTORY' : 'DEFEAT', cv.width / 2, cv.height / 2 - 6); ctx.shadowBlur = 0;
-    ctx.fillStyle = '#e8dcc8'; ctx.font = FONT_SUB; ctx.fillText(G.kills + ' heroes slain · ' + Math.floor(G.time) + 's · reload to play again', cv.width / 2, cv.height / 2 + 24); }
+  if (G.over) { ctx.fillStyle = 'rgba(0,0,0,.65)'; ctx.fillRect(0, 0, cv.width, cv.height); }               // the words are the end screen (DOM, see renderEnd)
   const gt = guideTarget(); if (gt && !G.guideHidden && !G.over) {         // the tutorial guide's pulsing marker
     const k = 0.5 + 0.5 * Math.sin(G.time * 5); ctx.strokeStyle = 'rgba(255,211,107,' + (0.5 + 0.5 * k) + ')'; ctx.lineWidth = 3;
     ctx.strokeRect(gt.x0 * TS + 1, gt.y0 * TS + 1, (gt.x1 - gt.x0 + 1) * TS - 2, (gt.y1 - gt.y0 + 1) * TS - 2); ctx.lineWidth = 1; }
@@ -1125,7 +1132,7 @@ function renderHud() {
   $('hMana').textContent = Math.floor(G.mana) + '/' + G.maxMana;
   for (const id of SPELL_ORDER) $('b_' + id).style.opacity = G.mana >= SPELLS[id].cost && !(G.spellCd[id] > 0) ? 1 : 0.45;
   for (const id in RESEARCH) { const b = $('b_' + id); if (!isAvail(id)) { b.style.opacity = 0.3; b.title = 'Locked — research it in a Library'; } else { b.title = ''; if (!SPELLS[id]) b.style.opacity = ''; } }
-  renderResearch(); renderObjectives(); renderGuide();
+  renderResearch(); renderObjectives(); renderGuide(); renderEnd();
   $('hHeart').textContent = Math.ceil(G.heartHp); $('hHeroes').textContent = G.heroes.length; $('hWave').textContent = VAR.WAVES ? G.wave + '/' + VAR.WAVES : '—';
   $('hNext').textContent = !VAR.WAVES ? '—' : !G.gateOpen ? 'tunnel to Gate' : G.nextWave === Infinity ? '—' : Math.max(0, Math.ceil(G.nextWave - G.time)) + 's';
   let dig = 0, claim = 0, busy = 0, upkeep = 0; for (const t of G.tasks.values()) { if (t.type === 'DIG') dig++; else if (t.type === 'CLAIM') claim++; else upkeep++; if (t.who.size) busy++; }
@@ -1171,6 +1178,24 @@ function renderGuide() {
   if (tl !== guideTool) { if (guideTool && $('b_' + guideTool)) $('b_' + guideTool).classList.remove('hint'); if (tl && $('b_' + tl)) $('b_' + tl).classList.add('hint'); guideTool = tl; }
 }
 $('guideX').onclick = () => { G.guideHidden = true; };
+/* The end screen: VICTORY or DEFEAT, the numbers, the three stars and what to do next. Built once, when the run ends. */
+const CAMPAIGN = window.CAMPAIGN || [], keepParams = () => ['view', 'sound'].filter(k => qs.get(k) !== null).map(k => '&' + k + '=' + encodeURIComponent(qs.get(k))).join('');
+const goLevel = (id) => { location.href = 'index.html?level=' + encodeURIComponent(id) + '&brief=1' + keepParams(); };
+let endShown = false;
+function renderEnd() {
+  if (!G.over || endShown) return; endShown = true;
+  const r = G.result, win = r.outcome === 'victory', nextId = Progress.next(CAMPAIGN, LV.id), rec = G.record;
+  $('endTitle').textContent = win ? 'Victory' : 'Defeat'; $('endTitle').className = win ? 'win' : 'lose';
+  $('endLine').textContent = win ? (LV.name || LV.id) + ' is yours.' : 'Your Dungeon Heart has been destroyed.';
+  $('endStats').innerHTML = '<span>Time <b>' + Progress.fmtTime(r.time) + '</b></span><span>Heroes slain <b>' + r.kills + '</b></span><span>Heart <b>' + Math.round(r.heart * 100) + '%</b></span>';
+  $('endStars').innerHTML = win ? r.starList.map(s => '<li class="' + (s.ok ? 'got' : '') + '"><span class="star">' + (s.ok ? '★' : '☆') + '</span>' + s.text + '</li>').join('') : '';
+  $('endBest').textContent = !win || !rec ? '' : rec.newBest ? (rec.first ? 'First victory!' : 'New best!') : 'Best: ' + Progress.level(LV.id).stars + ' of 3 stars, ' + Progress.fmtTime(Progress.level(LV.id).bestTime);
+  $('endNext').style.display = win && nextId && LEVEL_TABLE[nextId] ? '' : 'none'; $('endNext').onclick = () => goLevel(nextId);
+  $('endRetry').onclick = () => { location.href = 'index.html?level=' + encodeURIComponent(LV.id) + '&brief=1' + keepParams() + (qs.get('seed') ? '&seed=' + qs.get('seed') : ''); };
+  $('endMenu').onclick = () => { location.href = 'menu.html'; };
+  $('endscreen').style.display = 'flex'; (win && nextId ? $('endNext') : $('endRetry')).focus();
+}
+$('bMenu').onclick = () => { location.href = 'menu.html'; };
 function showBriefing(onBegin) {                          // the chapter screen: name, briefing, what you must do. Pauses the game until "Begin".
   const el = $('briefing'), was = G.speed || 1; G.speed = 0; refreshButtons();
   $('briefTitle').textContent = LV.name || LV.id; $('briefText').textContent = LV.briefing || LV.start.welcome || '';
@@ -1214,4 +1239,4 @@ function frame(now) {
 }
 requestAnimationFrame(frame);
 window.__ui = { get mouse() { return mouse; }, get tool() { return tool; }, inputDown, inputMove, inputUp, guideTarget };
-window.__game = { LV, LEVEL_TABLE, COND, OBJECTIVES, GUIDE, condState, updateObjectives, guideNow, guideTarget, showBriefing, validateLevel, buildMap, levelSize, levelPos, strike, Chicken, updateHatchery, prayRate, spriteOf, pickKind, RESEARCH, isAvail, unlockAll, addResearch, SKELETON, freeSlot, updateJail, knockOut, KO_SECONDS, TORTURE_SECONDS, SPELLS, SPELL_ORDER, castSpell, TRAPS, DOOR, placeThings, removeThings, doorAt, trapAt, HERO_LAND, W, H, G, HEROES, KINDS, spawnWave, Creature, Imp, Hero, hurt, los, T, TERRAIN, step, tagRect, build, scanTasks, findPath, capacity, goldReleased, damageTile, perApplication, VAR, audioMood, SPELL_SND, release };
+window.__game = { LV, LEVEL_TABLE, CAMPAIGN, finishGame, renderEnd, COND, OBJECTIVES, GUIDE, condState, updateObjectives, guideNow, guideTarget, showBriefing, validateLevel, buildMap, levelSize, levelPos, strike, Chicken, updateHatchery, prayRate, spriteOf, pickKind, RESEARCH, isAvail, unlockAll, addResearch, SKELETON, freeSlot, updateJail, knockOut, KO_SECONDS, TORTURE_SECONDS, SPELLS, SPELL_ORDER, castSpell, TRAPS, DOOR, placeThings, removeThings, doorAt, trapAt, HERO_LAND, W, H, G, HEROES, KINDS, spawnWave, Creature, Imp, Hero, hurt, los, T, TERRAIN, step, tagRect, build, scanTasks, findPath, capacity, goldReleased, damageTile, perApplication, VAR, audioMood, SPELL_SND, release };
