@@ -77,6 +77,8 @@ Prototype doors/traps (`placeThings`, `fireTrap`, `updateTraps` in `web/game.js`
 
 Prototype spells (`SPELLS`, `castSpell`, `updateMana` in `web/game.js`) follow the `KeeperSpellCastValidator` pattern: mana cost + cooldown + valid target before anything fires. Not modelled: researching spells in the Library, Temple prayer mana, possession, slap.
 
+Prototype knock-out/prison/torture (`knockOut`, `dropOff`, `updateJail`, `release` in `web/game.js`) follows OpenKeeper's `Unconscious` component and `RescueCreatureTask` / `CaptureEnemyCreatureTask` / `CarryEnemyCreatureToPrison`. Not modelled: jailbreaks by hero parties, torturers (creatures with the TORTURE job), per-creature `tortureTimeToConvert`, the Graveyard, and prisoners being fed.
+
 ## 8. Player verbs (the "hand" & spells) `[src: GameWorldController, PlayerState, KeeperSpellCastValidator]`
 Tag/untag dig · build/sell room · place door/trap · pick up creature/object (`InHand`, `Placeable`) · drop · slap · cast keeper spell (mana cost, research state `UNAVAILABLE/RESEARCHABLE/AVAILABLE`) · possess creature (`PossessedSystem`, mana per second).
 Research states per item type `ROOM, DOOR, TRAP, SPELL, CREATURE`.

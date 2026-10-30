@@ -63,15 +63,19 @@ function start() {
   const beds = new THREE.InstancedMesh(bedGeo, new THREE.MeshLambertMaterial({ color: 0x8a70c0 }), N);
   const tagGeo = new THREE.PlaneGeometry(.7, .7); tagGeo.rotateX(-Math.PI / 2);
   const tags = new THREE.InstancedMesh(tagGeo, new THREE.MeshBasicMaterial({ color: 0xffe070, transparent: true, opacity: .75 }), N);
-  for (const m of [goldBits, gemBits, piles, beds, tags]) { m.frustumCulled = false; scene.add(m); }
+  const cageGeo = new THREE.BoxGeometry(.84, .75, .84); cageGeo.translate(0, .375, 0);
+  const cages = new THREE.InstancedMesh(cageGeo, new THREE.MeshBasicMaterial({ color: 0xb8c0d0, wireframe: true }), N);
+  const rackGeo = new THREE.BoxGeometry(.8, .14, .5); rackGeo.translate(0, .2, 0);
+  const racks = new THREE.InstancedMesh(rackGeo, new THREE.MeshLambertMaterial({ color: 0x3a2018, emissive: 0x401008 }), N);
+  for (const m of [goldBits, gemBits, piles, beds, tags, cages, racks]) { m.frustumCulled = false; scene.add(m); }
 
   const COL = { floor: 0x4a3f33, owned: 0x4b6cc8, hero: 0x8a3a30, earth: 0x7a5636, near: 0xa47c52, rock: 0x2d2b2e, gold: 0x7a5a30, gem: 0x40364a,
-    [T.TREASURY]: 0x9a7e28, [T.LAIR]: 0x5a4a8a, [T.HEART]: 0x9a3030, [T.PORTAL]: 0x6a3a9a, [T.GATE]: 0x8a4a32 };
+    [T.TREASURY]: 0x9a7e28, [T.LAIR]: 0x5a4a8a, [T.HEART]: 0x9a3030, [T.PORTAL]: 0x6a3a9a, [T.GATE]: 0x8a4a32, [T.PRISON]: 0x56606c, [T.TORTURE]: 0x6a2828 };
   const tmpOwned = new THREE.Color(COL.owned);
   const ownedFloor = (x, y) => { const t = G.map[y * W + x]; return !!t && t.owner === 1 && !TERRAIN[t.t].solid; };
 
   function updateTiles() {
-    let nGold = 0, nGem = 0, nPile = 0, nBed = 0, nTag = 0;
+    let nGold = 0, nGem = 0, nPile = 0, nBed = 0, nTag = 0, nCage = 0, nRack = 0;
     const fill = Math.min(1, G.gold / Math.max(1, capacity()));
     for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
       const i = y * W + x, t = G.map[i], tr = TERRAIN[t.t], n = hash(x, y), shade = 0.88 + n * 0.24;
@@ -99,9 +103,11 @@ function start() {
       } else wallMesh.setColorAt(i, col.set(0));
       dummy.rotation.set(0, 0, 0); dummy.position.set(x + .5, 0, y + .5); if (h > 0) dummy.scale.set(1, h, 1); else dummy.scale.set(0, 0, 0); dummy.updateMatrix(); wallMesh.setMatrixAt(i, dummy.matrix);   // no block on open floor
       if (t.t === T.TREASURY && t.owner === 1) { dummy.position.set(x + .5, 0, y + .5); dummy.scale.set(1, 0.12 + fill * 0.55, 1); dummy.rotation.set(0, 0, 0); dummy.updateMatrix(); piles.setMatrixAt(nPile++, dummy.matrix); }
+      if (t.t === T.PRISON && t.owner === 1) { dummy.position.set(x + .5, 0, y + .5); dummy.scale.set(1, 1, 1); dummy.rotation.set(0, 0, 0); dummy.updateMatrix(); cages.setMatrixAt(nCage++, dummy.matrix); }
+      if (t.t === T.TORTURE && t.owner === 1) { dummy.position.set(x + .5, 0, y + .5); dummy.scale.set(1, 1, 1); dummy.rotation.set(0, (x + y) % 2 ? 0 : Math.PI / 2, 0); dummy.updateMatrix(); racks.setMatrixAt(nRack++, dummy.matrix); }
       if (t.t === T.LAIR && t.owner === 1) { dummy.position.set(x + .5, 0, y + .5); dummy.scale.set(1, 1, 1); dummy.rotation.set(0, 0, 0); dummy.updateMatrix(); beds.setMatrixAt(nBed++, dummy.matrix); }
     }
-    for (const [m, c] of [[goldBits, nGold], [gemBits, nGem], [piles, nPile], [beds, nBed], [tags, nTag]]) { m.count = c; m.instanceMatrix.needsUpdate = true; }
+    for (const [m, c] of [[goldBits, nGold], [gemBits, nGem], [piles, nPile], [beds, nBed], [tags, nTag], [cages, nCage], [racks, nRack]]) { m.count = c; m.instanceMatrix.needsUpdate = true; }
     for (const m of [floorMesh, wallMesh]) { m.instanceMatrix.needsUpdate = true; m.instanceColor.needsUpdate = true; }
   }
 
@@ -137,12 +143,13 @@ function start() {
     scene.add(g); return g;
   }
   function syncUnits() {
-    const all = [...G.imps, ...G.creatures, ...G.heroes], seen = new Set(), mouse = UI.mouse;
+    const all = [...G.imps, ...G.creatures, ...G.heroes, ...G.prisoners], seen = new Set(), mouse = UI.mouse;
     for (const u of all) {
       seen.add(u); let g = unitMeshes.get(u); if (!g) { g = makeUnit(u); unitMeshes.set(u, g); }
       const d = g.userData, held = u.held && mouse.fx !== undefined;
       const bob = u.path || u.state === 'work' ? Math.abs(Math.sin(G.time * 9 + u.x * 3)) * .06 : 0;
-      g.position.set(held ? mouse.fx : u.x, (held ? 1.4 : 0) + bob, held ? mouse.fy : u.y); g.rotation.y = -(u.face || 0);
+      const lying = u.unconscious || u.imprisoned;                                  // knocked-out and jailed units lie flat; carried ones are held up
+      g.position.set(held ? mouse.fx : u.x, (held ? 1.4 : 0) + bob + (lying ? (u.carriedBy ? .62 : .14) : 0), held ? mouse.fy : u.y); g.rotation.set(0, -(u.face || 0), lying ? Math.PI / 2 : 0);
       g.scale.setScalar(u.state === 'sleep' ? .8 : 1);
       // colour: flash on hit, imps tint when fleeing, ring pulse while working
       if (d.mat.emissive) d.mat.emissive.set(u.haste > 0 ? 0x2850ff : 0x000000);

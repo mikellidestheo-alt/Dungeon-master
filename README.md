@@ -51,6 +51,12 @@ seams, room building, lair assignment, mood/anger, sleep and payday, free-imp sp
   and recharge 1.6× faster for 12 s), **⚑ Call to Arms** (150 – creatures drop everything and gather at a flag for 25 s),
   **✦ Create Imp** (100 – on claimed floor). A failed cast costs nothing. In my bot test the same weak defence that
   lost without spells won with them (8 heroes killed, no creature lost, mana nearly spent).
+* **Knock-out, Prison and Torture Chamber:** a unit that loses its last hit points to an enemy attacker is knocked out
+  instead of killed (traps and spells, which have no attacker, still kill). Imps rush to carry your own fallen creatures
+  to a lair (or the Heart) to recover, and knocked-out heroes to a **Prison** (100g/tile, one prisoner per tile). Anyone
+  not picked up within 60 s bleeds out. Prisoners lose health; if one starves a **Skeleton** rises for you. Imps move
+  prisoners to a **Torture Chamber** (150g/tile) where, after 30 s, 70 % convert into your creatures (`Ex-Knight` ...) and
+  30 % die. Imps still run from live heroes, so capturing only works once you are winning the fight.
 * You win by surviving all waves, lose if the Heart (2500 hp) falls.
 
 Numbers marked `VAR` come from OpenKeeper's level variables; combat stats are tuning values.
