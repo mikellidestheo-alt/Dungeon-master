@@ -12,7 +12,9 @@ study of [OpenKeeper](https://github.com/tonihele/OpenKeeper) (a Java re-impleme
 | `docs/03-game-systems.md` | Gameplay rules distilled into a spec (terrain health state machine, tasks, economy, mood, rooms, combat) |
 | `docs/04-port-plan.md` | Stack choices (browser vs Linux-native), legal notes, milestone list, which Java files to read for each milestone |
 | `web/index.html`, `web/game.js` | **Playable prototype**: the headless-style simulation plus a 2D canvas view, no copyrighted assets |
-| `web/render3d.js` | **3D view** (three.js, stand-in boxes/cones/cylinders). Only reads the sim state, so art can be swapped later |
+| `web/render3d.js` | **3D view** (three.js). Isometric camera, your prop sprites as billboards, pixel-art floor/wall textures generated in code, stand-in shapes for units. Only reads the sim state |
+| `web/assets/sprites/` | Your hand-made prop art as transparent PNGs (Heart, Portal, Hero Gate, door, traps, cage, rack, bed, bookshelf, treasure pile, wall), plus `manifest.json` |
+| `tools/process_art.py` | Cuts the flat background out of the original JPGs: `python3 tools/process_art.py <folder-of-jpgs>` re-generates `web/assets/sprites/` |
 | `web/vendor/` | three.js 0.160.0 (MIT) kept in the repo so nothing loads from a CDN |
 
 ## Run the prototype
@@ -23,7 +25,14 @@ python3 -m http.server -d web 8000     # then open http://localhost:8000   (?see
 # because browsers block ES modules there.
 ```
 
-**3D controls:** `W A S D`/arrows pan, mouse wheel zooms, middle-drag pans. Clicking picks the wall top or floor under the cursor.
+**3D controls:** `W A S D`/arrows pan along the screen axes, mouse wheel zooms, middle-drag pans. Clicking picks the wall top or floor under the cursor.
+The camera is isometric (45°, narrow field of view) to match the sprite art; `?cam=top` gives the earlier steep top-down perspective.
+
+**Art status:** props use your sprites; floors, walls and effects are drawn in code; creatures, imps and heroes are still
+placeholder shapes (with an x-ray silhouette when they stand behind a wall) until the character sprites are added. The
+2D fallback view (`?view=2d`) does not use the sprites. The `wall` sprite is processed but not used yet: walls are textured
+blocks so they can be dug away tile by tile. To tune where a sprite sits on its tile, edit the `SPR` table at the top of
+`web/render3d.js` (`w` = width in tiles, `ay` = how far up the image the ground contact point is).
 
 Tag earth with **Dig** (left-drag; right-drag untags). Imps dig, mine gold, claim floor and haul gold to a
 **Treasury**. Dig east to the purple portal and claim it; creatures arrive and need a **Lair**, get angry without

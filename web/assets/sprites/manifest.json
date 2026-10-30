@@ -1,0 +1,62 @@
+{
+ "wall": {
+  "w": 494,
+  "h": 512,
+  "source": "Dungeon_wall_pixel_art_asset_9591d7ae.jpg"
+ },
+ "trap_gas": {
+  "w": 512,
+  "h": 398,
+  "source": "Gas_trap_emitting_green_fumes_bad08d5c.jpg"
+ },
+ "heart": {
+  "w": 512,
+  "h": 493,
+  "source": "Glowing_dungeon_heart_game_asset_d65c0fca.jpg"
+ },
+ "hero_gate": {
+  "w": 481,
+  "h": 512,
+  "source": "Glowing_portal_game_asset_745cc3b8.jpg"
+ },
+ "treasure": {
+  "w": 512,
+  "h": 290,
+  "source": "Gold_treasure_pile_glittering_7f1b8441.jpg"
+ },
+ "cage": {
+  "w": 395,
+  "h": 512,
+  "source": "Iron_prison_cage_game_asset_863c8e58.jpg"
+ },
+ "bookshelf": {
+  "w": 512,
+  "h": 426,
+  "source": "Library_bookshelf_pixel_art_asset_f4ecf1b7.jpg"
+ },
+ "trap_bolt": {
+  "w": 512,
+  "h": 356,
+  "source": "Lightning_trap_floor_tile_sparkling_e3687f4e.jpg"
+ },
+ "portal": {
+  "w": 436,
+  "h": 512,
+  "source": "Red_dungeon_portal_structure_19b42590.jpg"
+ },
+ "bed": {
+  "w": 512,
+  "h": 331,
+  "source": "Straw_bed_game_asset_e183bbae.jpg"
+ },
+ "rack": {
+  "w": 512,
+  "h": 445,
+  "source": "Torture_rack_game_asset_0531eda8.jpg"
+ },
+ "door": {
+  "w": 512,
+  "h": 435,
+  "source": "Wooden_iron_dungeon_door_8e6518dd.jpg"
+ }
+}
