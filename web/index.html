@@ -16,6 +16,10 @@
   h1 small { color: var(--dim); font-weight: normal; }
   #hud { display: flex; flex-wrap: wrap; gap: 6px 14px; background: var(--panel); padding: 6px 10px; border-radius: 6px; }
   #hud b { color: var(--gold); }
+  #audioCtl { margin-left: auto; display: flex; align-items: center; gap: 6px; }
+  #audioCtl button { padding: 0 7px; line-height: 1.5; }
+  #vol { width: 90px; accent-color: var(--gold); }
+  #audioHint { color: var(--dim); }
   #tools { display: flex; flex-wrap: wrap; gap: 6px; margin: 8px 0; }
   button { background: var(--panel2); color: var(--ink); border: 1px solid #4a3d2e; border-radius: 4px; padding: 5px 10px; cursor: pointer; font: inherit; }
   button:hover { border-color: var(--gold); }
@@ -50,6 +54,7 @@
     <span>Mana <b id="hMana">0</b></span>
     <span>Heart <b id="hHeart">0</b></span>
     <span>Wave <b id="hWave">0</b> · heroes <b id="hHeroes">0</b> · next <b id="hNext">—</b></span>
+    <span id="audioCtl"><button id="bMute" title="Mute / unmute (M)" aria-label="Mute">🔇</button><input id="vol" type="range" min="0" max="100" value="70" aria-label="Volume" title="Volume"><small id="audioHint">click anywhere to start sound</small></span>
   </div>
   <div id="tools"></div>
   <div id="stage"><canvas id="cv" width="800" height="560"></canvas></div>
@@ -63,10 +68,12 @@
     Build a <code>Treasury</code> to bank gold and a <code>Lair</code> so creatures from the portal (far right, claim it!) stop getting angry.
     Heroes: dig a tunnel from your dungeon to the red-tinted <b>Hero Gate</b> (south) and invasion waves start — Knights, Archers and Mages hunt your Heart.
     Use <code>✋ Hand</code> to pick up an imp or creature and drop it into the fight. Creatures heal and level up from kills; imps flee.
+    <b>Sound:</b> everything is synthesised in your browser (no audio files). It starts at your first click; use the speaker button or <code>M</code> to mute, the slider for volume.
     Constants come from OpenKeeper's level variables; see <code>docs/</code>.
   </div>
 </div>
 
+<script src="audio.js"></script>
 <script src="game.js"></script>
 <script type="module" src="render3d.js"></script>
 

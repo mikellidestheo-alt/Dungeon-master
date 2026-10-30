@@ -18,7 +18,7 @@
 | Pathfinding | write A\* yourself (~60 lines, see prototype) or `pathfinding` npm | graph is just a grid with per-creature cost fn |
 | Steering | simple waypoint follower first; gdx-ai-style `seek/arrive/separation` later | OpenKeeper separation radius 0.25 tile |
 | UI | DOM + CSS over a canvas | replaces Nifty GUI XML |
-| Audio | WebAudio; convert SDT (MP2/WAV) offline to OGG | |
+| Audio | WebAudio; convert SDT (MP2/WAV) offline to OGG | *prototype done with synthesised sound and music, no files: `web/audio.js`, `05-audio.md`; the SDT path is still open* |
 | **Linux native** | Same TypeScript in **Tauri/Electron** (cheapest), or a rewrite in **Godot 4** (GDScript/C#) / **Rust + Bevy** (bevy_ecs maps 1:1 to the component list) | Godot gives 3D, UI, audio, export to Linux for free; Bevy is the nearest to the ECS design |
 
 ## Milestones (each is shippable)
@@ -33,6 +33,7 @@
 8. **Heroes/AI** — hero gate parties, invasion triggers, rival keeper AI.
 9. **BYO-asset loader** — `WadFile`, RefPack decompress, `KwdFile` readers, KMF → glTF converter, texture decoder → PNG. Do this in a Node CLI first (testable against `assets/`), then lift into the page.
 10. **3D renderer** *(started: `web/render3d.js` draws the sim isometrically with the project's own prop sprites, generated floor/wall textures and stand-in unit shapes; no DK2 art, no fog of war, wall pieces are plain textured blocks)* — slab meshes from `complete/side/top` art resources, wall-section selection by neighbour mask, lighting from terrain colours, water/lava planes, fog of war texture, minimap.
+11. **Audio** *(done for the prototype: synthesised effects driven by sim events, distance attenuation, procedural score that follows the invasion, HUD mute/volume, optional recordings through `web/assets/audio/sounds.json`; still to do: user-supplied music tracks, and reading a user's own DK2 SDT archives with `SdtFile`/`BankMapFile`/`SFFile`)* — see `05-audio.md`.
 
 ## Suggested module layout (TypeScript)
 ```

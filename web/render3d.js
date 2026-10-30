@@ -421,6 +421,7 @@ function start() {
     if (keys.has('w') || keys.has('arrowup')) mv(u, sp); if (keys.has('s') || keys.has('arrowdown')) mv(u, -sp);
     if (keys.has('a') || keys.has('arrowleft')) mv(r, -sp); if (keys.has('d') || keys.has('arrowright')) mv(r, sp);
     cam.x = Math.max(0, Math.min(W, cam.x)); cam.z = Math.max(0, Math.min(H, cam.z)); placeCamera();
+    if (window.Sound) Sound.setListener(cam.x, cam.z, cam.dist * 0.28, r.x, r.z);     // effects get quieter and pan with distance from the camera
     updateTiles(); syncProps(); syncUnits(); syncEffects(); syncSelection();
     // landmarks
     const pulse = 1 + Math.sin(G.time * 4) * .035 + (G.heartFlash > 0 ? .1 : 0);

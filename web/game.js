@@ -72,6 +72,7 @@ const tile = (x, y) => inb(x, y) ? G.map[idx(x, y)] : null;
 const solid = (x, y) => { const t = tile(x, y); return !t || TERRAIN[t.t].solid; };
 function setTerrain(t, id) { t.t = id; t.hp = TERRAIN[id].maxHealth; t.tag = 0; if (TERRAIN[id].solid !== 1) { t.owner = t.owner; } }
 function say(msg) { G.log.unshift(msg); if (G.log.length > 40) G.log.pop(); renderLog(true); }
+const sfx = (id, x, y, o) => { if (window.Sound) Sound.play(id, x, y, o); };      // audio.js. Never touches rand(), so sound on/off cannot change a seeded run
 
 function genMap() {
   for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
@@ -137,9 +138,9 @@ function damageTile(x, y, dt, eff) {            // returns gold released
     const ng = Math.min(t.gold, tr.goldValue - goldReleased(tr.goldValue, tr.maxHealth, nh));
     released = t.gold - ng; t.gold = ng; t.hp = nh; destroyed = nh === 0;
   } else if (tr.imp) {                           // gems never run out: collapse, refill, pay a little
-    t.hp -= dmg; if (t.hp <= 0) { t.hp = tr.maxHealth; released = VAR.GOLD_MINED_FROM_GEMS; }
+    t.hp -= dmg; if (t.hp <= 0) { t.hp = tr.maxHealth; released = VAR.GOLD_MINED_FROM_GEMS; sfx('coin', x + .5, y + .5); }
   } else { t.hp -= dmg; destroyed = t.hp <= 0; }
-  if (destroyed) { setTerrain(t, tr.destroyedTo); t.gold = 0; G.dirty = true; }
+  if (destroyed) { setTerrain(t, tr.destroyedTo); t.gold = 0; G.dirty = true; sfx('crumble', x + .5, y + .5); }
   return released;
 }
 function claimable(x, y) {                       // ClaimTileTask: unowned floor next to our territory
@@ -151,8 +152,8 @@ function claimable(x, y) {                       // ClaimTileTask: unowned floor
 function healClaim(x, y, dt, eff) {
   const t = tile(x, y); t.hp = Math.min(TERRAIN[t.t].maxHealth, t.hp + perApplication(VAR.CLAIM_TILE_HEALTH, eff) * dt);
   if (t.hp >= TERRAIN[t.t].maxHealth) {
-    if (t.t === T.PORTAL) { for (const q of G.map) if (q.t === T.PORTAL) q.owner = 1; G.portalOwned = true; say('Portal claimed — creatures will arrive.'); }
-    else t.owner = 1;
+    if (t.t === T.PORTAL) { for (const q of G.map) if (q.t === T.PORTAL) q.owner = 1; G.portalOwned = true; say('Portal claimed — creatures will arrive.'); sfx('portal', x + .5, y + .5); }
+    else { t.owner = 1; sfx('claim', x + .5, y + .5); }
     G.dirty = true;
   }
 }
@@ -222,10 +223,12 @@ class Imp extends Mover {                        // CreatureState.IDLE -> findSt
       if (this.stepMove(dt, 1.4)) { this.state = 'idle'; this.think = 0.5; }
       return;
     }
+    this.chat = (this.chat === undefined ? 3 + Math.random() * 6 : this.chat) - dt;
+    if (this.chat <= 0) { this.chat = 8 + Math.random() * 10; sfx('imp', this.x, this.y); }
     this.scare -= dt;
     if (this.scare <= 0) {
       this.scare = 0.3; const h = nearestFoe(this, 6, true);
-      if (h) { this.drop(); const p = findPath(this.tx, this.ty, G.heart.x, G.heart.y + 2); if (p && p.length) { this.state = 'flee'; this.go(p); return; } }
+      if (h) { this.drop(); const p = findPath(this.tx, this.ty, G.heart.x, G.heart.y + 2); if (p && p.length) { this.state = 'flee'; this.go(p); sfx('imp_scream', this.x, this.y); return; } }
     }
     this.think -= dt;
     if (this.state === 'idle') {
@@ -245,6 +248,8 @@ class Imp extends Mover {                        // CreatureState.IDLE -> findSt
       if (k.body && (k.body.carriedBy || k.body.dead)) return this.drop();
       if (k.type === 'DIG') {
         if (this.gold >= VAR.IMP_MAX_GOLD && !this.hasRoomFor()) return this.drop();
+        this.digT = (this.digT || 0) - dt;
+        if (this.digT <= 0) { this.digT = 0.55; sfx(tile(k.x, k.y).gold > 0 ? 'mine' : 'dig', k.x + .5, k.y + .5); }
         const got = damageTile(k.x, k.y, dt, VAR.IMP_EFFICIENCY);
         this.gold += got; this.face = Math.atan2(k.y + 0.5 - this.y, k.x + 0.5 - this.x);
         if (this.gold >= VAR.IMP_MAX_GOLD) { this.drop(); this.think = 0; }
@@ -270,7 +275,7 @@ class Imp extends Mover {                        // CreatureState.IDLE -> findSt
       if (this.stepMove(dt)) {
         const space = capacity() - G.gold, put = Math.max(0, Math.min(this.gold, space));
         G.gold += put; this.gold -= put; this.state = 'idle'; this.think = 0.2;
-        if (put) { const t = tile(this.tx, this.ty); if (t) t.stored = Math.min(VAR.MAX_GOLD_PER_TREASURY_TILE, t.stored + put); }
+        if (put) { sfx('coins', this.x, this.y); const t = tile(this.tx, this.ty); if (t) t.stored = Math.min(VAR.MAX_GOLD_PER_TREASURY_TILE, t.stored + put); }
       }
     }
   }
@@ -382,12 +387,12 @@ class Creature extends Mover {                    // CreatureMoodSystem / Creatu
       const ch = this.chicken; if (!ch || ch.dead) { this.releaseChicken(); this.state = 'idle'; this.path = null; return; }
       this.rep -= dt; if (this.rep <= 0 || !this.path) { this.rep = 0.5; this.go(findPath(this.tx, this.ty, ch.tx, ch.ty)); }
       this.stepMove(dt); this.face = Math.atan2(ch.y - this.y, ch.x - this.x);
-      if (dist(this, ch) < 0.9) { this.state = 'eat'; this.eatT = VAR.EAT_SECONDS; this.path = null; ch.frozen = true; }
+      if (dist(this, ch) < 0.9) { this.state = 'eat'; this.eatT = VAR.EAT_SECONDS; this.path = null; ch.frozen = true; sfx('squawk', ch.x, ch.y); }
     } else if (this.state === 'eat') {
       this.eatT -= dt; const ch = this.chicken;
       if (this.eatT <= 0 || !ch || ch.dead) {
         if (ch) ch.dead = true; this.chicken = null; this.hunger = 0; this.hp = Math.min(this.maxHp, this.hp + this.maxHp * 0.15); this.anger = Math.max(0, this.anger - 300);
-        G.fx.push({ x: this.x, y: this.y - 0.5, txt: 'Yum', life: 0.8, color: '#ffd080' }); this.state = 'idle'; this.wait = 1;
+        G.fx.push({ x: this.x, y: this.y - 0.5, txt: 'Yum', life: 0.8, color: '#ffd080' }); sfx('munch', this.x, this.y); this.state = 'idle'; this.wait = 1;
       }
     } else if (this.state === 'toRack') {                                 // a Mistress goes to whoever is strapped to a rack
       const b = this.victim; if (!b || b.dead || b.status !== 'torture' || b.carriedBy) { this.releaseVictim(); this.state = 'idle'; this.path = null; }
@@ -396,8 +401,9 @@ class Creature extends Mover {                    // CreatureMoodSystem / Creatu
       const b = this.victim; if (!b || b.dead || b.status !== 'torture' || b.tormentor !== this || this.energy < 35 || this.hunger >= VAR.HUNGRY_AT) { this.releaseVictim(); this.state = 'idle'; this.wait = 1; }
       else { this.face = Math.atan2(b.y - this.y, b.x - this.x); this.anger = Math.max(0, this.anger - 30 * dt); }
     } else if (this.state === 'toAltar') {
-      if (this.stepMove(dt)) { this.state = 'pray'; this.studyT = VAR.PRAY_SECONDS; }
+      if (this.stepMove(dt)) { this.state = 'pray'; this.studyT = VAR.PRAY_SECONDS; this.sndT = 5; sfx('chime', this.x, this.y); }
     } else if (this.state === 'pray') {                                   // Temple: prayer turns into mana and soothes the creature
+      this.sndT -= dt; if (this.sndT <= 0) { this.sndT = 5 + this.id % 4; sfx('chime', this.x, this.y); }
       this.studyT -= dt; this.anger = Math.max(0, this.anger - 40 * dt); G.mana = Math.min(G.maxMana, G.mana + this.pray * (1 + 0.1 * (this.level - 1)) * dt);
       if (this.studyT <= 0 || this.energy < 35 || this.hunger >= VAR.HUNGRY_AT) { this.releaseDesk(); this.state = 'idle'; this.wait = 1; }
     } else if (this.state === 'toDesk') {
@@ -466,21 +472,27 @@ function nearestFoe(u, maxD, needLos) {
 }
 const heartTarget = { get x() { return G.heart.x + 0.5; }, get y() { return G.heart.y + 0.5; }, heart: true, dead: false };
 const roll = (d) => d * (0.85 + rand() * 0.3);
+const BOWS = new Set(['Archer', 'Dark Elf']), HIT = { Spider: 'bite', Salamander: 'bite', Troll: 'club', 'Bile Demon': 'club', Giant: 'club' };   // which voice a blow uses; the default is a sword
+const baseName = (u) => u.name.replace('Ex-', '');
 function strike(u, t) {
   u.cd = u.cdMax; u.face = Math.atan2(t.y - u.y, t.x - u.x); let dmg = roll(u.dmg);
   if (u.ambush && !t.heart && !t.door && t.hp >= t.maxHp) { dmg *= 2; G.fx.push({ x: t.x, y: t.y - 0.8, txt: 'Backstab!', life: 0.9, color: '#ffb0b0' }); }        // Assassin: the opening blow
-  if (u.ranged) G.shots.push({ x: u.x, y: u.y, tgt: t, dmg, src: u, speed: 11, color: u.team === 'k' ? '#d9a0ff' : '#ffe9a0' });
+  if (u.ranged) {
+    const bow = BOWS.has(baseName(u)); sfx(bow ? 'bow' : 'magic', u.x, u.y);
+    G.shots.push({ x: u.x, y: u.y, tgt: t, dmg, src: u, speed: 11, hit: bow ? 'arrow_hit' : 'magic_hit', color: u.team === 'k' ? '#d9a0ff' : '#ffe9a0' });
+  }
   else {
-    hurt(t, dmg, u);
-    if (u.cleave) for (const o of foesOf(u)) if (o !== t && alive(o) && dist(o, t) < 1.4) hurt(o, dmg * 0.5, u);  // Reaper: the scythe sweeps
+    hurt(t, dmg, u, HIT[baseName(u)]);
+    if (u.cleave) for (const o of foesOf(u)) if (o !== t && alive(o) && dist(o, t) < 1.4) hurt(o, dmg * 0.5, u, 'sword');  // Reaper: the scythe sweeps
   }
 }
-function hurt(t, dmg, src) {
+function hurt(t, dmg, src, snd) {
   if (t.dead) return;
   if (t.unconscious && !src) { kill(t, null); return; }                   // traps and spells finish the helpless
   if (t.unconscious || t.imprisoned) return;
   if (t.armor && src) dmg *= 1 - t.armor;
   if (t.door && src && src.doorBreaker) dmg *= src.doorBreaker;           // Dwarf and Giant                                   // Black Knight
+  if (t.door) sfx('door_hit', t.x, t.y); else if (t.heart) sfx('heart_hit', t.x, t.y); else if (src) sfx(snd || 'sword', t.x, t.y);   // traps and spells (no src) make their own noise
   G.fx.push({ x: t.x, y: t.y - 0.4, txt: Math.round(dmg), life: 0.7, color: t.team === 'k' || t.heart ? '#ff8080' : '#fff' });
   if (t.heart) {
     G.heartHp = Math.max(0, G.heartHp - dmg); G.heartFlash = 0.2;
@@ -490,8 +502,8 @@ function hurt(t, dmg, src) {
   t.hp -= dmg; t.flash = 0.15; if (t.hp <= 0) { if (canKnockOut(t, src)) knockOut(t, src); else kill(t, src); }
 }
 function kill(t, src) {
-  if (t.door) { t.dead = true; G.doors = G.doors.filter(d => d !== t); const dt_ = tile(t.tx, t.ty); if (dt_) dt_.door = null; G.fx.push({ x: t.x, y: t.y, splat: true, life: 3 }); G.dirty = true; say('A door was smashed!'); return; }
-  t.dead = true; G.fx.push({ x: t.x, y: t.y, splat: true, life: 6 });
+  if (t.door) { t.dead = true; G.doors = G.doors.filter(d => d !== t); const dt_ = tile(t.tx, t.ty); if (dt_) dt_.door = null; G.fx.push({ x: t.x, y: t.y, splat: true, life: 3 }); G.dirty = true; sfx('door_break', t.x, t.y); say('A door was smashed!'); return; }
+  t.dead = true; G.fx.push({ x: t.x, y: t.y, splat: true, life: 6 }); sfx(t.isImp ? 'imp_scream' : 'death', t.x, t.y);
   if (t.isImp) { t.drop(); say('An imp was slain.'); }
   else if (t.team === 'k') { if (t.lair) t.lair.occupant = null; if (t.releaseDesk) { t.releaseDesk(); t.releaseChicken(); t.releaseVictim(); } say(t.name + ' #' + t.id + ' has fallen!'); }
   else { G.kills++; say('A hero ' + t.name + ' is slain.'); }
@@ -500,7 +512,7 @@ function kill(t, src) {
 function gainXp(c) {                              // CreatureExperienceSystem, reduced
   c.xp += VAR.XP_PER_KILL;
   if (c.level < VAR.MAX_LEVEL && c.xp >= VAR.XP_PER_LEVEL * c.level) {
-    c.level++; c.maxHp = Math.round(c.maxHp * 1.18); c.dmg *= 1.18; c.hp = Math.min(c.maxHp, c.hp + c.maxHp * 0.3);
+    sfx('levelup', c.x, c.y); c.level++; c.maxHp = Math.round(c.maxHp * 1.18); c.dmg *= 1.18; c.hp = Math.min(c.maxHp, c.hp + c.maxHp * 0.3);
     say(c.name + ' #' + c.id + ' reached level ' + c.level + '!');
   }
 }
@@ -530,7 +542,7 @@ function updateShots(dt) {
   for (const s of G.shots) {
     const t = s.tgt; if (t.dead) { s.done = true; continue; }
     const dx = t.x - s.x, dy = t.y - s.y, d = Math.hypot(dx, dy), m = s.speed * dt;
-    if (d <= m + 0.2) { hurt(t, s.dmg, s.src); s.done = true; } else { s.x += dx / d * m; s.y += dy / d * m; }
+    if (d <= m + 0.2) { hurt(t, s.dmg, s.src, s.hit); s.done = true; } else { s.x += dx / d * m; s.y += dy / d * m; }
   }
   G.shots = G.shots.filter(s => !s.done);
   for (const f of G.fx) f.life -= dt; G.fx = G.fx.filter(f => f.life > 0);
@@ -588,13 +600,14 @@ function spawnWave() {
     const kind = kinds[i];
     const h = new Hero(G.gate.x - 1 + (i % 3), G.gate.y - 1 + ((i / 3) | 0), kind, scale, party); party.push(h); G.heroes.push(h);
   }
+  if (window.Sound) Sound.stinger(kinds[0].boss ? 'boss' : 'wave');
   G.wave++; G.nextWave = G.wave < VAR.WAVES ? G.time + VAR.WAVE_INTERVAL : Infinity;
   say('⚔ Wave ' + G.wave + '/' + VAR.WAVES + ': ' + kinds.length + ' heroes pour out of the Hero Gate' + (kinds[0].boss ? ', led by the ' + kinds[0].name + '!' : '!'));
 }
 function heroLogic(dt) {
   if (!G.gateOpen) {
     G.gateT -= dt; if (G.gateT > 0) return; G.gateT = 2;
-    if (findPath(G.gate.x, G.gate.y, G.heart.x, G.heart.y)) { G.gateOpen = true; G.nextWave = G.time + VAR.FIRST_WAVE_DELAY;
+    if (findPath(G.gate.x, G.gate.y, G.heart.x, G.heart.y)) { G.gateOpen = true; sfx('gong'); G.nextWave = G.time + VAR.FIRST_WAVE_DELAY;
       say('The Hero Gate is linked to your dungeon! Heroes will invade in ' + VAR.FIRST_WAVE_DELAY + 's.'); }
     return;
   }
@@ -623,7 +636,7 @@ function placeThings(kind, x0, y0, x1, y1) {
     else { const tr = { kind, tx: x, ty: y, x: x + .5, y: y + .5, charges: def.max, max: def.max, cd: 0, prog: 0 }; t.trap = tr; G.traps.push(tr); }
     spent += def.cost; n++;
   }
-  G.gold -= spent; if (n) say('Placed ' + n + ' ' + name + (n > 1 ? 's' : '') + ' for ' + spent + ' gold.'); else say('Doors and traps go on your claimed floor, not on rooms.');
+  G.gold -= spent; if (n) sfx('build', (x0 + x1) / 2 + .5, (y0 + y1) / 2 + .5); if (n) say('Placed ' + n + ' ' + name + (n > 1 ? 's' : '') + ' for ' + spent + ' gold.'); else say('Doors and traps go on your claimed floor, not on rooms.');
   G.dirty = true;
 }
 function removeThings(x0, y0, x1, y1) {                  // right-click: sell for half the price
@@ -633,13 +646,13 @@ function removeThings(x0, y0, x1, y1) {                  // right-click: sell fo
     if (t.door) { refund += DOOR.cost / 2; G.doors = G.doors.filter(d => d !== t.door); t.door = null; n++; }
     else if (t.trap) { refund += TRAPS[t.trap.kind].cost / 2; G.traps = G.traps.filter(d => d !== t.trap); t.trap = null; n++; }
   }
-  if (n) { G.gold += refund; say('Sold ' + n + ' item(s) for ' + refund + ' gold.'); G.dirty = true; }
+  if (n) { G.gold += refund; sfx('coins', (x0 + x1) / 2 + .5, (y0 + y1) / 2 + .5); say('Sold ' + n + ' item(s) for ' + refund + ' gold.'); G.dirty = true; }
 }
 function fireTrap(tr) {
   tr.charges--; tr.cd = TRAPS[tr.kind].cd;
-  if (tr.kind === 'gas') { G.clouds.push({ x: tr.x, y: tr.y, r: 2.2, life: 5, dps: 10, tick: 0 }); say('A Gas Trap hisses!'); }
+  if (tr.kind === 'gas') { sfx('gas', tr.x, tr.y); G.clouds.push({ x: tr.x, y: tr.y, r: 2.2, life: 5, dps: 10, tick: 0 }); say('A Gas Trap hisses!'); }
   else {
-    G.fx.push({ x: tr.x, y: tr.y, bolt: true, life: 0.35 }); say('A Lightning Trap discharges!');
+    G.fx.push({ x: tr.x, y: tr.y, bolt: true, life: 0.35 }); sfx('lightning', tr.x, tr.y); say('A Lightning Trap discharges!');
     for (const h of G.heroes) if (!h.dead && dist(h, tr) <= 2.2) { hurt(h, 45, null); if (!h.stunImmune) h.stun = 1.5; G.fx.push({ x: h.x, y: h.y, bolt: true, life: 0.3 }); }
   }
 }
@@ -649,7 +662,7 @@ function updateTraps(dt) {
     tr.cd = Math.max(0, tr.cd - dt);
     const stepper = tr.charges > 0 && tr.cd <= 0 && G.heroes.find(h => !h.dead && !h.unconscious && !h.flying && Math.hypot(h.x - tr.x, h.y - tr.y) <= 0.9);   // flyers glide over
     if (stepper) {
-      if (stepper.disarms) { tr.charges = 0; say('A Dwarf disarms the ' + TRAPS[tr.kind].name + '!'); G.fx.push({ x: tr.x, y: tr.y - 0.5, txt: 'Disarmed', life: 0.9, color: '#ffd080' }); }
+      if (stepper.disarms) { tr.charges = 0; sfx('clank', tr.x, tr.y); say('A Dwarf disarms the ' + TRAPS[tr.kind].name + '!'); G.fx.push({ x: tr.x, y: tr.y - 0.5, txt: 'Disarmed', life: 0.9, color: '#ffd080' }); }
       else fireTrap(tr);
     }
   }
@@ -678,12 +691,12 @@ const RESEARCH = {
 };
 const RESEARCH_ROOM = { [T.PRISON]: 'prison', [T.TORTURE]: 'torture', [T.TEMPLE]: 'temple' };
 const isAvail = (id) => !RESEARCH[id] || !!G.research.done[id];
-function needs(id) { if (isAvail(id)) return true; say(RESEARCH[id].name + ' is not researched yet — build a Library and let your thinkers study.'); return false; }
+function needs(id) { if (isAvail(id)) return true; sfx('deny'); say(RESEARCH[id].name + ' is not researched yet — build a Library and let your thinkers study.'); return false; }
 function nextResearch() { return Object.keys(RESEARCH).find(id => !G.research.done[id]) || null; }
 function addResearch(p) {
   const r = G.research, id = r.current; if (!id) return;
   r.points[id] = (r.points[id] || 0) + p;
-  if (r.points[id] >= RESEARCH[id].pts) { r.done[id] = true; r.current = nextResearch(); say('✦ Research complete: ' + RESEARCH[id].name + '!' + (r.current ? ' Now studying ' + RESEARCH[r.current].name + '.' : ' Nothing left to research.')); }
+  if (r.points[id] >= RESEARCH[id].pts) { sfx('research'); r.done[id] = true; r.current = nextResearch(); say('✦ Research complete: ' + RESEARCH[id].name + '!' + (r.current ? ' Now studying ' + RESEARCH[r.current].name + '.' : ' Nothing left to research.')); }
 }
 function unlockAll() { for (const id in RESEARCH) G.research.done[id] = true; G.research.current = null; }
 
@@ -692,10 +705,11 @@ function unlockAll() { for (const id in RESEARCH) G.research.done[id] = true; G.
  * hungry creatures run GoToEat and the missing food feeds REASON_NO_FOOD. The Temple lets creatures pray for mana
  * (Attributes.manaGenPrayer, MOTIONLESS_WHILE_PRAYING_SECONDS). */
 class Chicken extends Mover {
-  constructor(x, y) { super(x, y, 0.6); Object.assign(this, { team: 'k', isChicken: true, hp: 10, maxHp: 10, dead: false, flash: 0, claimedBy: null, frozen: false, t: 1, id: ++G.nextId, sprite: 'chicken' }); }
+  constructor(x, y) { super(x, y, 0.6); Object.assign(this, { team: 'k', isChicken: true, hp: 10, maxHp: 10, dead: false, flash: 0, claimedBy: null, frozen: false, t: 1, cluckT: 2 + Math.random() * 8, id: ++G.nextId, sprite: 'chicken' }); }
   update(dt) {
     if (this.dead) return;
     if (this.frozen) { this.path = null; return; }                       // being eaten
+    this.cluckT -= dt; if (this.cluckT <= 0) { this.cluckT = 7 + Math.random() * 12; sfx('cluck', this.x, this.y); }
     this.t -= dt;
     if (!this.path && this.t <= 0 && G.hatchTiles.length) { this.t = 1.5 + rand() * 3; const t = G.hatchTiles[(rand() * G.hatchTiles.length) | 0]; this.go(findPath(this.tx, this.ty, t.x, t.y)); }
     this.stepMove(dt);
@@ -722,7 +736,7 @@ const KO_SECONDS = 60, PRISON_DRAIN = 0.5, TORTURE_DRAIN = 0.25, TORTURE_SECONDS
 const SKELETON = { name: 'Skeleton', sprite: 'skeleton', elite: 'skeleton_knight', color: '#d8d8c8', pay: 0, hp: 70, dmg: 8, range: 1.2, cdMax: 1.1, ranged: 0, noLair: true, noFood: true };   // rises from starved prisoners
 function canKnockOut(t, src) { return !t.isImp && !t.door && !t.heart && !!src && !!src.team && !!t.team && src.team !== t.team; }
 function knockOut(t, src) {
-  t.unconscious = true; t.uTime = KO_SECONDS; t.hp = 0; t.state = 'ko'; t.path = null; t.flash = 0.15;
+  sfx('ko', t.x, t.y); t.unconscious = true; t.uTime = KO_SECONDS; t.hp = 0; t.state = 'ko'; t.path = null; t.flash = 0.15;
   G.fx.push({ x: t.x, y: t.y - 0.4, txt: 'KO', life: 0.9, color: '#ffd060' });
   say(t.team === 'k' ? t.name + ' #' + t.id + ' is knocked out — imps will carry it to a lair.' : 'A hero ' + t.name + ' is knocked out.');
   if (src.level && !src.dead) gainXp(src);
@@ -768,7 +782,7 @@ function release(b, how) {
   if (how === 'convert') {
     const c = new Creature(tx, ty, { name: 'Ex-' + b.name, sprite: b.sprite, tint: true, color: b.color, pay: 70, hp: b.maxHp, dmg: b.dmg, range: b.range, cdMax: b.cdMax, ranged: b.ranged, research: b.name === 'Mage' ? 1.2 : 0.4, pray: 0.5 });
     G.creatures.push(c); G.fx.push({ x: c.x, y: c.y, ring: true, r: 1.2, color: '#c080ff', life: 0.8, max: 0.8 });
-    say('The ' + b.name + ' breaks and joins your dungeon as ' + c.name + '!');
+    sfx('convert', c.x, c.y); say('The ' + b.name + ' breaks and joins your dungeon as ' + c.name + '!');
   } else if (how === 'starve') {
     const c = new Creature(tx, ty, SKELETON); G.creatures.push(c); say('A starved prisoner rises as a Skeleton!');
   } else say('A tortured ' + b.name + ' dies without breaking.');
@@ -785,6 +799,7 @@ const SPELLS = {
   imp:       { name: 'Create Imp',   icon: '✦',  cost: 100, cd: 2,  r: 0.5, color: '#ff6a6a' },
 };
 const SPELL_ORDER = ['lightning', 'heal', 'haste', 'rally', 'imp'];
+const SPELL_SND = { lightning: 'lightning', heal: 'heal', haste: 'haste', rally: 'rally', imp: 'imp_spawn' };
 function updateMana(dt) {
   G.manaT -= dt; if (G.manaT <= 0) { G.manaT = 1; G.ownedTiles = 0; for (const t of G.map) if (t.owner === 1 && !TERRAIN[t.t].solid) G.ownedTiles++; G.manaRate = 3 + 0.04 * G.ownedTiles; }
   G.mana = Math.min(G.maxMana, G.mana + G.manaRate * dt);
@@ -796,7 +811,7 @@ function castSpell(id, f) {                      // f = {fx, fy} world position 
   const sp = SPELLS[id], tx = Math.floor(f.fx), ty = Math.floor(f.fy), t = tile(tx, ty);
   if (G.over || !t) return false;
   if (RESEARCH[id] && !isAvail(id)) { needs(id); return false; }
-  const fail = (m) => { say(m); return false; };
+  const fail = (m) => { sfx('deny'); say(m); return false; };
   if (G.mana < sp.cost) return fail('Not enough mana for ' + sp.name + ' (' + sp.cost + ').');
   if ((G.spellCd[id] || 0) > 0) return fail(sp.name + ' is recharging.');
   if (id === 'lightning') {
@@ -821,7 +836,7 @@ function castSpell(id, f) {                      // f = {fx, fy} world position 
     if (G.imps.length >= 14) return fail('Too many imps already.');
     G.imps.push(new Imp(tx, ty)); ring(f, sp.color, 0.8);
   }
-  G.mana -= sp.cost; G.spellCd[id] = sp.cd; return true;
+  G.mana -= sp.cost; G.spellCd[id] = sp.cd; sfx(SPELL_SND[id], f.fx, f.fy); return true;
 }
 
 /* ===================================================================================== player actions */
@@ -833,12 +848,14 @@ function build(roomId, x0, y0, x1, y1) {          // RoomPlacementValidator (red
     if (G.gold - spent < tr.cost) { say('Not enough gold for more ' + tr.name + ' tiles.'); x = 1e9; y = 1e9; break; }
     t.t = roomId; t.hp = tr.maxHealth; t.room = 1; t.bed = null; spent += tr.cost; n++;
   }
-  G.gold -= spent; if (n) say('Built ' + n + ' ' + tr.name + ' tile(s) for ' + spent + ' gold.'); else say('Nothing to build there — rooms need your claimed floor.');
+  G.gold -= spent; if (n) sfx('build', (x0 + x1) / 2 + .5, (y0 + y1) / 2 + .5); if (n) say('Built ' + n + ' ' + tr.name + ' tile(s) for ' + spent + ' gold.'); else say('Nothing to build there — rooms need your claimed floor.');
   G.dirty = true;
 }
 function tagRect(x0, y0, x1, y1, on) {
+  let n = 0;
   for (let y = Math.min(y0, y1); y <= Math.max(y0, y1); y++) for (let x = Math.min(x0, x1); x <= Math.max(x0, x1); x++) {
-    const t = tile(x, y); if (t && TERRAIN[t.t].solid && TERRAIN[t.t].tag) t.tag = on ? 1 : 0; }
+    const t = tile(x, y); if (t && TERRAIN[t.t].solid && TERRAIN[t.t].tag) { if (t.tag !== (on ? 1 : 0)) n++; t.tag = on ? 1 : 0; } }
+  if (n) sfx(on ? 'tag' : 'untag');
   scanTasks();
 }
 
@@ -849,12 +866,12 @@ function step(dt) {
   G.scanT -= dt; if (G.scanT <= 0 || G.dirty) { scanTasks(); G.scanT = 0.4; G.dirty = false; }
   // free imp generation: MINIMUM_IMP_THRESHOLD / TIME_BEFORE_FREE_IMP_GENERATED_SECONDS
   G.nextImp -= dt;
-  if (G.imps.length < VAR.MINIMUM_IMP_THRESHOLD && G.nextImp <= 0) { G.nextImp = VAR.TIME_BEFORE_FREE_IMP_GENERATED_SECONDS; G.imps.push(new Imp(G.heart.x, G.heart.y + 2)); say('A free imp crawls out of the Heart.'); }
+  if (G.imps.length < VAR.MINIMUM_IMP_THRESHOLD && G.nextImp <= 0) { G.nextImp = VAR.TIME_BEFORE_FREE_IMP_GENERATED_SECONDS; G.imps.push(new Imp(G.heart.x, G.heart.y + 2)); sfx('imp_spawn', G.heart.x + .5, G.heart.y + 2.5); say('A free imp crawls out of the Heart.'); }
   for (const i of G.imps) i.update(dt);
   // portal spawning (CreatureSpawnSystem), only once claimed
   G.nextSpawn -= dt;
   if (G.portalOwned && G.nextSpawn <= 0 && G.creatures.length < VAR.CREATURES_SUPPORTED_BY_FIRST_PORTAL) {
-    G.nextSpawn = 25; const k = pickKind(); G.creatures.push(new Creature(G.portal.x, G.portal.y, k)); say('A ' + k.name + ' enters through the portal.');
+    G.nextSpawn = 25; const k = pickKind(); sfx('portal', G.portal.x + .5, G.portal.y + .5); G.creatures.push(new Creature(G.portal.x, G.portal.y, k)); say('A ' + k.name + ' enters through the portal.');
   }
   G.creatures = G.creatures.filter(c => c.dead ? false : c.update(dt) !== 'leave');
   for (const h of G.heroes) h.update(dt);
@@ -866,6 +883,7 @@ function step(dt) {
   if (G.nextPay <= 0) {
     G.nextPay = VAR.PAY_DAY_FREQUENCY_SECONDS; let total = 0, short = 0;
     for (const c of G.creatures) { if (G.gold >= c.pay) { G.gold -= c.pay; total += c.pay; } else { c.anger += 400; short++; } }
+    if (total) sfx('payday');
     if (G.creatures.length) say('Payday: paid ' + total + ' gold' + (short ? ', ' + short + ' unpaid (angry!)' : '') + '.');
   }
 }
@@ -994,12 +1012,12 @@ function handClick(m) {
   const held = G.held;
   if (held) {
     if (solid(Math.floor(m.fx), Math.floor(m.fy))) { say('Can\'t drop it into solid rock.'); return; }
-    held.x = m.fx; held.y = m.fy; held.held = false; held.state = 'idle'; held.path = null; held.think = 0; G.held = null; return;
+    sfx('drop', m.fx, m.fy); held.x = m.fx; held.y = m.fy; held.held = false; held.state = 'idle'; held.path = null; held.think = 0; G.held = null; return;
   }
   let best = null, bd = 1.3;
   for (const u of G.creatures.concat(G.imps)) { const d = Math.hypot(u.x - m.fx, u.y - m.fy); if (!u.dead && d < bd) { best = u; bd = d; } }
   if (!best) return;
-  if (best.isImp) best.drop(); best.held = true; best.path = null; G.held = best;
+  sfx('pickup', best.x, best.y); if (best.isImp) best.drop(); best.held = true; best.path = null; G.held = best;
 }
 function renderLog(isNew) { const el = $('log'); el.innerHTML = G.log.slice(0, 12).map((m, i) => '<div' + (i === 0 && isNew ? ' class="new"' : '') + '>' + m + '</div>').join(''); }
 function renderHud() {
@@ -1045,14 +1063,27 @@ for (let i = 0; i < 3; i++) G.imps.push(new Imp(G.heart.x - 1 + i, G.heart.y + 2
 say('Welcome, Keeper. Tag earth near the Heart; dig east to the portal.');
 refreshButtons();
 
+/* What the score should feel: calm until invaders are alive and awake, then tension grows with their number and their distance to the
+ * Heart; a boss alive pins it high and brings the brass and timpani in (see Music in audio.js). A quiet dread precedes each wave. */
+function audioMood() {
+  const live = G.heroes.filter(h => !h.dead && !h.unconscious && h.state !== 'flee');
+  let tension = 0, boss = 0;
+  if (live.length) {
+    let near = Infinity; for (const h of live) near = Math.min(near, Math.hypot(h.x - G.heart.x, h.y - G.heart.y));
+    tension = 0.4 + 0.2 * Math.min(1, live.length / 6) + 0.4 * (1 - Math.min(1, Math.max(0, (near - 4) / 28)));
+    if (live.some(h => h.boss)) { boss = 1; tension = Math.max(tension, 0.8); }
+  } else if (G.gateOpen && G.wave < VAR.WAVES && G.nextWave - G.time < 12) tension = 0.25;
+  return { tension, boss, over: G.over };
+}
 let last = performance.now(), acc = 0; const DT = 1 / 20;           // ticksPerSec analogue
 let lastFrame = performance.now(); const DT_FRAME = (now) => { const d = Math.min(0.1, (now - lastFrame) / 1000); lastFrame = now; return d; };
 function frame(now) {
   acc += Math.min(0.25, (now - last) / 1000) * G.speed; last = now;
   while (acc >= DT) { step(DT); acc -= DT; }
   if (window.__render3d) window.__render3d(DT_FRAME(now)); else draw();
+  if (window.Sound) Sound.setMood(audioMood());
   renderHud(); requestAnimationFrame(frame);
 }
 requestAnimationFrame(frame);
 window.__ui = { get mouse() { return mouse; }, get tool() { return tool; }, inputDown, inputMove, inputUp };
-window.__game = { strike, Chicken, updateHatchery, prayRate, spriteOf, pickKind, RESEARCH, isAvail, unlockAll, addResearch, SKELETON, freeSlot, updateJail, knockOut, KO_SECONDS, TORTURE_SECONDS, SPELLS, SPELL_ORDER, castSpell, TRAPS, DOOR, placeThings, removeThings, doorAt, trapAt, HERO_LAND, W, H, G, HEROES, KINDS, spawnWave, Creature, Imp, Hero, hurt, los, T, TERRAIN, step, tagRect, build, scanTasks, findPath, capacity, goldReleased, damageTile, perApplication, VAR };
+window.__game = { strike, Chicken, updateHatchery, prayRate, spriteOf, pickKind, RESEARCH, isAvail, unlockAll, addResearch, SKELETON, freeSlot, updateJail, knockOut, KO_SECONDS, TORTURE_SECONDS, SPELLS, SPELL_ORDER, castSpell, TRAPS, DOOR, placeThings, removeThings, doorAt, trapAt, HERO_LAND, W, H, G, HEROES, KINDS, spawnWave, Creature, Imp, Hero, hurt, los, T, TERRAIN, step, tagRect, build, scanTasks, findPath, capacity, goldReleased, damageTile, perApplication, VAR, audioMood, SPELL_SND, release };
