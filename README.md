@@ -23,6 +23,8 @@ study of [OpenKeeper](https://github.com/tonihele/OpenKeeper) (a Java re-impleme
 | `tools/test_levels.js` | Headless Chromium checks for the level format and loader: `node tools/test_levels.js` |
 | `tools/test_audio.js` | Headless Chromium checks for the sound system: `node tools/test_audio.js` |
 | `tools/process_art.py` | Cuts the flat background (and the painted ground shadow of characters) out of the original JPGs: `python3 tools/process_art.py <folder> [--set units --max 320]` re-generates `web/assets/sprites/` |
+| `web/assets/ui/frame.jpg` | The carved-stone/parchment interface frame. The page is a fixed-size layout (about 1461 px wide) laid over this image and scaled to the window; HUD, toolbar, map, task/log scrolls, research panel and help sit at fixed mockup coordinates |
+| `tools/make_ui_frame.py` | Rebuilds `frame.jpg` from `tools/source/ui-mockup.jpg` by repainting the panel interiors blank: `python3 tools/make_ui_frame.py` |
 | `web/vendor/` | three.js 0.160.0 (MIT) and the UI fonts in `fonts/` (Cinzel, Cinzel Decorative, IM Fell English, EB Garamond; SIL Open Font License, licences alongside), kept in the repo so nothing loads from a CDN |
 
 ## Run the prototype

@@ -42,10 +42,11 @@ function start() {
   }
   const screenRight = () => ({ x: Math.cos(cam.yaw), z: -Math.sin(cam.yaw) }), screenUp = () => ({ x: -Math.sin(cam.yaw), z: -Math.cos(cam.yaw) });
   function resize() {
-    const w = stage.clientWidth || 800, h = Math.round(w * 0.7);
+    const w = stage.clientWidth || 800, h = stage.clientHeight || Math.round(w * 0.7);                       // the panel decides the size
+    renderer.setPixelRatio(Math.min(2.5, (window.devicePixelRatio || 1) * (window.__uiScale || 1)));         // the page is scaled, so render at the scaled density
     renderer.setSize(w, h, false); canvas.style.height = h + 'px'; camera.aspect = w / h; camera.updateProjectionMatrix();
   }
-  window.addEventListener('resize', resize); resize(); placeCamera();
+  window.addEventListener('resize', resize); window.__onUiScale = resize; resize(); placeCamera();
 
   scene.add(new THREE.HemisphereLight(0xb0a8c0, 0x2a2430, 0.95));
   const sun = new THREE.DirectionalLight(0xfff0d8, 1.25); sun.position.set(4, 12, 9); scene.add(sun);
