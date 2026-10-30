@@ -54,7 +54,7 @@ const G = {
   map: [], time: 0, speed: 1, gold: 1000, imps: [], creatures: [], tasks: new Map(),
   nextImp: 0, nextSpawn: 20, nextPay: VAR.PAY_DAY_FREQUENCY_SECONDS, scanT: 0, log: [],
   portalOwned: false, heart: { x: 6, y: H >> 1 }, portal: { x: W - 8, y: H >> 1 }, gate: { x: 22, y: H - 5 },
-  heroes: [], shots: [], fx: [], heartHp: VAR.HEART_HEALTH, heartFlash: 0, gateOpen: false, gateT: 0,
+  heroes: [], shots: [], fx: [], doors: [], traps: [], clouds: [], heartHp: VAR.HEART_HEALTH, heartFlash: 0, gateOpen: false, gateT: 0,
   wave: 0, nextWave: Infinity, over: null, kills: 0, held: null, nextId: 0,
 };
 const idx = (x, y) => y * W + x;
@@ -150,7 +150,7 @@ function healClaim(x, y, dt, eff) {
 
 /* ===================================================================================== task board
  * TaskManager.scanTerrainTasks: one tile-task per tile per player, created/removed as the map changes. */
-const TASK = { DIG: { prio: 10, max: 3 }, CLAIM: { prio: 6, max: 1 } };
+const TASK = { DIG: { prio: 10, max: 3 }, CLAIM: { prio: 6, max: 1 }, REPAIR: { prio: 7, max: 2 }, REARM: { prio: 5, max: 1 } };   // RepairWallTileTask / workshop crates analogues
 function scanTasks() {
   const live = new Set();
   for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
@@ -161,10 +161,13 @@ function scanTasks() {
     const key = type + ':' + x + ',' + y; live.add(key);
     if (!G.tasks.has(key)) G.tasks.set(key, { key, type, x, y, who: new Set() });
   }
+  const add = (type, x, y) => { const key = type + ':' + x + ',' + y; live.add(key); if (!G.tasks.has(key)) G.tasks.set(key, { key, type, x, y, who: new Set() }); };
+  for (const d of G.doors) if (!d.dead && d.hp < d.maxHp && !G.heroes.some(h => Math.hypot(h.x - d.x, h.y - d.y) < 4)) add('REPAIR', d.tx, d.ty);   // imps wait until the fight is over
+  for (const tr of G.traps) if (tr.charges < tr.max && G.gold >= TRAPS[tr.kind].rearmCost) add('REARM', tr.tx, tr.ty);
   for (const [k, task] of G.tasks) if (!live.has(k)) { for (const w of task.who) if (w.task === task) w.drop(); G.tasks.delete(k); }
 }
 function taskTargets(task) {                     // DigTileTask.getTarget = an accessible neighbour; Claim = the tile
-  if (task.type === 'CLAIM') return [[task.x, task.y]];
+  if (task.type !== 'DIG') return [[task.x, task.y]];
   return [[1,0],[-1,0],[0,1],[0,-1]].map(([dx, dy]) => [task.x + dx, task.y + dy]).filter(([x, y]) => !solid(x, y));
 }
 
@@ -174,9 +177,12 @@ class Mover {
   get tx() { return Math.floor(this.x); } get ty() { return Math.floor(this.y); }
   go(path) { this.path = path && path.length ? path.slice() : null; return path !== null; }
   stepMove(dt, mult = 1) {                        // mult: running (fleeing) is faster, Attributes.runSpeed
-    let left = this.speed * dt * mult;
+    let left = this.speed * dt * mult; this.blocker = null;
     while (this.path && this.path.length && left > 0) {
-      const n = this.path[0], dx = n.x + 0.5 - this.x, dy = n.y + 0.5 - this.y, d = Math.hypot(dx, dy);
+      const n = this.path[0];
+      if (this.team === 'h' && this.state !== 'flee') {       // a closed door stops invaders until it is smashed; keepers walk through
+        const door = doorAt(n.x, n.y); if (door && !door.dead && !(this.tx === n.x && this.ty === n.y)) { this.blocker = door; break; } }
+      const dx = n.x + 0.5 - this.x, dy = n.y + 0.5 - this.y, d = Math.hypot(dx, dy);
       if (d <= left) { this.x = n.x + 0.5; this.y = n.y + 0.5; left -= d; this.path.shift(); }
       else { this.x += dx / d * left; this.y += dy / d * left; left = 0; this.face = Math.atan2(dy, dx); }
     }
@@ -221,6 +227,12 @@ class Imp extends Mover {                        // CreatureState.IDLE -> findSt
         const got = damageTile(k.x, k.y, dt, VAR.IMP_EFFICIENCY);
         this.gold += got; this.face = Math.atan2(k.y + 0.5 - this.y, k.x + 0.5 - this.x);
         if (this.gold >= VAR.IMP_MAX_GOLD) { this.drop(); this.think = 0; }
+      } else if (k.type === 'REPAIR') {
+        const d = doorAt(k.x, k.y); if (!d || d.dead || d.hp >= d.maxHp) return this.drop();
+        d.hp = Math.min(d.maxHp, d.hp + 40 * VAR.IMP_EFFICIENCY / 100 * dt);
+      } else if (k.type === 'REARM') {
+        const tr = trapAt(k.x, k.y), def = tr && TRAPS[tr.kind]; if (!tr || tr.charges >= tr.max || G.gold < def.rearmCost) return this.drop();
+        tr.prog = (tr.prog || 0) + dt; if (tr.prog >= def.rearm) { tr.prog = 0; tr.charges++; G.gold -= def.rearmCost; }
       } else healClaim(k.x, k.y, dt, VAR.IMP_EFFICIENCY);
     } else if (this.state === 'deliver') {
       if (this.stepMove(dt)) {
@@ -345,6 +357,7 @@ function hurt(t, dmg, src) {
   t.hp -= dmg; t.flash = 0.15; if (t.hp <= 0) kill(t, src);
 }
 function kill(t, src) {
+  if (t.door) { t.dead = true; G.doors = G.doors.filter(d => d !== t); const dt_ = tile(t.tx, t.ty); if (dt_) dt_.door = null; G.fx.push({ x: t.x, y: t.y, splat: true, life: 3 }); G.dirty = true; say('A door was smashed!'); return; }
   t.dead = true; G.fx.push({ x: t.x, y: t.y, splat: true, life: 6 });
   if (t.isImp) { t.drop(); say('An imp was slain.'); }
   else if (t.team === 'k') { if (t.lair) t.lair.occupant = null; say(t.name + ' #' + t.id + ' has fallen!'); }
@@ -376,7 +389,9 @@ function fightBrain(u, dt) {                      // true = this unit's turn was
   u.state = 'fight';
   if (dist(u, t) <= u.range && los(u.x, u.y, t.x, t.y)) { u.path = null; u.face = Math.atan2(t.y - u.y, t.x - u.x); if (u.cd <= 0) strike(u, t); return true; }
   u.rep -= dt; if (u.rep <= 0 || !u.path) { u.rep = 0.4; u.go(findPath(u.tx, u.ty, t.tx, t.ty)); }
-  u.stepMove(dt); return true;
+  u.stepMove(dt);
+  if (u.blocker && !u.blocker.dead && u.cd <= 0) { u.face = Math.atan2(u.blocker.y - u.y, u.blocker.x - u.x); strike(u, u.blocker); }
+  return true;
 }
 function updateShots(dt) {
   for (const s of G.shots) {
@@ -402,6 +417,7 @@ class Hero extends Mover {
   get leader() { return this.party.find(h => !h.dead && h.state !== 'flee') || null; }
   update(dt) {
     if (this.dead) return; this.flash = Math.max(0, this.flash - dt);
+    if (this.stun > 0) { this.stun -= dt; this.cd = Math.max(0, this.cd - dt); return; }                 // lightning-trap stun
     if (fightBrain(this, dt)) return;
     if (dist(this, heartTarget) <= this.range + 1.5 && los(this.x, this.y, heartTarget.x, heartTarget.y)) {   // the objective: KILL_PLAYER
       this.path = null; this.face = Math.atan2(heartTarget.y - this.y, heartTarget.x - this.x); if (this.cd <= 0) strike(this, heartTarget); return;
@@ -410,6 +426,7 @@ class Hero extends Mover {
     if (lead === this) { if (this.think <= 0 || !this.path) { this.think = 1; this.go(findPath(this.tx, this.ty, G.heart.x, G.heart.y)); } }
     else if (lead && dist(this, lead) > 2.2 && (this.think <= 0 || !this.path)) { this.think = 0.6; this.go(findPath(this.tx, this.ty, lead.tx, lead.ty)); }   // FollowTarget
     this.stepMove(dt);
+    if (this.blocker && !this.blocker.dead) { this.face = Math.atan2(this.blocker.y - this.y, this.blocker.x - this.x); if (this.cd <= 0) strike(this, this.blocker); }   // smash the door
   }
 }
 function spawnWave() {
@@ -430,6 +447,59 @@ function heroLogic(dt) {
   }
   if (G.time >= G.nextWave && G.wave < VAR.WAVES) spawnWave();
   if (G.wave >= VAR.WAVES && !G.heroes.length && !G.over) { G.over = 'victory'; say('All invaders are defeated — the dungeon is yours!'); }
+}
+
+/* ===================================================================================== doors & traps
+ * DoorsController / TrapsController, reduced. Doors are walls to heroes (they must smash them) and open for your units;
+ * imps repair them. Traps are hidden from heroes, fire when one steps on the tile, hold a few charges and are re-armed
+ * by imps for gold (stand-in for the Workshop's manufactured crates). */
+const TRAPS = {
+  gas:  { name: 'Gas Trap',       cost: 150, max: 3, cd: 7, rearm: 3, rearmCost: 30, color: '#7fe04a' },
+  bolt: { name: 'Lightning Trap', cost: 200, max: 2, cd: 5, rearm: 4, rearmCost: 40, color: '#ffe040' },
+};
+const DOOR = { cost: 100, hp: 400 };
+const doorAt = (x, y) => { const t = tile(x, y); return t && t.door || null; };
+const trapAt = (x, y) => { const t = tile(x, y); return t && t.trap || null; };
+function placeThings(kind, x0, y0, x1, y1) {
+  const def = kind === 'door' ? DOOR : TRAPS[kind], name = kind === 'door' ? 'Door' : def.name; let n = 0, spent = 0;
+  for (let y = Math.min(y0, y1); y <= Math.max(y0, y1); y++) for (let x = Math.min(x0, x1); x <= Math.max(x0, x1); x++) {
+    const t = tile(x, y); if (!t || t.t !== T.PATH || t.owner !== 1 || t.door || t.trap) continue;
+    if (G.gold - spent < def.cost) { say('Not enough gold for more ' + name + 's.'); x = 1e9; y = 1e9; break; }
+    if (kind === 'door') { const d = { door: true, tx: x, ty: y, x: x + .5, y: y + .5, hp: DOOR.hp, maxHp: DOOR.hp, dead: false, flash: 0 }; t.door = d; G.doors.push(d); }
+    else { const tr = { kind, tx: x, ty: y, x: x + .5, y: y + .5, charges: def.max, max: def.max, cd: 0, prog: 0 }; t.trap = tr; G.traps.push(tr); }
+    spent += def.cost; n++;
+  }
+  G.gold -= spent; if (n) say('Placed ' + n + ' ' + name + (n > 1 ? 's' : '') + ' for ' + spent + ' gold.'); else say('Doors and traps go on your claimed floor, not on rooms.');
+  G.dirty = true;
+}
+function removeThings(x0, y0, x1, y1) {                  // right-click: sell for half the price
+  let n = 0, refund = 0;
+  for (let y = Math.min(y0, y1); y <= Math.max(y0, y1); y++) for (let x = Math.min(x0, x1); x <= Math.max(x0, x1); x++) {
+    const t = tile(x, y); if (!t) continue;
+    if (t.door) { refund += DOOR.cost / 2; G.doors = G.doors.filter(d => d !== t.door); t.door = null; n++; }
+    else if (t.trap) { refund += TRAPS[t.trap.kind].cost / 2; G.traps = G.traps.filter(d => d !== t.trap); t.trap = null; n++; }
+  }
+  if (n) { G.gold += refund; say('Sold ' + n + ' item(s) for ' + refund + ' gold.'); G.dirty = true; }
+}
+function fireTrap(tr) {
+  tr.charges--; tr.cd = TRAPS[tr.kind].cd;
+  if (tr.kind === 'gas') { G.clouds.push({ x: tr.x, y: tr.y, r: 2.2, life: 5, dps: 10, tick: 0 }); say('A Gas Trap hisses!'); }
+  else {
+    G.fx.push({ x: tr.x, y: tr.y, bolt: true, life: 0.35 }); say('A Lightning Trap discharges!');
+    for (const h of G.heroes) if (!h.dead && dist(h, tr) <= 2.2) { hurt(h, 45, null); h.stun = 1.5; G.fx.push({ x: h.x, y: h.y, bolt: true, life: 0.3 }); }
+  }
+}
+function updateTraps(dt) {
+  for (const d of G.doors) d.flash = Math.max(0, d.flash - dt);
+  for (const tr of G.traps) {
+    tr.cd = Math.max(0, tr.cd - dt);
+    if (tr.charges > 0 && tr.cd <= 0 && G.heroes.some(h => !h.dead && Math.hypot(h.x - tr.x, h.y - tr.y) <= 0.9)) fireTrap(tr);
+  }
+  for (const c of G.clouds) {
+    c.life -= dt; c.tick -= dt;
+    if (c.tick <= 0) { c.tick = 0.5; for (const h of G.heroes) if (!h.dead && dist(h, c) <= c.r) hurt(h, c.dps * 0.5, null); }
+  }
+  G.clouds = G.clouds.filter(c => c.life > 0);
 }
 
 /* ===================================================================================== player actions */
@@ -465,7 +535,7 @@ function step(dt) {
   }
   G.creatures = G.creatures.filter(c => c.dead ? false : c.update(dt) !== 'leave');
   for (const h of G.heroes) h.update(dt);
-  updateShots(dt); heroLogic(dt);
+  updateTraps(dt); updateShots(dt); heroLogic(dt);
   G.heroes = G.heroes.filter(h => !h.dead); G.creatures = G.creatures.filter(c => !c.dead); G.imps = G.imps.filter(i => !i.dead);
   // payday
   G.nextPay -= dt;
@@ -515,6 +585,12 @@ function draw() {
     if (tr.solid && !tr.imp && t.hp < tr.maxHealth && t.hp > 0) { ctx.fillStyle = 'rgba(0,0,0,.6)'; ctx.fillRect(px + 2, py + TS - 5, TS - 4, 3); ctx.fillStyle = '#e0624f'; ctx.fillRect(px + 2, py + TS - 5, (TS - 4) * t.hp / tr.maxHealth, 3); }
     if (!tr.solid && t.owner !== 1 && t.hp > 0 && t.hp < tr.maxHealth) { ctx.fillStyle = 'rgba(70,110,220,.8)'; ctx.fillRect(px + 2, py + TS - 5, (TS - 4) * t.hp / tr.maxHealth, 3); }
   }
+  for (const d of G.doors) { const px = d.tx * TS, py = d.ty * TS; ctx.fillStyle = d.flash > 0 ? '#fff' : '#8a5a2a'; ctx.fillRect(px + 2, py + 2, TS - 4, TS - 4); ctx.strokeStyle = '#3a2410'; ctx.strokeRect(px + 2.5, py + 2.5, TS - 5, TS - 5);
+    ctx.beginPath(); ctx.moveTo(px + 2, py + TS / 2); ctx.lineTo(px + TS - 2, py + TS / 2); ctx.stroke(); if (d.hp < d.maxHp) { ctx.fillStyle = 'rgba(0,0,0,.7)'; ctx.fillRect(px + 2, py + TS - 5, TS - 4, 3); ctx.fillStyle = '#e0a050'; ctx.fillRect(px + 2, py + TS - 5, (TS - 4) * d.hp / d.maxHp, 3); } }
+  for (const tr of G.traps) { const px = tr.x * TS, py = tr.y * TS; ctx.globalAlpha = tr.charges ? 0.95 : 0.35; ctx.strokeStyle = TRAPS[tr.kind].color; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(px, py, 6, 0, 7); ctx.stroke(); ctx.lineWidth = 1;
+    ctx.fillStyle = TRAPS[tr.kind].color; for (let i = 0; i < tr.charges; i++) ctx.fillRect(px - 5 + i * 4, py - 1, 3, 3); ctx.globalAlpha = 1; }
+  for (const c of G.clouds) { ctx.fillStyle = `rgba(120,220,70,${0.28 * Math.min(1, c.life)})`; ctx.beginPath(); ctx.arc(c.x * TS, c.y * TS, c.r * TS, 0, 7); ctx.fill(); }
+  for (const f of G.fx) if (f.bolt) { ctx.strokeStyle = '#fff6a0'; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(f.x * TS - 3, f.y * TS - 14); ctx.lineTo(f.x * TS + 3, f.y * TS - 6); ctx.lineTo(f.x * TS - 2, f.y * TS - 2); ctx.lineTo(f.x * TS + 2, f.y * TS + 4); ctx.stroke(); ctx.lineWidth = 1; }
   for (const f of G.fx) if (f.splat) { ctx.fillStyle = `rgba(140,20,20,${Math.min(.5, f.life / 6)})`; ctx.beginPath(); ctx.arc(f.x * TS, f.y * TS, 6, 0, 7); ctx.fill(); }
   for (const i of G.imps) { const [px, py] = scr(i); ctx.fillStyle = i.flash > 0 ? '#fff' : i.state === 'flee' ? '#ff9060' : '#d04040'; ctx.beginPath(); ctx.arc(px, py, 4.2, 0, 7); ctx.fill();
     ctx.fillStyle = '#fff'; ctx.fillRect(px + Math.cos(i.face) * 2.5 - .5, py + Math.sin(i.face) * 2.5 - .5, 2, 2);
@@ -532,7 +608,7 @@ function draw() {
     ctx.fillStyle = '#000'; ctx.font = 'bold 8px sans-serif'; ctx.textAlign = 'center'; ctx.fillText(h.letter, px, py + 3); bar(px, py, h); }
   for (const s of G.shots) { ctx.fillStyle = s.color; ctx.beginPath(); ctx.arc(s.x * TS, s.y * TS, 2.2, 0, 7); ctx.fill(); }
   ctx.font = 'bold 9px sans-serif'; ctx.textAlign = 'center';
-  for (const f of G.fx) if (!f.splat) { ctx.globalAlpha = Math.min(1, f.life * 2); ctx.fillStyle = f.color; ctx.fillText(f.txt, f.x * TS, (f.y - (0.7 - f.life) * 0.8) * TS); ctx.globalAlpha = 1; }
+  for (const f of G.fx) if (!f.splat && !f.bolt) { ctx.globalAlpha = Math.min(1, f.life * 2); ctx.fillStyle = f.color; ctx.fillText(f.txt, f.x * TS, (f.y - (0.7 - f.life) * 0.8) * TS); ctx.globalAlpha = 1; }
   { const hp = G.heartHp / VAR.HEART_HEALTH, bx = (G.heart.x - 1) * TS, by = (G.heart.y + 2) * TS + 2;     // Heart health
     ctx.fillStyle = 'rgba(0,0,0,.7)'; ctx.fillRect(bx, by, TS * 3, 4); ctx.fillStyle = hp > .5 ? '#e05050' : '#ff9030'; ctx.fillRect(bx, by, TS * 3 * hp, 4); }
   if (G.over) { ctx.fillStyle = 'rgba(0,0,0,.65)'; ctx.fillRect(0, 0, cv.width, cv.height); ctx.textAlign = 'center';
@@ -547,6 +623,7 @@ function draw() {
 /* ===================================================================================== UI wiring */
 const $ = (id) => document.getElementById(id);
 const TOOLS = [ ['dig', 'Dig (tag)'], ['hand', '✋ Hand'], ['treasury', 'Treasury ' + TERRAIN[T.TREASURY].cost + 'g/tile'], ['lair', 'Lair ' + TERRAIN[T.LAIR].cost + 'g/tile'],
+  ['door', 'Door ' + DOOR.cost + 'g'], ['gas', 'Gas Trap ' + TRAPS.gas.cost + 'g'], ['bolt', 'Lightning ' + TRAPS.bolt.cost + 'g'],
   ['sp1', '⏸ Pause'], ['sp2', '1×'], ['sp3', '3×'], ['sp4', '8×'] ];
 for (const [id, label] of TOOLS) { const b = document.createElement('button'); b.textContent = label; b.id = 'b_' + id; b.onclick = () => {
   if (id.startsWith('sp')) { G.speed = [0, 1, 3, 8][+id[2] - 1]; } else tool = id; refreshButtons(); }; $('tools').appendChild(b); }
@@ -560,6 +637,7 @@ function inputUp(p, f) {
   if (!mouse.down) return; const right = mouse.down === 3;
   if (tool === 'hand') { if (!right) handClick(f); }
   else if (tool === 'dig') tagRect(mouse.sx, mouse.sy, p.x, p.y, !right);
+  else if (tool === 'door' || tool === 'gas' || tool === 'bolt') { if (right) removeThings(mouse.sx, mouse.sy, p.x, p.y); else placeThings(tool, mouse.sx, mouse.sy, p.x, p.y); }
   else if (!right) build(tool === 'treasury' ? T.TREASURY : T.LAIR, mouse.sx, mouse.sy, p.x, p.y);
   mouse.down = 0;
 }
@@ -588,9 +666,9 @@ function renderHud() {
   $('hPay').textContent = Math.max(0, Math.ceil(G.nextPay)); $('hTime').textContent = Math.floor(G.time);
   $('hHeart').textContent = Math.ceil(G.heartHp); $('hHeroes').textContent = G.heroes.length; $('hWave').textContent = G.wave + '/' + VAR.WAVES;
   $('hNext').textContent = !G.gateOpen ? 'tunnel to Gate' : G.nextWave === Infinity ? '—' : Math.max(0, Math.ceil(G.nextWave - G.time)) + 's';
-  let dig = 0, claim = 0, busy = 0; for (const t of G.tasks.values()) { if (t.type === 'DIG') dig++; else claim++; if (t.who.size) busy++; }
+  let dig = 0, claim = 0, busy = 0, upkeep = 0; for (const t of G.tasks.values()) { if (t.type === 'DIG') dig++; else if (t.type === 'CLAIM') claim++; else upkeep++; if (t.who.size) busy++; }
   const mood = G.creatures.map(c => c.name + ' #' + c.id + ' Lv' + c.level + ' ' + Math.ceil(c.hp) + '/' + c.maxHp + 'hp: ' + c.mood + (c.lair ? '' : ' (no bed)')).join('<br>');
-  $('tasks').innerHTML = 'Dig tiles <b>' + dig + '</b> · Claim tiles <b>' + claim + '</b> · in progress <b>' + busy + '</b><br>' +
+  $('tasks').innerHTML = 'Dig tiles <b>' + dig + '</b> · Claim tiles <b>' + claim + '</b> · Repair/rearm <b>' + upkeep + '</b> · in progress <b>' + busy + '</b><br>' +
     'Idle imps <b>' + G.imps.filter(i => i.state === 'idle').length + '</b>/' + G.imps.length + '<br><span style="color:var(--dim)">' + (mood || 'No creatures yet — dig east and claim the purple portal.') + '</span>';
 }
 
@@ -609,4 +687,4 @@ function frame(now) {
 }
 requestAnimationFrame(frame);
 window.__ui = { get mouse() { return mouse; }, get tool() { return tool; }, inputDown, inputMove, inputUp };
-window.__game = { HERO_LAND, W, H, G, HEROES, KINDS, spawnWave, Creature, Imp, Hero, hurt, los, T, TERRAIN, step, tagRect, build, scanTasks, findPath, capacity, goldReleased, damageTile, perApplication, VAR };
+window.__game = { TRAPS, DOOR, placeThings, removeThings, doorAt, trapAt, HERO_LAND, W, H, G, HEROES, KINDS, spawnWave, Creature, Imp, Hero, hurt, los, T, TERRAIN, step, tagRect, build, scanTasks, findPath, capacity, goldReleased, damageTile, perApplication, VAR };

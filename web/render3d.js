@@ -11,7 +11,7 @@ if (params.get('view') !== '2d') {
 }
 
 function start() {
-  const { G, T, TERRAIN, HERO_LAND, W, H, capacity, VAR } = window.__game, UI = window.__ui;
+  const { G, T, TERRAIN, HERO_LAND, W, H, capacity, VAR, TRAPS } = window.__game, UI = window.__ui;
   const WALL_H = 1.25, ROCK_H = 1.6;
 
   /* ------------------------------------------------------------------ renderer, scene, camera */
@@ -152,8 +152,44 @@ function start() {
     for (const [u, g] of unitMeshes) if (!seen.has(u)) { scene.remove(g); g.traverse(o => { if (o.isMesh) { o.geometry.dispose(); if (o.material.dispose) o.material.dispose(); } }); unitMeshes.delete(u); }
   }
 
+  /* doors & traps: a few individual meshes keyed by sim object */
+  const doorMeshes = new Map(), trapMeshes = new Map();
+  const woodMat = () => new THREE.MeshLambertMaterial({ color: 0x8a5a2a });
+  function makeDoor(d) {
+    const wall = (x, y) => x < 0 || y < 0 || x >= W || y >= H || TERRAIN[G.map[y * W + x].t].solid;
+    const g = new THREE.Group(), ns = wall(d.tx - 1, d.ty) && wall(d.tx + 1, d.ty);       // corridor runs north-south: the slab spans x
+    const slab = new THREE.Mesh(new THREE.BoxGeometry(ns ? .96 : .2, 1.05, ns ? .2 : .96), woodMat()); slab.position.y = .525; g.add(slab);
+    const band = new THREE.Mesh(new THREE.BoxGeometry(ns ? 1 : .24, .12, ns ? .24 : 1), new THREE.MeshLambertMaterial({ color: 0x3a3a40 })); band.position.y = .6; g.add(band);
+    const bar = makeBar({ team: 'k' }); bar.position.y = 1.35; g.add(bar);
+    g.position.set(d.x, 0, d.y); g.userData = { slab, bar, open: 0, mat: slab.material }; scene.add(g); return g;
+  }
+  function makeTrap(tr) {
+    const g = new THREE.Group(), c = new THREE.Color(TRAPS[tr.kind].color);
+    const disc = new THREE.Mesh(new THREE.CylinderGeometry(.34, .34, .05, 14), new THREE.MeshLambertMaterial({ color: c, emissive: c, emissiveIntensity: .25 })); disc.position.y = .03; g.add(disc);
+    const spike = new THREE.Mesh(tr.kind === 'gas' ? new THREE.CylinderGeometry(.06, .1, .22, 8) : new THREE.ConeGeometry(.12, .3, 4), new THREE.MeshLambertMaterial({ color: 0x303034 })); spike.position.y = .16; g.add(spike);
+    const pips = []; for (let i = 0; i < tr.max; i++) { const p = new THREE.Mesh(new THREE.SphereGeometry(.05, 6, 6), new THREE.MeshBasicMaterial({ color: c })); p.position.set(-.18 + i * .18, .12, .3); g.add(p); pips.push(p); }
+    g.position.set(tr.x, 0, tr.y); g.userData = { disc, pips }; scene.add(g); return g;
+  }
+  function syncProps() {
+    const keep = new Set();
+    for (const d of G.doors) {
+      keep.add(d); let g = doorMeshes.get(d); if (!g) { g = makeDoor(d); doorMeshes.set(d, g); }
+      const near = G.creatures.concat(G.imps).some(u => !u.dead && Math.hypot(u.x - d.x, u.y - d.y) < 1.4), u = g.userData;
+      u.open += ((near ? 1 : 0) - u.open) * .25; u.slab.position.y = .525 + u.open * 1.0;                 // raised like a portcullis while a friend passes
+      u.mat.color.set(d.flash > 0 ? 0xffffff : 0x8a5a2a);
+      u.bar.visible = d.hp < d.maxHp; u.bar.userData.fg.scale.x = .5 * Math.max(.001, d.hp / d.maxHp);
+    }
+    for (const tr of G.traps) {
+      keep.add(tr); let g = trapMeshes.get(tr); if (!g) { g = makeTrap(tr); trapMeshes.set(tr, g); }
+      g.userData.pips.forEach((p, i) => p.visible = i < tr.charges); g.userData.disc.material.emissiveIntensity = tr.charges ? .3 : 0;
+      g.userData.disc.material.color.set(tr.charges ? TRAPS[tr.kind].color : 0x444444);
+    }
+    for (const m of [doorMeshes, trapMeshes]) for (const [k, g] of m) if (!keep.has(k)) { scene.remove(g); g.traverse(o => { if (o.isMesh) { o.geometry.dispose(); o.material.dispose(); } }); m.delete(k); }
+  }
+
   /* shots, damage numbers, blood splats (small pools) */
-  const shotPool = [], splatPool = [], numPool = [], numTex = new Map();
+  const shotPool = [], splatPool = [], numPool = [], boltPool = [], cloudPool = [], numTex = new Map();
+  const boltGeo = new THREE.CylinderGeometry(.05, .05, 3, 6), cloudGeo = new THREE.SphereGeometry(1, 16, 10);
   const shotGeo = new THREE.SphereGeometry(.09, 8, 6), splatGeo = new THREE.CircleGeometry(.3, 14); splatGeo.rotateX(-Math.PI / 2);
   function numberMat(n, color) {
     const key = n + color; let m = numTex.get(key); if (m) return m;
@@ -161,12 +197,16 @@ function start() {
     m = new THREE.SpriteMaterial({ map: new THREE.CanvasTexture(c), transparent: true, depthTest: false }); numTex.set(key, m); return m;
   }
   function syncEffects() {
-    shotPool.forEach(m => m.visible = false); splatPool.forEach(m => m.visible = false); numPool.forEach(m => m.visible = false);
+    shotPool.forEach(m => m.visible = false); splatPool.forEach(m => m.visible = false); numPool.forEach(m => m.visible = false); boltPool.forEach(m => m.visible = false); cloudPool.forEach(m => m.visible = false);
+    G.clouds.forEach((c, i) => { let m = cloudPool[i]; if (!m) { m = new THREE.Mesh(cloudGeo, new THREE.MeshBasicMaterial({ color: 0x78dc46, transparent: true, depthWrite: false })); scene.add(m); cloudPool[i] = m; }
+      m.visible = true; m.material.opacity = .28 * Math.min(1, c.life); m.scale.set(c.r, .8 + Math.sin(G.time * 5 + i) * .08, c.r); m.position.set(c.x, .5, c.y); });
     G.shots.forEach((s, i) => { let m = shotPool[i]; if (!m) { m = new THREE.Mesh(shotGeo, new THREE.MeshBasicMaterial({ color: 0xffffff })); scene.add(m); shotPool[i] = m; }
       m.visible = true; m.material.color.set(s.color); m.position.set(s.x, .6, s.y); });
-    let si = 0, ni = 0;
+    let si = 0, ni = 0, bi = 0;
     for (const f of G.fx) {
-      if (f.splat) { let m = splatPool[si]; if (!m) { m = new THREE.Mesh(splatGeo, new THREE.MeshBasicMaterial({ color: 0x8c1414, transparent: true })); scene.add(m); splatPool[si] = m; }
+      if (f.bolt) { let m = boltPool[bi]; if (!m) { m = new THREE.Mesh(boltGeo, new THREE.MeshBasicMaterial({ color: 0xfff6a0 })); scene.add(m); boltPool[bi] = m; }
+        bi++; m.visible = true; m.position.set(f.x, 1.5, f.y); m.scale.set(1 + (Math.random() - .5) * .8, 1, 1 + (Math.random() - .5) * .8); }
+      else if (f.splat) { let m = splatPool[si]; if (!m) { m = new THREE.Mesh(splatGeo, new THREE.MeshBasicMaterial({ color: 0x8c1414, transparent: true })); scene.add(m); splatPool[si] = m; }
         si++; m.visible = true; m.material.opacity = Math.min(.55, f.life / 6); m.position.set(f.x, .02, f.y); }
       else { let m = numPool[ni]; if (!m) { m = new THREE.Sprite(); m.scale.set(.6, .3, 1); m.renderOrder = 11; scene.add(m); numPool[ni] = m; }
         ni++; m.visible = true; m.material = numberMat(f.txt, f.color); m.position.set(f.x, 1.0 + (0.7 - f.life) * 0.8, f.y); }
@@ -226,7 +266,7 @@ function start() {
     if (keys.has('w') || keys.has('arrowup')) cam.z -= sp; if (keys.has('s') || keys.has('arrowdown')) cam.z += sp;
     if (keys.has('a') || keys.has('arrowleft')) cam.x -= sp; if (keys.has('d') || keys.has('arrowright')) cam.x += sp;
     cam.x = Math.max(0, Math.min(W, cam.x)); cam.z = Math.max(0, Math.min(H, cam.z)); placeCamera();
-    updateTiles(); syncUnits(); syncEffects(); syncSelection();
+    updateTiles(); syncProps(); syncUnits(); syncEffects(); syncSelection();
     const pulse = 1 + Math.sin(G.time * 4) * .07;
     heartMesh.scale.setScalar(pulse * (G.heartFlash > 0 ? 1.25 : 1)); heartMesh.rotation.y += dt * .6; heartMesh.material.emissive.setHex(G.heartFlash > 0 ? 0xffffff : 0x801010);
     heartLight.intensity = 2.0 + Math.sin(G.time * 4) * .5;

@@ -73,6 +73,8 @@ worker.execute(): while adjacent/at target, tick executeTask; on isValid()==fals
 * Dead → `Death` + corpse (`DEAD_BODY_DIES_AFTER_SECONDS` 60), `CAN_BE_RESURECTED`, vampire needs `DECOMPOSE_VALUE_NEEDED_FOR_VAMPIRE` 1000.
 * Prison / torture: `PRISON_MODIFY_CREATURE_HEALTH_PER_SECOND` −3, `tortureTimeToConvert`, `tortureMoodChange`.
 
+Prototype doors/traps (`placeThings`, `fireTrap`, `updateTraps` in `web/game.js`): doors block invaders until smashed, traps are hidden, charge-limited and re-armed by imps for gold; OpenKeeper's versions are `DoorsController`/`TrapsController` with `DoorComponent`/`TrapComponent`, manufactured at the Workshop.
+
 ## 8. Player verbs (the "hand" & spells) `[src: GameWorldController, PlayerState, KeeperSpellCastValidator]`
 Tag/untag dig · build/sell room · place door/trap · pick up creature/object (`InHand`, `Placeable`) · drop · slap · cast keeper spell (mana cost, research state `UNAVAILABLE/RESEARCHABLE/AVAILABLE`) · possess creature (`PossessedSystem`, mana per second).
 Research states per item type `ROOM, DOOR, TRAP, SPELL, CREATURE`.

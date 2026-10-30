@@ -40,6 +40,11 @@ seams, room building, lair assignment, mood/anger, sleep and payday, free-imp sp
   Imps never fight, they run to the Heart. Heroes that get weak run back to the Gate and escape.
 * Creatures heal on your land, sleep in lairs below 50 % hp, and **level up** from kills.
 * **✋ Hand**: pick up an imp or creature and drop it into the fight.
+* **Doors and traps** (build on your claimed floor, right-click to sell for half): heroes can't walk through a closed
+  **Door** (100g, 400 hp), they stop and smash it while your units pass freely and imps repair it. **Gas Traps** (150g,
+  poison cloud) and **Lightning Traps** (200g, burst + stun) are hidden from heroes, fire when stepped on, hold a few
+  charges, and imps re-arm them for gold. With the same 8 creatures and 3 lair tiles, one door plus three traps in the
+  tunnel to the Hero Gate turned a lost game into a win in my bot test (9 heroes killed, Heart untouched).
 * You win by surviving all waves, lose if the Heart (2500 hp) falls.
 
 Numbers marked `VAR` come from OpenKeeper's level variables; combat stats are tuning values.
