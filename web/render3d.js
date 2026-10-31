@@ -415,6 +415,28 @@ function start() {
   canvas.addEventListener('pointerup', e => { if (e.button === 1) { pan = null; return; } const h = pick(e); UI.inputUp(h.p, h.f); });
   canvas.addEventListener('pointerleave', () => { if (!UI.mouse.down) UI.mouse.x = -1; });
   canvas.addEventListener('wheel', e => { e.preventDefault(); cam.dist = Math.max(cam.min, Math.min(cam.max, cam.dist * (1 + Math.sign(e.deltaY) * .1))); }, { passive: false });
+  /* Edge scrolling: push the mouse to a side of the map and the camera pans that way, like the W A S D keys. In the window the edge is the
+   * outer 24 px of the map (and only where the map itself is under the mouse, not the objectives panel or a hint); in full screen it is the
+   * edge of the screen, even over the bar of buttons, so up and down work too. The mouse must stay there for a moment first, so passing the
+   * edge on the way to a button does nothing, and the nearer the edge the faster it goes. ?edge=0 turns it off. */
+  const EDGE_ON = params.get('edge') !== '0';
+  let ptr = null, edgeSince = 0;
+  addEventListener('pointermove', e => { ptr = e.pointerType === 'touch' ? null : { x: e.clientX, y: e.clientY }; });
+  document.documentElement.addEventListener('mouseleave', () => { ptr = null; }); addEventListener('blur', () => { ptr = null; });
+  const isFull = () => !!(document.fullscreenElement || document.webkitFullscreenElement);
+  function edgePush(now) {                                       // { x: -1..1, y: -1..1, k: 0.5..1 } or null
+    if (!EDGE_ON || !ptr || pan) { edgeSince = 0; return null; }
+    let L, T, R, B, m;
+    if (isFull()) { L = 0; T = 0; R = innerWidth; B = innerHeight; m = 10; }
+    else { const b = canvas.getBoundingClientRect(); L = b.left; T = b.top; R = b.right; B = b.bottom; m = 24; if (document.elementFromPoint(ptr.x, ptr.y) !== canvas) { edgeSince = 0; return null; } }
+    const dl = ptr.x - L, dr = R - ptr.x, dt_ = ptr.y - T, db = B - ptr.y;
+    if (dl < 0 || dr < 0 || dt_ < 0 || db < 0) { edgeSince = 0; return null; }
+    const x = dl < m ? -1 : dr < m ? 1 : 0, y = dt_ < m ? 1 : db < m ? -1 : 0;                  // y: +1 pans up the screen
+    if (!x && !y) { edgeSince = 0; return null; }
+    if (!edgeSince) edgeSince = now; if (now - edgeSince < 180) return null;
+    const depth = Math.max(x ? 1 - Math.min(dl, dr) / m : 0, y ? 1 - Math.min(dt_, db) / m : 0);
+    return { x, y, k: 0.5 + 0.5 * Math.max(0, Math.min(1, depth)) };
+  }
   const keys = new Set();
   addEventListener('keydown', e => { if (e.target.tagName !== 'INPUT') keys.add(e.key.toLowerCase()); });
   addEventListener('keyup', e => keys.delete(e.key.toLowerCase()));
@@ -426,6 +448,7 @@ function start() {
     const mv = (v, s) => { cam.x += v.x * s; cam.z += v.z * s; };
     if (keys.has('w') || keys.has('arrowup')) mv(u, sp); if (keys.has('s') || keys.has('arrowdown')) mv(u, -sp);
     if (keys.has('a') || keys.has('arrowleft')) mv(r, -sp); if (keys.has('d') || keys.has('arrowright')) mv(r, sp);
+    const ed = edgePush(performance.now()); if (ed) { mv(r, ed.x * sp * ed.k); mv(u, ed.y * sp * ed.k); }
     cam.x = Math.max(0, Math.min(W, cam.x)); cam.z = Math.max(0, Math.min(H, cam.z)); placeCamera();
     if (window.Sound) Sound.setListener(cam.x, cam.z, cam.dist * 0.28, r.x, r.z);     // effects get quieter and pan with distance from the camera
     updateTiles(); syncProps(); syncUnits(); syncEffects(); syncSelection(); syncGuide();

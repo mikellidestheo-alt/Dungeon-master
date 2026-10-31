@@ -1236,7 +1236,7 @@ function showBriefing(onBegin) {                          // the chapter screen:
   $('briefTitle').textContent = LV.name || LV.id; $('briefText').textContent = LV.briefing || LV.start.welcome || '';
   $('briefGoals').innerHTML = WV.endless ? '<li>Survive as many waves as you can</li><li>A boss leads every 5th wave</li>' : OBJECTIVES.map(o => '<li>' + objText(o) + (o.optional ? ' <i>(bonus)</i>' : '') + '</li>').join('');
   el.style.display = 'flex'; sfx('scroll');
-  $('briefGo').onclick = () => { el.style.display = 'none'; G.speed = was; refreshButtons(); sfx('begin'); if (onBegin) onBegin(); };
+  $('briefGo').onclick = () => { el.style.display = 'none'; G.speed = was; refreshButtons(); sfx('begin'); if (window.__fs) __fs.restore(); if (onBegin) onBegin(); };
 }
 
 function applyStart() {                                                              // what the level hands you at the start

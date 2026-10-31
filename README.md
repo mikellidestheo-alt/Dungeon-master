@@ -32,7 +32,7 @@ completing its objectives (every chapter includes surviving all its waves) and l
 
 | Where | What |
 |---|---|
-| Top bar | Gold (held / what your Treasuries can bank), Imps, Creatures (of 15), Payday countdown, Time, Mana, Heart, then Wave, heroes alive and a countdown to the next wave (it says *tunnel to Gate* until a Gate is linked, and *gates 1/2* when a level has more). A **☰ Chapters** (or **☰ Sandbox**) button, **Retire** in endless mode, and the sound controls |
+| Top bar | Gold (held / what your Treasuries can bank), Imps, Creatures (of 15), Payday countdown, Time, Mana, Heart, then Wave, heroes alive and a countdown to the next wave (it says *tunnel to Gate* until a Gate is linked, and *gates 1/2* when a level has more). A **☰ Chapters** (or **☰ Sandbox**) button, **Retire** in endless mode, **⛶ Full screen**, and the sound controls |
 | Toolbar | **Dig**, **Hand**, rooms (cost per tile), **Door** and traps, spells (mana cost and hotkey), **Pause / 1× / 3× / 8×**. Anything not yet researched is greyed out |
 | Dungeon view | Top left: the **objectives** (ticked as you go, with counters). Bottom: the **hint banner** (✕ hides it; the highlighted toolbar button and the gold marker on the map show what it means) |
 | Below the view | **Task board** (digging queue, chickens, hungry, praying, prisoners, and the mood of every creature), **Log**, **Research** panel, and a short help scroll (the basics: digging, rooms, creatures, the invasion, objectives, camera) |
@@ -47,7 +47,8 @@ completing its objectives (every chapter includes surviving all its waves) and l
 | Cast a spell | Click its button or press `1` Lightning, `2` Heal, `3` Speed, `4` Call to Arms, `5` Create Imp, then click the dungeon. Lightning needs a hero under the cursor. A refused cast costs nothing |
 | Move a creature or imp | **✋ Hand**: click one to pick it up (your cursor, the Keeper's evil hand, closes into a fist holding an imp, and the creature disappears from the map while you carry it), click again to drop it, for example into a fight |
 | Choose research | Click an item in the **Research** panel (only once you have a Library) |
-| Camera (3D) | `W A S D` or the arrow keys pan, the wheel zooms, middle-drag pans |
+| Camera (3D) | `W A S D` or the arrow keys pan, **or push the mouse to the edge of the map** (hold it there a moment; nearer the edge is faster; in full screen it is the edge of the screen, under the bars too); the wheel zooms, middle-drag pans |
+| Full screen | The **⛶ Full screen** button in the top bar, or `F`. The map fills the screen, the numbers bar and the toolbar float over its top and bottom, and the Task board, Log and Research slide in from the right with **☰ Panels** or `P`. `Esc` leaves it. It is remembered, so *Begin* on the next briefing takes you back into it |
 | Speed, sound | **Pause / 1× / 3× / 8×** buttons; `M` mutes, the sliders set master, music and effects volume |
 
 **A typical chapter.**
@@ -91,6 +92,7 @@ stronger, and a boss (Prince, then King) leads every fifth one. Your score is th
 | `view=2d`, `cam=top` | the flat canvas view, or the steeper top-down 3D camera |
 | `sound=0` | no audio at all |
 | `nosave=1` | do not record the result (for testing) |
+| `edge=0` | turn off scrolling the map by pushing the mouse to its edge |
 
 ## Playtest checklist
 
@@ -180,6 +182,16 @@ Tick as you go; write down anything surprising in the template at the end.
 - [ ] New sounds feel right: objective chime, hint bell, the briefing scroll, the stars on the end screen, the new-best flourish, the quiet *retire* bell.
 - [ ] Volume balance between music and effects; anything too loud or too quiet.
 
+**7b. Full screen and edge scrolling**
+
+- [ ] The **⛶ Full screen** button and the `F` key enter and leave full screen; `Esc` leaves it too. The map fills the whole screen, nothing is cut off, and the page does not scroll.
+- [ ] The numbers bar (top) and the toolbar (bottom) float over the map without hiding the objectives or the hint banner. Every toolbar button is reachable.
+- [ ] **☰ Panels** (or `P`) opens the Task board, Log and Research on the right; you can still pick research in chapter IV. Does anything need to be visible all the time that is not?
+- [ ] Press *Begin* on a briefing after using full screen once: it goes back to full screen by itself.
+- [ ] Push the mouse to each side of the map: it pans left, right, up and down, with a short delay and faster the nearer the edge. In the window the zone is about 24 px inside the map; in full screen it is the very edge of the screen, even under the bars.
+- [ ] It does **not** scroll when you are just moving across to a button, or while a briefing or end screen covers the map. Is the delay and speed comfortable? (`?edge=0` turns it off.)
+- [ ] Try several monitors and window sizes, and a laptop trackpad: is there a way you trigger edge scrolling by accident?
+
 **8. Browsers and devices** (tick the ones you tried)
 
 - [ ] Chrome or Chromium
@@ -191,7 +203,7 @@ Tick as you go; write down anything surprising in the template at the end.
 
 **Known rough edges** (already known; tell me only if they are worse than described)
 
-- The page is a fixed 1461 x 2000 px layout scaled to the window width, so it is tall and you scroll to reach the Research panel and help.
+- In the window the page is a fixed 1461 x 2000 px layout scaled to the window width, so it is tall and you scroll to reach the Research panel and help. **Full screen** (`F`) is the way around that: the map fills the screen and the panels become a drawer.
 - The 3D view has a dark corner at the top left of the map.
 - Chapters opened from the menu are silent until your first click, because browsers refuse sound before a gesture.
 - Heroes that flee escape through their Gate, so only about 40 % of a wave is ever "slain"; this is how the kill bonuses were sized.
@@ -229,6 +241,7 @@ Tick as you go; write down anything surprising in the template at the end.
 | `tools/test_levels.js` | Headless Chromium checks for the level format and loader: `node tools/test_levels.js` |
 | `tools/test_audio.js` | Headless Chromium checks for the sound system: `node tools/test_audio.js` |
 | `tools/bot.js`, `tools/test_bots.js` | Scripted players (a careful one and a lazy one) that play every chapter on several seeds; the test checks each chapter is winnable but not trivial and the right length: `node tools/test_bots.js` (about 80 s) |
+| `tools/test_fullscreen.js` | Headless Chromium checks for full screen (real full screen in headless Chromium) and edge scrolling: `node tools/test_fullscreen.js` |
 | `tools/make_cursors.py`, `tools/test_cursor.js` | Cuts the checkerboard out of the two cursor paintings, crops, scales and writes the PNGs and `web/cursor.css`: `python3 tools/make_cursors.py`; and the headless checks for the cursor: `node tools/test_cursor.js` |
 | `tools/test_chapters.js` | Headless Chromium checks for the ten campaign chapters, plus a scripted playthrough of the Tutorial: `node tools/test_chapters.js` |
 | `tools/test_gates.js` | Headless Chromium checks for several Hero Gates (linking, split waves, fleeing, 3D): `node tools/test_gates.js` |

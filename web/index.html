@@ -202,6 +202,29 @@
   #endBest { min-height: 22px; margin-bottom: 14px; font: 700 14px var(--head); letter-spacing: .12em; text-transform: uppercase; color: #7a3b08; }
   #endscreen .btns { display: flex; justify-content: center; gap: 10px; } #endscreen button { padding: 9px 18px; }
   button.hint { animation: hintPulse 1.1s ease-in-out infinite; } @keyframes hintPulse { 50% { box-shadow: 0 0 0 3px #ffd36b, 0 0 16px #ffd36b; border-color: #ffd36b; } }
+  /* ====================================================================================================================
+     Full screen (the browser sets html.fs): the map fills the screen, the bar of numbers and the toolbar float over its top and bottom edges,
+     and the Task board, Log and Research panels become a drawer on the right ("Panels" button or the P key). The 1461x2000 picture frame is
+     not used. The script at the bottom keeps --hudH and --toolsH up to date, so the objectives, the hints and the drawer clear the bars.
+     ==================================================================================================================== */
+  #bPanels { display: none; }
+  html.fs, html.fs body { overflow: hidden; height: 100%; }
+  html.fs #wrap { width: 100vw !important; height: 100vh !important; margin: 0; }
+  html.fs #frame { width: 100vw; height: 100vh; transform: none !important; background: #000; }
+  html.fs h1, html.fs #help { display: none; }
+  html.fs #stage { left: 0; top: 0; width: 100%; height: 100%; }
+  html.fs #stage::after { box-shadow: none; }
+  html.fs #hud { left: 0; top: 0; width: 100%; height: auto; padding: 10px 14px; z-index: 20; font-size: 12.5px; background: linear-gradient(180deg, #0c0806f5, #0c0806d0 72%, #0c080600); }
+  html.fs #tools { left: 0; top: auto; bottom: 0; width: 100%; height: auto; margin: 0; padding: 10px 14px 12px; z-index: 20; justify-content: center; background: linear-gradient(0deg, #0c0806f5, #0c0806d0 72%, #0c080600); }
+  html.fs #bPanels { display: inline-block; }
+  html.fs #objPanel { top: calc(var(--hudH, 64px) + 10px); }
+  html.fs #guide { bottom: calc(var(--toolsH, 100px) + 12px); }
+  html.fs #side { display: none; }
+  html.fs.panels #side { display: flex; flex-direction: column; gap: 10px; position: absolute; right: 0; top: var(--hudH, 64px); bottom: var(--toolsH, 100px); width: min(460px, 92vw); padding: 10px; overflow-y: auto; z-index: 15; background: #0c0806ee; border-left: 1px solid #54401f; }
+  html.fs #side .box { position: static; width: auto; height: auto; overflow: visible; padding: 10px 14px; border-radius: 3px; flex: none; }
+  html.fs #side .parch { background: radial-gradient(ellipse at 20% 0%, #ecdcb2, transparent 60%), linear-gradient(180deg, #dcc99e, #c3aa74); }
+  html.fs #side #boxResearch { background: linear-gradient(180deg, #2a2118, #17120e); border: 1px solid #54401f; }
+  html.fs #research { grid-template-columns: repeat(2, 1fr) !important; }
   @media (prefers-reduced-motion: reduce) { button { transition: none; } button.hint { animation: none; box-shadow: 0 0 0 3px #ffd36b; } }
 </style>
 </head>
@@ -217,7 +240,7 @@
     <span>Mana <b id="hMana">0</b></span>
     <span>Heart <b id="hHeart">0</b></span>
     <span>Wave <b id="hWave">0</b> · heroes <b id="hHeroes">0</b> · next <b id="hNext">—</b></span>
-    <span><button id="bMenu" title="Back to the menu">☰ Chapters</button> <button id="bRetire" title="End this endless run and bank your waves">Retire</button></span>
+    <span><button id="bMenu" title="Back to the menu">☰ Chapters</button> <button id="bRetire" title="End this endless run and bank your waves">Retire</button> <button id="bFull" title="Full screen (F)">⛶ Full screen</button> <button id="bPanels" title="Task board, log and research (P)">☰ Panels</button></span>
     <span id="audioCtl"><button id="bMute" title="Mute / unmute (M)" aria-label="Mute">🔇</button><input id="vol" type="range" min="0" max="100" value="70" aria-label="Master volume" title="Master volume"><label>Music <input id="musVol" type="range" min="0" max="100" value="100" aria-label="Music volume" title="Music volume"></label><label>Effects <input id="sfxVol" type="range" min="0" max="100" value="100" aria-label="Effects volume" title="Effects volume"></label><small id="audioHint">click anywhere to start sound</small></span>
   </div>
   <div id="tools"></div>
@@ -237,20 +260,46 @@
     <b>Your dungeon:</b> choose <code>Dig</code> and drag over earth or gold to tag it (right-drag untags); imps dig, mine, claim floor and carry gold home. Build a <code>Treasury</code> to bank it and a <code>Lair</code> for beds,
     then claim the purple <b>Portal</b>: creatures arrive and need a bed, food (a <code>Hatchery</code>) and wages at payday, or they grow angry and leave.<br>
     <b>The invasion</b> starts when a tunnel links a red-tinted <b>Hero Gate</b> to your Heart, so you choose when: dig all but the last tile, set doors and traps, then open it. Spells on <span style="white-space:nowrap"><code>1</code>-<code>5</code></span> cost mana; <code>✋ Hand</code> moves creatures and imps.<br>
-    <b>Winning:</b> finish the objectives (top left of the view) and keep your Dungeon Heart alive. Hints at the bottom of the view guide each chapter; <code>☰ Chapters</code> returns to the menu. Locked rooms, traps and spells are researched in a <code>Library</code>. Pan with <code>W A S D</code>, zoom with the wheel.
+    <b>Winning:</b> finish the objectives (top left of the view) and keep your Dungeon Heart alive. Hints at the bottom of the view guide each chapter; <code>☰ Chapters</code> returns to the menu. Locked rooms, traps and spells are researched in a <code>Library</code>. Pan with <code>W A S D</code> or by pushing the mouse to the map's edge, zoom with the wheel; <code>F</code> is full screen.
   </div>
 </div></div>
 
 <script>
-  /* scale the 1461x2000 interface to the window width (never below .3 or above 1.4); the 3D view re-fits itself through window.__onUiScale */
+  /* Scales the 1461x2000 interface to the window width (never below .3 or above 1.4); the 3D view re-fits itself through window.__onUiScale.
+   * In full screen the picture frame is dropped (see "Full screen" in the CSS) and the map fills the screen. The F key and the Full screen
+   * button toggle it; the choice is remembered, and a click on the briefing's Begin button (a click is what browsers need) re-enters it. */
   (function () {
-    const wrap = document.getElementById('wrap'), frame = document.getElementById('frame');
+    const root = document.documentElement, $ = (id) => document.getElementById(id), wrap = $('wrap'), frame = $('frame'), hud = $('hud'), tools = $('tools'), cv = $('cv'), bFull = $('bFull'), bPanels = $('bPanels');
+    const fsEl = () => document.fullscreenElement || document.webkitFullscreenElement, can = !!(root.requestFullscreen || root.webkitRequestFullscreen);
+    const pref = { get() { try { return localStorage.getItem('dm.fs') === '1'; } catch (e) { return false; } }, set(v) { try { localStorage.setItem('dm.fs', v ? '1' : '0'); } catch (e) { /* not remembered */ } } };
+    const bars = () => { root.style.setProperty('--hudH', hud.offsetHeight + 'px'); root.style.setProperty('--toolsH', tools.offsetHeight + 'px'); };
     function fit() {
-      const s = Math.max(0.3, Math.min(1.4, document.documentElement.clientWidth / 1461));
-      frame.style.transform = 'scale(' + s + ')'; wrap.style.width = Math.round(1461 * s) + 'px'; wrap.style.height = Math.round(2000 * s) + 'px';
-      window.__uiScale = s; if (window.__onUiScale) window.__onUiScale();
+      const full = !!fsEl(); root.classList.toggle('fs', full); if (!full) root.classList.remove('panels');
+      if (full) {
+        frame.style.transform = ''; wrap.style.width = ''; wrap.style.height = ''; window.__uiScale = 1; bars();
+        if (cv.style.display !== 'none') { const k = Math.min(innerWidth / cv.width, innerHeight / cv.height);      // the flat 2D view keeps its proportions, centred
+          Object.assign(cv.style, { position: 'absolute', width: cv.width * k + 'px', height: cv.height * k + 'px', left: (innerWidth - cv.width * k) / 2 + 'px', top: (innerHeight - cv.height * k) / 2 + 'px' }); }
+      } else {
+        for (const p of ['position', 'width', 'height', 'left', 'top']) cv.style.removeProperty(p);
+        const s = Math.max(0.3, Math.min(1.4, root.clientWidth / 1461));
+        frame.style.transform = 'scale(' + s + ')'; wrap.style.width = Math.round(1461 * s) + 'px'; wrap.style.height = Math.round(2000 * s) + 'px'; window.__uiScale = s;
+      }
+      bFull.textContent = full ? '⛶ Exit full screen' : '⛶ Full screen'; bPanels.textContent = root.classList.contains('panels') ? '☰ Hide panels' : '☰ Panels';
+      if (window.__onUiScale) window.__onUiScale();
     }
+    async function enter() { try { await (root.requestFullscreen ? root.requestFullscreen({ navigationUI: 'hide' }) : root.webkitRequestFullscreen()); } catch (e) { /* refused: stay in the window */ } }
+    function leave() { try { (document.exitFullscreen || document.webkitExitFullscreen).call(document); } catch (e) { /* already out */ } }
+    function toggle() { if (!can) return; if (fsEl()) leave(); else enter(); }
+    function panels() { if (!fsEl()) return; root.classList.toggle('panels'); fit(); }
+    bFull.style.display = can ? '' : 'none'; bFull.onclick = toggle; bPanels.onclick = panels;
+    addEventListener('keydown', e => {
+      if (e.target.tagName === 'INPUT' || e.ctrlKey || e.metaKey || e.altKey) return; const k = e.key.toLowerCase();
+      if (k === 'f') toggle(); else if (k === 'p') panels();
+    });
+    for (const ev of ['fullscreenchange', 'webkitfullscreenchange']) document.addEventListener(ev, () => { pref.set(!!fsEl()); fit(); });
+    if (window.ResizeObserver) { const ro = new ResizeObserver(() => { if (fsEl()) bars(); }); ro.observe(hud); ro.observe(tools); }
     window.addEventListener('resize', fit); fit();
+    window.__fs = { toggle, enter, leave, panels, active: () => !!fsEl(), supported: can, remembered: () => pref.get(), restore() { if (can && pref.get() && !fsEl()) enter(); } };
   })();
 </script>
 <script src="audio.js"></script>
