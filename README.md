@@ -3,6 +3,200 @@
 A from-scratch Dungeon-Keeper-style game, planned as **HTML5 first, Linux second**, based on a reverse-engineering
 study of [OpenKeeper](https://github.com/tonihele/OpenKeeper) (a Java re-implementation of Dungeon Keeper II).
 
+## Quick start
+
+```sh
+python3 -m http.server -d web 8000     # then open http://localhost:8000/menu.html
+```
+
+Open **`menu.html`**, pick *The Awakening* (chapter I) and press **Begin chapter**. You need a current browser with WebGL for the 3D view
+(without it the game falls back to a flat 2D view; `?view=2d` forces it) and you must serve the folder, not open `index.html` from disk.
+I have only ever run it in headless Chromium; every other browser is part of the playtest below.
+
+## How to play
+
+**The idea.** You are a Dungeon Keeper. Your **Dungeon Heart** is the life of your dungeon. **Imps** dig, mine gold, claim floor and haul
+gold home; **creatures** come through your **Portal** to fight for you. Heroes invade from the **Hero Gate(s)**, in waves, and hunt your Heart.
+Nothing happens to you until you tunnel to a Gate, so you build at your own pace and **choose when the invasion starts**. A chapter is won by
+completing its objectives (every chapter includes surviving all its waves) and lost if the Heart falls.
+
+**The screen.**
+
+| Where | What |
+|---|---|
+| Top bar | Gold (held / what your Treasuries can bank), Imps, Creatures (of 15), Payday countdown, Time, Mana, Heart, then Wave, heroes alive and a countdown to the next wave (it says *tunnel to Gate* until a Gate is linked, and *gates 1/2* when a level has more). A **☰ Chapters** (or **☰ Sandbox**) button, **Retire** in endless mode, and the sound controls |
+| Toolbar | **Dig**, **Hand**, rooms (cost per tile), **Door** and traps, spells (mana cost and hotkey), **Pause / 1× / 3× / 8×**. Anything not yet researched is greyed out |
+| Dungeon view | Top left: the **objectives** (ticked as you go, with counters). Bottom: the **hint banner** (✕ hides it; the highlighted toolbar button and the gold marker on the map show what it means) |
+| Below the view | **Task board** (digging queue, chickens, hungry, praying, prisoners, and the mood of every creature), **Log**, **Research** panel, and a help scroll |
+
+**Controls.**
+
+| To do this | Do this |
+|---|---|
+| Dig or mine | Choose **Dig**, then drag a box over earth or gold. Imps do the rest. Right-drag **untags**. Rock and gem seams cannot be dug through |
+| Build a room | Choose the room, drag a box over **your claimed floor** (bare floor you have not claimed yet does not count). It costs gold per tile. Rooms cannot be sold |
+| Doors and traps | Choose it and click or drag over claimed floor, usually in a tunnel. **Right-click sells for half.** Imps repair doors and re-arm traps for gold |
+| Cast a spell | Click its button or press `1` Lightning, `2` Heal, `3` Speed, `4` Call to Arms, `5` Create Imp, then click the dungeon. Lightning needs a hero under the cursor. A refused cast costs nothing |
+| Move a creature or imp | **✋ Hand**: click one to pick it up, click again to drop it, for example into a fight |
+| Choose research | Click an item in the **Research** panel (only once you have a Library) |
+| Camera (3D) | `W A S D` or the arrow keys pan, the wheel zooms, middle-drag pans |
+| Speed, sound | **Pause / 1× / 3× / 8×** buttons; `M` mutes, the sliders set master, music and effects volume |
+
+**A typical chapter.**
+
+1. **Dig and mine.** Tag the tunnel east and the nearest **gold seam**. Each gold tile is worth 2000 gold; gem seams (blue) never run out and pay 25 gold at a time.
+2. **Bank it.** Build a **Treasury** (50 gold a tile). Your Heart holds 2000 gold on its own and each Treasury tile adds 3000; gold beyond that cannot be carried home.
+3. **Claim the Portal** by digging to it and letting your imps claim the floor. A creature arrives about every 25 seconds, up to 15.
+4. **Look after them.** Each creature needs a **Lair** tile to sleep in, **food** (a **Hatchery** raises chickens, they get hungry about every two minutes) and **wages** at every **payday** (every 90 seconds, 60 to 220 gold each; fifteen creatures cost about 1650 a payday). Unhappy creatures turn angry and eventually leave. The Task board shows every creature's mood.
+5. **Prepare.** Build what the chapter teaches: Library and research, Prison and Torture, Temple, doors and traps. The gaps in the rock ridges are natural choke points.
+6. **Open a Gate.** Tunnel to the red-tinted **Hero Gate** (a path of open floor from Gate to Heart). The first wave arrives after the chapter's preparation countdown. *Tip:* dig the whole tunnel except its last tile, set your doors and traps, and only then dig the last tile.
+7. **Fight.** Creatures fight on their own and level up from kills. You cast spells, move creatures with the Hand and keep a few imps alive (they re-arm traps and mend doors, and they run from heroes, so replace them with `5`). Heroes that get weak run back to their Gate and escape, so you will slay only a part of each wave.
+8. **Win or lose.** The end screen shows time, heroes slain, Heart left, and up to three stars. Next chapter, Retry and Chapters are one click away.
+
+**Chapters, stars and saves.** The chapter menu lists ten chapters; each unlocks when the one before it is won. Stars: **1** win; **2** finish with at least half the Heart left; **3** also complete the chapter's **bonus objective**. Progress, best times and stars are saved in this browser (`localStorage`, key `dm.save.v1`); *Erase saved progress* on the menu clears them.
+
+| # | Chapter | What it teaches | Feels like |
+|---|---|---|---|
+| I | The Awakening | digging, mining, claiming, Treasury, Lair, the Portal; guided step by step | one weak Knight; relax |
+| II | Creatures of the Dark | the Portal, beds, wages | gentle |
+| III | Mouths to Feed | hunger and the Hatchery | gentle |
+| IV | The Library | research (Gas Trap, Heal) | first real pressure |
+| V | Doors and Snares | doors and traps; the **Dwarf** disarms and smashes them | |
+| VI | The Dungeon Below | Prison, Torture Chamber; the **Monk** heals | |
+| VII | Prayers and Power | Temple, mana, spells; the **Fairy** flies over traps | |
+| VIII | Two Gates | two entrances (each wave is split between linked Gates); the **Giant** | |
+| IX | The Siege | the **Prince** and the armoured **Stone Knight** | hard |
+| X | The King's Crusade | three Gates; the **King** | the hardest |
+
+**Sandbox and endless mode** (button on the chapter menu): pick the number of waves, one of four difficulties, starting gold and mana,
+whether everything is researched, one or two Hero Gates, and a map seed; or choose the **Endless Siege**, where waves never stop, get faster and
+stronger, and a boss (Prince, then King) leads every fifth one. Your score is the waves you survived; **Retire** banks it. The best score per difficulty is saved.
+
+**Handy URL options** (add to `index.html?...`; the menu and sandbox pass `view` and `sound` along):
+
+| Option | Effect |
+|---|---|
+| `level=<id>` | a chapter (`tutorial`, `portal`, `hatchery`, `library`, `traps`, `prison`, `temple`, `gates`, `siege`, `crusade`), `classic`, `tiny`, `lesson` or `sandbox` |
+| `seed=<n>` | another random seed (a different creature mix; for `classic` and the sandbox, a different map) |
+| `brief=1` | open behind the chapter's briefing card; `guide=0` turns the hints off |
+| `unlock=1` | everything researched from the start |
+| `view=2d`, `cam=top` | the flat canvas view, or the steeper top-down 3D camera |
+| `sound=0` | no audio at all |
+| `nosave=1` | do not record the result (for testing) |
+
+## Playtest checklist
+
+The scripted bots (`node tools/test_bots.js`) say every chapter is *winnable* and *not trivial*, and that a fast player's times add up to about
+140 minutes. They cannot say whether it is **fun, clear or fair**, whether the art sits right, or how the sound feels. That is what this list is for.
+Tick as you go; write down anything surprising in the template at the end.
+
+**Before you start**
+
+- [ ] Use a fresh browser profile or press *Erase saved progress* on the menu. Note the browser, version, operating system and GPU.
+- [ ] Have a stopwatch or note the clock. Play with sound on and headphones for at least one chapter.
+- [ ] If you want a true first-time experience, play chapter I without reading the *How to play* section above or `docs/`: the game is supposed to teach itself.
+
+**1. Menu and first launch**
+
+- [ ] `menu.html` loads with no console errors. Chapter I is open and selected; II to X are locked and say why. Clicking a locked chapter does nothing (and sounds a soft *deny*).
+- [ ] *Begin chapter* shows the briefing card with the right title, text and goals, and the game is paused behind it. *Begin* starts the game.
+- [ ] The sound controls on the menu work (the score plays after your first click; `M` mutes).
+
+**2. Chapter I, played as a stranger would** (target 5 to 8 minutes)
+
+- [ ] Can you tell what to do from the hint banner alone, at every step? Where did you hesitate? Is any hint wrong, late or missing?
+- [ ] Does the pulsing toolbar button and the gold marker on the map point at the right thing every time (including in the 3D view)?
+- [ ] Is the objective list (top left) readable and does it tick and count as you work?
+- [ ] Do you understand why you must claim the Portal, build a Lair, and what the countdown after tunnelling to the Gate means?
+- [ ] Did the Knight feel like a lesson rather than a threat? Did you use the **Hand**? Did the Heart take any damage?
+- [ ] The victory screen shows three stars, *First victory!*, and Next chapter opens chapter II behind its briefing.
+
+**3. For every chapter** (copy this block per chapter)
+
+- [ ] Briefing and objectives make sense; the new thing the chapter teaches is clear without outside help.
+- [ ] You could always see *why* you were stuck (no beds, hungry, out of gold, a locked item, nothing claimed).
+- [ ] The map reads well: you can find the Portal, the Gate(s), the gold, and the gaps where tunnels must go. No seam or Gate is awkwardly placed.
+- [ ] Time to finish was within the target below (a longer first play is normal). Note the actual time.
+- [ ] Difficulty felt: too easy / fair / too hard / unfair. Was any single moment a cheap loss?
+- [ ] The bonus objective (third star) was understandable and worth chasing.
+- [ ] Defeat felt like *your* mistake, and Retry put you straight back in with the same map and seed.
+
+| # | Chapter | Target (first play) | A good player should find | Check in particular |
+|---|---|---|---|---|
+| I | The Awakening | 5-8 min | trivial | the whole guide |
+| II | Creatures of the Dark | 10-12 | easy | creature moods; beds; the first payday |
+| III | Mouths to Feed | 10-12 | easy | does hunger show clearly? is the Hatchery obvious? |
+| IV | The Library | 10-12 | easy, first real tension | choosing research in the panel; do desks fill? |
+| V | Doors and Snares | 12-16 | fair | placing doors and traps; the Dwarf; the bonus (6 traps) |
+| VI | The Dungeon Below | 12-16 | fair | capturing, imprisoning, torturing, converting |
+| VII | Prayers and Power | 12-16 | fair | the Temple; mana; all five spells; the Fairy |
+| VIII | Two Gates | 16-22 | fair, long | linking one Gate versus both; defending two tunnels |
+| IX | The Siege | 16-22 | hard | gold running low; armour and the Prince; the last wave |
+| X | The King's Crusade | 22-28 | the hardest; about half of careful runs win | the three Gates; the King's wave; the finish |
+
+**4. Systems**
+
+- [ ] **Economy:** gold seams, banking, Treasury capacity, wages, running dry. Is it clear how much gold you have and need?
+- [ ] **Creatures:** arrival, beds, anger, leaving, leveling to elite sprites at level 3, healing in the Lair. Are the Task board lines understandable?
+- [ ] **Hatchery:** chickens appear, hungry creatures eat, anger drops. What happens if you never build one?
+- [ ] **Library:** research bars fill, an item completes, the toolbar unlocks it.
+- [ ] **Doors and traps:** heroes stop at doors; traps fire and run out; imps repair and re-arm; right-click sells for half.
+- [ ] **Prison and Torture:** knocked-out heroes are carried to the Prison, tortured and converted, or starve into skeletons.
+- [ ] **Temple:** creatures pray, mana rises, the Temple art looks right at 3x3 and larger.
+- [ ] **Spells:** every spell works and refuses politely (no mana, cooling down, no target). Hotkeys `1` to `5`.
+- [ ] **Hand:** pick up and drop creatures and imps; dropping into rock is refused.
+- [ ] **Gates:** the countdown starts at the first link; with two or more Gates each wave is split; fleeing heroes escape through their own Gate; *gates 1/2* in the bar.
+- [ ] **Speed:** 3x and 8x stay smooth in a big fight; Pause really pauses (including the end of a wave).
+
+**5. Sandbox, endless and saves**
+
+- [ ] Every control on the sandbox page changes the summary; *Begin* opens exactly that game; Retry reopens the same one (same seed).
+- [ ] Two Gates in the sandbox: the second cavern is in the north and works.
+- [ ] Endless: waves never stop, the gap shrinks, a boss leads waves 5, 10, 15, 20. *Retire* banks the score; *Overrun* when the Heart falls; the best per difficulty is saved and shown on the sandbox page.
+- [ ] Stars and best times are saved across a reload; chapters unlock in order; *Erase saved progress* resets all of it.
+- [ ] In a private window (storage blocked) the game still runs and nothing throws.
+
+**6. Interface, art and performance**
+
+- [ ] Resize the window from about 900 px to a very wide one: does the fixed layout scale cleanly? Is any text clipped or unreadable?
+- [ ] Is anything in the 3D view hard to read: units hidden behind walls, sprites sitting wrong on their tile, the marker or objectives panel in the way?
+- [ ] Frame rate in the 3D view at 1x, and at 8x in the biggest fight of chapter IX or X. Note your hardware if it stutters.
+- [ ] Both views: `?view=2d` is playable too.
+- [ ] Does the page ever feel slow after twenty minutes (memory, a growing log)?
+
+**7. Sound** (headphones)
+
+- [ ] Nothing plays before your first click, then the score fades in; mute, master, music and effects sliders work and are remembered after a reload.
+- [ ] Effects are not tiring: imp chatter, chickens, digging and the coin sounds over a long session. Which one annoys you first?
+- [ ] The wave horn and the boss horn make you sit up; the music tension follows the fight and relaxes afterwards.
+- [ ] New sounds feel right: objective chime, hint bell, the briefing scroll, the stars on the end screen, the new-best flourish, the quiet *retire* bell.
+- [ ] Volume balance between music and effects; anything too loud or too quiet.
+
+**8. Browsers and devices** (tick the ones you tried)
+
+- [ ] Chrome or Chromium
+- [ ] Firefox
+- [ ] Safari
+- [ ] Edge
+- [ ] a laptop with no dedicated GPU
+- [ ] Touch: the game uses pointer events, but I have never tried it on a tablet or phone. Is it playable? (Right-drag and middle-drag have no touch equivalent.)
+
+**Known rough edges** (already known; tell me only if they are worse than described)
+
+- The page is a fixed 1461 x 2000 px layout scaled to the window width, so it is tall and you scroll to reach the Research panel and help.
+- The 3D view has a dark corner at the top left of the map.
+- The help scroll at the bottom of the game page is still the original prototype text and does not mention chapters or objectives.
+- Chapters opened from the menu are silent until your first click, because browsers refuse sound before a gesture.
+- Heroes that flee escape through their Gate, so only about 40 % of a wave is ever "slain"; this is how the kill bonuses were sized.
+- There is no keyboard shortcut for pause or speed, and no way to sell a room.
+- The scripted bots never use the Hand and rarely level creatures; a human should be able to beat them.
+
+**Write-up template** (one row per chapter or problem)
+
+| Chapter / area | Browser | Time | Felt (1 trivial ... 5 unfair) | Stars | What confused or annoyed me | Idea |
+|---|---|---|---|---|---|---|
+| | | | | | | |
+
 ## What is here
 
 | Path | What |
@@ -36,7 +230,7 @@ study of [OpenKeeper](https://github.com/tonihele/OpenKeeper) (a Java re-impleme
 | `tools/make_ui_frame.py` | Rebuilds `frame.jpg` from `tools/source/ui-mockup.jpg` by repainting the panel interiors blank: `python3 tools/make_ui_frame.py` |
 | `web/vendor/` | three.js 0.160.0 (MIT) and the UI fonts in `fonts/` (Cinzel, Cinzel Decorative, IM Fell English, EB Garamond; SIL Open Font License, licences alongside), kept in the repo so nothing loads from a CDN |
 
-## Run the prototype
+## Run the prototype (options)
 
 ```sh
 python3 -m http.server -d web 8000     # then open http://localhost:8000/menu.html (the chapter menu); index.html?level=classic&seed=123 plays a level directly
@@ -64,8 +258,7 @@ wounded creatures). Skeletons rise from starved prisoners and imps dig. At **lev
 form (e.g. the runic Troll, the green-flame Goblin, the Rogue, the Fire Knight, the Firefly). Heroes: Knight, Archer, Mage, Thief (fast), Royal Guard (tank), Monk (heals
 wounded allies), and five that each counter something: the **Dwarf** (disarms traps instead of setting them off, chews through
 doors 2.5× faster), the **Giant** (slow, huge, immune to lightning stuns, smashes doors 3×), the **Stone Knight** (25 % armour and
-immune to gas), the **Fairy** (flies over closed doors and floor traps and heals allies) and two bosses: the **Prince** (leads wave 4)
-and the **King** (leads the last wave); neither flees. All the character art is now in use. The `wall` sprite is processed but not used yet: walls are textured
+immune to gas), the **Fairy** (flies over closed doors and floor traps and heals allies) and two bosses: the **Prince** and the **King** (in `classic` they lead wave 4 and the last wave; the campaign and the sandbox use them as boss waves); neither flees. All the character art is now in use. The `wall` sprite is processed but not used yet: walls are textured
 blocks so they can be dug away tile by tile. To tune where a sprite sits on its tile, edit the `SPR` table at the top of
 `web/render3d.js` (`w` = width in tiles, `ay` = how far up the image the ground contact point is); character heights are in the `USIZE` table.
 
@@ -77,7 +270,7 @@ The prototype implements: terrain-health state machine (`damageTile`/`healTile`)
 per-tile tasks and assignee caps, A* with no corner-cutting, imp work/deliver loop, gold-proportional mining, gem
 seams, room building, lair assignment, mood/anger, sleep and payday, free-imp spawning, plus **combat and heroes**:
 
-* **Hero Gate** (red-tinted cavern, south): dig a tunnel to it and invasion waves start (5 scripted waves; parties
+* **Hero Gate** (a red-tinted cavern): dig a tunnel to it and invasion waves start (every level scripts its own; the `classic` level has 5 waves; parties
   follow a leader and hunt your Dungeon Heart, ranged heroes shoot): **1** Knight, Archer · **2** Knight, Mage, Thief · **3** Knight, Dwarf,
   Guard, Monk · **4** Prince, Giant, Fairy, Archer, Thief · **5** King, Stone Knight, Guard, Fairy, Mage, Archer; each wave is 12 % stronger).
 * **Fight AI** modelled on `CreatureState.IDLE`'s "flee or attack first": sense (sight + line of sight; keepers also
@@ -133,7 +326,7 @@ seams, room building, lair assignment, mood/anger, sleep and payday, free-imp sp
   rendered offline and checked, plus a scripted run in headless Chromium); the *taste* (levels, how annoying the imps are) is for
   your ears, and the numbers to tune are `DEF` and the music constants at the top of `web/audio.js`. Drop recordings in
   `web/assets/audio/` and list them in `sounds.json` to replace any effect.
-* You win by surviving all waves, lose if the Heart (2500 hp) falls.
+* You win a level by completing its objectives (every level includes surviving all its waves) and lose if the Dungeon Heart falls (2500 to 3000 hp, depending on the level).
 
 Numbers marked `VAR` come from OpenKeeper's level variables; combat stats are tuning values.
 
