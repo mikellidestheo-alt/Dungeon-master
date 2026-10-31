@@ -27,7 +27,7 @@ completing its objectives (every chapter includes surviving all its waves) and l
 | Top bar | Gold (held / what your Treasuries can bank), Imps, Creatures (of 15), Payday countdown, Time, Mana, Heart, then Wave, heroes alive and a countdown to the next wave (it says *tunnel to Gate* until a Gate is linked, and *gates 1/2* when a level has more). A **☰ Chapters** (or **☰ Sandbox**) button, **Retire** in endless mode, and the sound controls |
 | Toolbar | **Dig**, **Hand**, rooms (cost per tile), **Door** and traps, spells (mana cost and hotkey), **Pause / 1× / 3× / 8×**. Anything not yet researched is greyed out |
 | Dungeon view | Top left: the **objectives** (ticked as you go, with counters). Bottom: the **hint banner** (✕ hides it; the highlighted toolbar button and the gold marker on the map show what it means) |
-| Below the view | **Task board** (digging queue, chickens, hungry, praying, prisoners, and the mood of every creature), **Log**, **Research** panel, and a help scroll |
+| Below the view | **Task board** (digging queue, chickens, hungry, praying, prisoners, and the mood of every creature), **Log**, **Research** panel, and a short help scroll (the basics: digging, rooms, creatures, the invasion, objectives, camera) |
 
 **Controls.**
 
@@ -185,7 +185,6 @@ Tick as you go; write down anything surprising in the template at the end.
 
 - The page is a fixed 1461 x 2000 px layout scaled to the window width, so it is tall and you scroll to reach the Research panel and help.
 - The 3D view has a dark corner at the top left of the map.
-- The help scroll at the bottom of the game page is still the original prototype text and does not mention chapters or objectives.
 - Chapters opened from the menu are silent until your first click, because browsers refuse sound before a gesture.
 - Heroes that flee escape through their Gate, so only about 40 % of a wave is ever "slain"; this is how the kill bonuses were sized.
 - There is no keyboard shortcut for pause or speed, and no way to sell a room.
