@@ -7,7 +7,9 @@
  *
  * 'steady' plays the way a sensible newcomer would: it digs to the gold and the Portal, builds the rooms the chapter asks for (and a
  * Hatchery, because creatures starve without one), raises an army, researches what the objectives want, prepares a tunnel to the
- * Hero Gate but leaves the last tile undug, lines it with doors and traps, and only then opens it. In battle it casts Lightning, Heal
+ * Hero Gate but leaves the last tile undug, lines it with doors and traps, and only then opens it. It keeps a bed and food ahead of its army
+ * (the Portal waits when either runs out), adds the rooms that draw stronger creatures (a Library from chapter 4, a Temple from chapter 7) and, from
+ * chapter 5, a Training Room so its creatures level up. In battle it casts Lightning, Heal
  * and Call to Arms. 'lazy' does the least that starts the invasion: a Treasury, a small Lair, the Portal, and a tunnel to the Gate at
  * once. It exists to prove that a chapter is not won by doing nothing.
  */
@@ -15,10 +17,11 @@
   window.makeBot = function (skill) {
     const g = window.__game, G = g.G, T = g.T, W = g.W, H = g.H, TR = g.TERRAIN, LV = g.LV, steady = skill !== 'lazy';
     const idx = (x, y) => y * W + x, at = (x, y) => (x >= 0 && y >= 0 && x < W && y < H ? G.map[idx(x, y)] : null);
-    const ROOM = { treasury: T.TREASURY, lair: T.LAIR, library: T.LIBRARY, hatchery: T.HATCHERY, temple: T.TEMPLE, prison: T.PRISON, torture: T.TORTURE };
+    const ROOM = { treasury: T.TREASURY, lair: T.LAIR, library: T.LIBRARY, hatchery: T.HATCHERY, temple: T.TEMPLE, prison: T.PRISON, torture: T.TORTURE, training: T.TRAINING };
     const isOpen = (t) => t && !TR[t.t].solid, diggable = (t) => t && (t.t === T.EARTH || t.t === T.GOLD);
     const objs = LV.objectives || [{ type: 'survive' }], obj = (type, key, val) => objs.filter(o => o.type === type && (key === undefined || o[key] === val));
     const need = (type, key, val, req) => Math.max(0, ...obj(type, key, val).filter(o => !req || !o.optional).map(o => o.n || 1));        // the biggest n any objective asks for (req: required ones only)
+    const chapter = Math.max(0, (g.CAMPAIGN || []).indexOf(LV.id));       // 0-based place in the campaign (other levels count as the first)
     const heart = () => ({ x: G.heart.x + 0.5, y: G.heart.y + 0.5 });
     const dist = (a, b) => Math.hypot(a.x - b.x, a.y - b.y);
 
@@ -54,16 +57,20 @@
     const reserved = () => { const s = new Set(); if (S.routes) for (const r of S.routes) { for (const [x, y] of r.cells) s.add(idx(x, y)); if (steady) for (const [x, y] of heroPath(G.gates[r.gate], r)) s.add(idx(x, y)); } return s; };      // tunnel and approach stay free for doors and traps
 
     function wantRooms() {
-      const c = G.creatures.length, w = {};
+      const c = G.creatures.length, w = {}, V = g.VAR;
       w.treasury = Math.max(2, steady ? 2 + Math.ceil(c / 4) : 2);
-      w.lair = steady ? Math.min(16, Math.max(need('room', 'room', 'lair'), c + 2)) : 3;
+      w.lair = steady ? Math.min(16, Math.max(need('room', 'room', 'lair'), c + 2)) : 3;          // a bed for everyone, and one ahead: the Portal waits when every bed is taken
       if (!steady) return w;
-      w.hatchery = c >= 3 || need('room', 'room', 'hatchery') ? Math.min(7, Math.max(need('room', 'room', 'hatchery'), 2 + Math.floor(c / 3))) : 0;
+      w.hatchery = c >= 3 || need('room', 'room', 'hatchery') ? Math.min(7, Math.max(need('room', 'room', 'hatchery'), 1 + Math.ceil(Math.max(0, c + 2 - V.FREE_FEED) / V.FEED_PER_HATCHERY_TILE))) : 0;      // food for everyone too: 3 from the larder, 4 a tile
       for (const r of ['library', 'prison', 'torture', 'temple']) w[r] = need('room', 'room', r);
+      /* what a sensible player adds once the basics stand: the rooms that draw stronger creatures through the Portal (the Monsters tab lists what each kind needs), and a Training Room */
+      if (c >= 3 && chapter >= 3) w.library = Math.max(w.library, 3);                              // Warlocks and Dark Elves
+      if (c >= 3 && chapter >= 6 && g.isAvail('temple')) w.temple = Math.max(w.temple, 3);         // Vampires and Dark Angels
+      w.training = c >= 3 && (chapter >= 4 || need("level") > 0) ? Math.min(6, 1 + Math.floor(c / 2)) : 0;
       return w;
     }
     function buildRooms() {
-      const w = wantRooms(), order = ['treasury', 'lair', 'hatchery', 'library', 'prison', 'torture', 'temple'], ex = reserved();
+      const w = wantRooms(), order = ['treasury', 'lair', 'hatchery', 'library', 'prison', 'torture', 'temple', 'training'], ex = reserved();
       for (const r of order) {
         const have = count(ROOM[r]), want = w[r] || 0; if (have >= want) continue;
         const free = claimedFree(ex), cost = TR[ROOM[r]].cost; let n = Math.min(want - have, free.length, Math.floor((G.gold - 60) / cost)); if (r === 'treasury' && have === 0) n = Math.min(want, free.length);
@@ -172,7 +179,7 @@
       const survived = G.wave >= g.VAR.WAVES && !G.heroes.length && G.heartHp > 0;
       const done = Object.keys(G.objDone).length, bonus = objs.filter(o => o.optional).length, bonusDone = objs.filter((o, i) => o.optional && G.objDone[i]).length;
       return { outcome: G.over || (survived ? 'survived' : 'timeout'), time: Math.round(G.time), heart: Math.max(0, G.heartHp) / g.VAR.HEART_HEALTH, minHeart: Math.max(0, S.minHeart) / g.VAR.HEART_HEALTH,
-        creatures: G.creatures.length, spawned: S.seen.size, fell: S.fell, left: S.left, impsLost: S.imps, doorsLost: S.doorsLost, kills: G.kills, wave: G.wave, waves: g.VAR.WAVES, objectives: done, of: objs.length, bonusDone, bonus, stars: G.result && G.result.stars,
+        creatures: G.creatures.length, maxLevel: Math.max(1, ...G.creatures.map(c => c.level)), avgLevel: G.creatures.length ? G.creatures.reduce((t, c) => t + c.level, 0) / G.creatures.length : 1, spawned: S.seen.size, fell: S.fell, left: S.left, impsLost: S.imps, doorsLost: S.doorsLost, kills: G.kills, wave: G.wave, waves: g.VAR.WAVES, objectives: done, of: objs.length, bonusDone, bonus, stars: G.result && G.result.stars,
         linkedAt: S.linked ? Math.round(S.linkedAt) : null, gold: Math.floor(G.gold), traps: G.traps.length, doors: G.doors.length, spells: G.stats.spells, prisoners: G.prisoners.length };
     }
     return { think, run, state: S };

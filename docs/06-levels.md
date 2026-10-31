@@ -199,7 +199,7 @@ thing, and the difficulty rises through data alone:
 | 6 | `prison` | The Dungeon Below | Prison, Torture Chamber; **Monk** | 6 | 1.05 | 100 | 100 | 1 | + Prison, Torture |
 | 7 | `temple` | Prayers and Power | Temple, spells; **Fairy** | 6 | 1.20 | 90 | 100 | 1 | + Temple, every spell |
 | 8 | `gates` | Two Gates | two entrances; **Giant** | 7 | 1.20 | 80 | 100 | 2 | everything |
-| 9 | `siege` | The Siege | **Prince**, **Stone Knight** | 8 | 1.20 | 70 | 100 | 2 | everything |
+| 9 | `siege` | The Siege | **Prince**, **Stone Knight** | 8 | 1.30 | 70 | 100 | 2 | everything |
 | 10 | `crusade` | The King's Crusade | the **King**; three entrances | 10 | 1.30 | 60 | 90 | 3 | everything |
 
 "hero x" is `waves.heroMult`, "prep" the seconds from the first linked Gate to wave 1 (the Tutorial has none: its Knight waits at the Gate and attacks the moment you link it), "gap" the seconds between waves. Starting gold rises
@@ -239,20 +239,20 @@ Results with 8 seeds each (what the test pins, with margins, is in the file):
 
 | # | chapter | steady bot wins | game time | creatures lost per run | bonus star | lazy bot survives |
 |---|---|---|---|---|---|---|
-| 1 | The Awakening | 8/8 | 5.7 min | 0 | - | 8/8 (it is the Tutorial) |
-| 2 | Creatures of the Dark | 8/8 | 10.4 | 0 | 8/8 | 8/8 |
-| 3 | Mouths to Feed | 8/8 | 11.8 | 0 | 8/8 | 8/8 |
-| 4 | The Library | 8/8 | 11.8 | 0 | 8/8 | 3/8 |
-| 5 | Doors and Snares | 8/8 | 12.4 | 0 | 8/8 | 4/8 |
-| 6 | The Dungeon Below | 8/8 | 13.2 | 3 (they leave) | 7/8 | 0/8 |
-| 7 | Prayers and Power | 8/8 | 13.4 | 0 | 8/8 | 0/8 |
-| 8 | Two Gates | 8/8 | 17.6 | 0.5 | 8/8 | 0/8 |
-| 9 | The Siege | 4/8 | 20.8 | 16 | 2/4 wins | 0/8 |
-| 10 | The King's Crusade | 4/8 | 22.6 | 16 | 3/4 wins | 0/8 |
+| 1 | The Awakening | 8/8 | 2.3 min | 0 | - | 8/8 (it is the Tutorial) |
+| 2 | Creatures of the Dark | 8/8 | 10.4 | 0 | 8/8 | 7/8 |
+| 3 | Mouths to Feed | 8/8 | 11.8 | 0 | 8/8 | 0/8 |
+| 4 | The Library | 8/8 | 11.0 | 0 | 8/8 | 0/8 |
+| 5 | Doors and Snares | 8/8 | 12.1 | 0 | 8/8 | 0/8 |
+| 6 | The Dungeon Below | 8/8 | 13.1 | 3 (they leave) | 8/8 | 0/8 |
+| 7 | Prayers and Power | 8/8 | 13.9 | 0 | 8/8 | 0/8 |
+| 8 | Two Gates | 8/8 | 17.5 | 0 | 8/8 | 0/8 |
+| 9 | The Siege | 5/8 | 20.4 | 11 | 3/5 wins | 0/8 |
+| 10 | The King's Crusade | 3/8 | 22.6 | 11 | 2/3 wins | 0/8 |
 
-The bot is a *fast* player, so a first-time human takes longer: its times add up to about 140 minutes, against the 2.5-3 hours aimed for.
+The bot is a *fast* player, so a first-time human takes longer: its times add up to about 136 minutes, against the 2.5-3 hours aimed for.
 "Not trivial" means the lazy bot never wins a chapter after the first and never survives chapters 6-10, while the finale costs even the
-careful bot about 16 creatures and half its runs. Chapters 1-8 are meant to be cleared cleanly by a prepared player: they teach, and
+careful bot about 11 creatures and more than half its runs. Chapters 1-8 are meant to be cleared cleanly by a prepared player: they teach, and
 the pressure arrives in 9 and 10.
 
 What the bots showed, and what changed because of it:
@@ -267,7 +267,16 @@ What the bots showed, and what changed because of it:
   reach; the bonuses are now 20 (chapter 9) and 22 (chapter 10), reached in about half of the wins.
 - The bot's own bugs mattered: its first route search ran through the hero cavern and opened the Gate by accident, and its first
   defence zone sat on the wrong tunnel. Both were fixed in `bot.js`, not in the chapters.
-- The bot is a yardstick, not a person. It never uses the Hand, rarely levels creatures and does not play the spells cleverly, so a good
+- **After the rooms rule, capacity and levels** (arrivals by rooms, the army limit, the Training Room, the waiting Knight) the bots were taught
+  the new rules in `bot.js`: beds and food kept ahead of the army, a Library from chapter 4 and a Temple from chapter 7 (the rooms that draw Warlocks,
+  Dark Elves, Vampires and Dark Angels), and from chapter 5 a Training Room of up to six tiles. Measured with nothing retuned, the army was weaker (no
+  stronger kinds) and the finale unwinnable (0/8); with the bot building those rooms and training, chapter 9 became a walkover (8/8) and chapter 10
+  6/8, because trained creatures are stronger. Retuned with data only, as the brief prefers: **chapter 9** `heroMult` 1.2 to 1.3 and `scale` 0.08 to
+  0.13 (now 5/8), **chapter 10** `scale` 0.04 to 0.07 (now 3/8). The Tutorial is shorter (the bot needs 2.3 minutes, a person about 3-5) because its Knight
+  waits at the Gate, so its length window in `test_bots.js` moved from 4.5-8.5 to 1.8-5. The lazy bot (a Lair of three) now survives
+  chapter 3 never and chapter 2 in 7 of 8: its army is capped by its three beds. With 15 creatures and six dummies a creature reaches level 2-3 in
+  a chapter (average about 2); a player who builds more dummies levels faster.
+- The bot is a yardstick, not a person. It never uses the Hand, only levels creatures by building a Training Room and does not play the spells cleverly, so a good
   player should beat it; and results move by a seed or two when anything changes, which is why the thresholds have margins.
 
 ## Chapters, stars and saves

@@ -41,13 +41,13 @@ const mean = (a) => a.length ? a.reduce((x, y) => x + y, 0) / a.length : 0;
 
     const by = (n, tier) => jobs.filter(j => j.n === n && j.tier === tier).map(j => j.r);
     const pct = (x) => Math.round(x * 100) + '%', mins = (s) => (Math.round(s / 6) / 10).toFixed(1);
-    console.log('\n chapter                        steady bot: wins  time(min)  heart min/end  army fell left  bonus  stars |  lazy bot: wins  survived  heart end');
+    console.log('\n chapter                        steady bot: wins  time(min)  heart min/end  army lvl(max/avg) fell left  bonus  stars |  lazy bot: wins  survived  heart end');
     const sum = {};
     for (const n of WANT) {
       const st = by(n, 'steady'), lz = by(n, 'lazy');
       const row = sum[n] = { steadyWins: st.filter(r => r.outcome === 'victory').length, lazyWins: lz.filter(r => r.outcome === 'victory').length, lazySurv: lz.filter(r => r.outcome === 'victory' || r.outcome === 'survived').length,
         time: mean(st.map(r => r.time)), minHeart: mean(st.map(r => r.minHeart)), lazyHeart: mean(lz.map(r => r.heart)), st, lz };
-      console.log(` ${String(n).padStart(2)} ${IDS[n - 1].padEnd(10)} ${' '.repeat(18)} ${row.steadyWins}/${st.length}      ${mins(row.time).padStart(5)}      ${pct(row.minHeart).padStart(4)} / ${pct(mean(st.map(r => r.heart))).padStart(4)}   ${mean(st.map(r => r.creatures)).toFixed(0).padStart(3)} ${mean(st.map(r => r.fell)).toFixed(1).padStart(4)} ${mean(st.map(r => r.left)).toFixed(1).padStart(4)}  ${mean(st.map(r => r.bonusDone)).toFixed(1)}/${st[0] ? st[0].bonus : 0}  ${mean(st.map(r => r.stars || 0)).toFixed(1)}  |   ${row.lazyWins}/${lz.length}    ${row.lazySurv}/${lz.length}    ${pct(row.lazyHeart).padStart(4)}   [${lz.map(r => r.outcome).join(',')}]`);
+      console.log(` ${String(n).padStart(2)} ${IDS[n - 1].padEnd(10)} ${' '.repeat(18)} ${row.steadyWins}/${st.length}      ${mins(row.time).padStart(5)}      ${pct(row.minHeart).padStart(4)} / ${pct(mean(st.map(r => r.heart))).padStart(4)}   ${mean(st.map(r => r.creatures)).toFixed(0).padStart(3)} ${(mean(st.map(r => r.maxLevel)).toFixed(0) + '/' + mean(st.map(r => r.avgLevel)).toFixed(1)).padStart(7)} ${mean(st.map(r => r.fell)).toFixed(1).padStart(4)} ${mean(st.map(r => r.left)).toFixed(1).padStart(4)}  ${mean(st.map(r => r.bonusDone)).toFixed(1)}/${st[0] ? st[0].bonus : 0}  ${mean(st.map(r => r.stars || 0)).toFixed(1)}  |   ${row.lazyWins}/${lz.length}    ${row.lazySurv}/${lz.length}    ${pct(row.lazyHeart).padStart(4)}   [${lz.map(r => r.outcome).join(',')}]`);
     }
 
     /* ---- what we expect. Margins are wide on purpose: the sim is deterministic, but a small change anywhere can move a chapter by a seed or two. ---- */
@@ -65,7 +65,8 @@ const mean = (a) => a.length ? a.reduce((x, y) => x + y, 0) / a.length : 0;
     }
     if (has(8) && has(10)) check('the finale is harder than chapter 8: it loses more creatures and wins less', fell(10) > fell(8) + 5 && rate(10) < rate(8));
     console.log('length: a fast bot should land inside the chapter\'s target, a first-time human takes longer');
-    const window_ = { 1: [4.5, 8.5], 2: [9.5, 12.5], 3: [9.5, 12.5], 4: [9.5, 12.5], 5: [11.5, 16], 6: [11.5, 16], 7: [11.5, 16], 8: [15.5, 22], 9: [15.5, 22.5], 10: [21.5, 28] };
+    const window_ = { 1: [1.8, 5],        // chapter 1: the Knight now waits at the Gate, so the 3-minute countdown is gone (it was 4.5-8.5)
+       2: [9.5, 12.5], 3: [9.5, 12.5], 4: [9.5, 12.5], 5: [11.5, 16], 6: [11.5, 16], 7: [11.5, 16], 8: [15.5, 22], 9: [15.5, 22.5], 10: [21.5, 28] };
     for (const n of WANT) { const m = mean(sum[n].st.filter(r => r.outcome === 'victory').map(r => r.time)) / 60, [lo, hi] = window_[n]; if (m) check(`chapter ${n}: ${m.toFixed(1)} min is inside ${lo}-${hi}`, m >= lo && m <= hi); }
     if (WANT.length === 10) { const tot = WANT.reduce((a, n) => a + mean(sum[n].st.filter(r => r.outcome === 'victory').map(r => r.time)) / 60, 0); check(`the whole campaign: ${tot.toFixed(0)} min for a fast bot (125-170), so 2.5-3 h for a person`, tot >= 125 && tot <= 170); }
     console.log('stars: the third star is reachable');

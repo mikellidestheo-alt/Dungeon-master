@@ -10,7 +10,7 @@
  *   6   The Dungeon Below       Prison, Torture; Monk     6     1.05   100   100    1     + Prison, Torture Chamber
  *   7   Prayers and Power       Temple, spells; Fairy     6     1.20    90   100    1     + Temple and every spell
  *   8   Two Gates               two entrances; Giant      7     1.20    80   100    2     everything
- *   9   The Siege               Prince, Stone Knight      8     1.20    70   100    2     everything
+ *   9   The Siege               Prince, Stone Knight      8     1.30    70   100    2     everything   (waves.scale 0.13: levelled creatures made it too easy)
  *   10  The King's Crusade      the King; three Gates    10     1.30    60    90    3     everything
  *
  * "hero x" is waves.heroMult, "prep" the seconds from the first linked Gate to wave 1 (none in the Tutorial: waves.waiting), "gap" the seconds between waves.
@@ -467,7 +467,7 @@
       '##################################################'
     ] },
     start: { gold: 2000, mana: 600, imps: 4, unlock: 'all', research: null, pretag: [], welcome: 'Eight waves are coming. Two Gates, and the Prince himself.' },
-    waves: { prep: 70, interval: 100, scale: 0.08, heroMult: 1.2,
+    waves: { prep: 70, interval: 100, scale: 0.13, heroMult: 1.3,
       plan: W('K A T', 'G D K H A', 'N K F M A T', 'S G K H M A T', 'P G D H F M A T', 'N G H F K M A T A', 'S G D H F M A T A', 'P S G D H F M A') },
     rules: { heartHp: 2500 },
     objectives: [
@@ -522,7 +522,7 @@
       '####################################################'
     ] },
     start: { gold: 2500, mana: 600, imps: 4, unlock: 'all', research: null, pretag: [], welcome: 'The King is coming. Three Gates, ten waves, and everything researched.' },
-    waves: { prep: 60, interval: 90, scale: 0.04, heroMult: 1.3,
+    waves: { prep: 60, interval: 90, scale: 0.07, heroMult: 1.3,
       plan: W('K A T', 'G K H A', 'S K H A M T', 'P G K H A M T', 'S G D H F M A', 'N G K H F M A T', 'P S G H F M A T', 'S G D H F M A T', 'S G D H F M A T', 'Y P S G N H F M A') },
     rules: { heartHp: 2500 },
     objectives: [
