@@ -1137,6 +1137,7 @@ function draw() {
   const gt = guideTarget(); if (gt && !G.guideHidden && !G.over) {         // the tutorial guide's pulsing marker
     const k = 0.5 + 0.5 * Math.sin(G.time * 5); ctx.strokeStyle = 'rgba(255,211,107,' + (0.5 + 0.5 * k) + ')'; ctx.lineWidth = 3;
     ctx.strokeRect(gt.x0 * TS + 1, gt.y0 * TS + 1, (gt.x1 - gt.x0 + 1) * TS - 2, (gt.y1 - gt.y0 + 1) * TS - 2); ctx.lineWidth = 1; }
+  const hv = hoverUnit(); if (hv) { const [px, py] = scr(hv); ctx.strokeStyle = '#ffe070'; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.ellipse(px, py + 3, 8.5, 5.5, 0, 0, 7); ctx.stroke(); ctx.lineWidth = 1; }       // the creature a click would pick up
   if (mouse.down && tool !== 'hand') {                        // drag preview
     const x0 = Math.min(mouse.sx, mouse.x), x1 = Math.max(mouse.sx, mouse.x), y0 = Math.min(mouse.sy, mouse.y), y1 = Math.max(mouse.sy, mouse.y);
     ctx.fillStyle = mouse.down === 3 ? 'rgba(255,80,80,.25)' : 'rgba(255,230,120,.25)'; ctx.fillRect(x0 * TS, y0 * TS, (x1 - x0 + 1) * TS, (y1 - y0 + 1) * TS);
@@ -1146,7 +1147,7 @@ function draw() {
 
 /* ===================================================================================== UI wiring */
 const $ = (id) => document.getElementById(id);
-const TOOLS = [ ['dig', 'Dig (tag)'], ['hand', '✋ Hand'], ['treasury', 'Treasury ' + TERRAIN[T.TREASURY].cost + 'g'], ['lair', 'Lair ' + TERRAIN[T.LAIR].cost + 'g'],
+const TOOLS = [ ['dig', 'Dig / grab'], ['hand', '✋ Hand'], ['treasury', 'Treasury ' + TERRAIN[T.TREASURY].cost + 'g'], ['lair', 'Lair ' + TERRAIN[T.LAIR].cost + 'g'],
   ['library', 'Library ' + TERRAIN[T.LIBRARY].cost + 'g'], ['hatchery', 'Hatchery ' + TERRAIN[T.HATCHERY].cost + 'g'], ['temple', 'Temple ' + TERRAIN[T.TEMPLE].cost + 'g'], ['prison', 'Prison ' + TERRAIN[T.PRISON].cost + 'g'], ['torture', 'Torture ' + TERRAIN[T.TORTURE].cost + 'g'],
   ['door', 'Door ' + DOOR.cost + 'g'], ['gas', 'Gas Trap ' + TRAPS.gas.cost + 'g'], ['bolt', 'Lightning Trap ' + TRAPS.bolt.cost + 'g'],
   ...SPELL_ORDER.map((id, i) => [id, SPELLS[id].icon + ' ' + SPELLS[id].name + ' ' + SPELLS[id].cost + ' [' + (i + 1) + ']']),
@@ -1223,21 +1224,33 @@ addEventListener('keydown', e => {                                // B, C, H ope
   if (e.target.tagName === 'INPUT' || e.ctrlKey || e.metaKey || e.altKey) return; const k = e.key.toLowerCase(), t = TABS.find(t => t.key.toLowerCase() === k);
   if (t) { if (t.id === 'monsters') { tool = 'hand'; setTab('monsters', true); refreshButtons(); } else setTab(t.id); }
   else if (k === 'escape' && openTab) setTab(openTab);
+  else if (k === 'escape') cancelTool();
 });
 function posF(e) { const r = cv.getBoundingClientRect(); return { fx: (e.clientX - r.left) / r.width * W, fy: (e.clientY - r.top) / r.height * H }; }
 function pos(e) { const r = cv.getBoundingClientRect(); return { x: Math.max(0, Math.min(W - 1, Math.floor((e.clientX - r.left) / r.width * W))), y: Math.max(0, Math.min(H - 1, Math.floor((e.clientY - r.top) / r.height * H))) }; }
 /* Input is expressed in world terms ({x,y} tile, {fx,fy} float tile coords) so the 2D and the 3D view share it. */
 const ROOM_TOOLS = { treasury: T.TREASURY, lair: T.LAIR, library: T.LIBRARY, hatchery: T.HATCHERY, temple: T.TEMPLE, prison: T.PRISON, torture: T.TORTURE };
+/* The default mode is the Dig tool ('dig', shown as "Dig / grab"): left-drag over walls tags them, a left-click on one of your creatures or imps
+ * picks it up (and the next left-click puts it down), right-drag untags and also sells any door or trap in the box. Every other tool (a room, door,
+ * trap, spell, the Hand) is cancelled by a right-click, which returns to this mode; so does Esc. Right-click while carrying puts the creature down
+ * at the nearest open floor under the cursor and returns to the default too. */
+const DEFAULT_TOOL = 'dig';
+function cancelTool() { if (tool === DEFAULT_TOOL) return false; tool = DEFAULT_TOOL; refreshButtons(); sfx('untag'); return true; }
 function inputDown(p, f, button) { mouse = { x: p.x, y: p.y, sx: p.x, sy: p.y, down: button === 2 ? 3 : 1, fx: f.fx, fy: f.fy }; }
 function inputMove(p, f) { mouse.x = p.x; mouse.y = p.y; mouse.fx = f.fx; mouse.fy = f.fy; }
 function inputUp(p, f) {
-  if (!mouse.down) return; const right = mouse.down === 3;
-  if (tool === 'hand') { if (!right) handClick(f); }
-  else if (tool === 'dig') tagRect(mouse.sx, mouse.sy, p.x, p.y, !right);
+  if (!mouse.down) return; const right = mouse.down === 3, click = p.x === mouse.sx && p.y === mouse.sy, box = [mouse.sx, mouse.sy, p.x, p.y]; mouse.down = 0;
+  if (right && G.held) { dropHeld(f, true); cancelTool(); }                                  // right-click while carrying: set it down near the cursor, back to the default mode
+  else if (right && click && tool !== DEFAULT_TOOL) cancelTool();                           // right-click cancels the tool
+  else if (tool === 'hand') { if (!right) handClick(f); }
+  else if (tool === DEFAULT_TOOL) {
+    if (right) { tagRect(...box, false); removeThings(...box); }                              // right-drag: untag, and sell doors and traps in the box
+    else if (G.held) handClick(f);                                                            // carrying: left-click puts it down
+    else { const u = click && unitAt(f); if (u) pickUp(u); else tagRect(...box, true); }     // a click on a creature picks it up; anything else tags
+  }
   else if (SPELLS[tool]) { if (!right) castSpell(tool, f); }
-  else if (tool === 'door' || tool === 'gas' || tool === 'bolt') { if (right) removeThings(mouse.sx, mouse.sy, p.x, p.y); else placeThings(tool, mouse.sx, mouse.sy, p.x, p.y); }
-  else if (!right && ROOM_TOOLS[tool]) build(ROOM_TOOLS[tool], mouse.sx, mouse.sy, p.x, p.y);
-  mouse.down = 0;
+  else if (tool === 'door' || tool === 'gas' || tool === 'bolt') { if (right) removeThings(...box); else placeThings(tool, ...box); }
+  else if (!right && ROOM_TOOLS[tool]) build(ROOM_TOOLS[tool], ...box);
 }
 addEventListener('keydown', e => { const i = '12345'.indexOf(e.key); if (i >= 0 && e.target.tagName !== 'INPUT') { if (isAvail(SPELL_ORDER[i])) tool = SPELL_ORDER[i]; else needs(SPELL_ORDER[i]); setTab('spells', true); refreshButtons(); } });
 cv.addEventListener('contextmenu', e => e.preventDefault());
@@ -1249,19 +1262,33 @@ cv.addEventListener('pointerup', e => inputUp(pos(e), posF(e)));
 /* The Hand: pick up one of your imps/creatures and drop it elsewhere (GameWorldController pick-up / drop, `InHand`). */
 /* The cursor is the Keeper's hand (cursor.css); while you carry a creature or imp it closes into a fist holding an imp. */
 function syncHandCursor() { document.documentElement.classList.toggle('holding', !!(G.held && !G.held.dead && !G.over)); }
-function handClick(m) {
-  const held = G.held;
-  if (held) {
-    if (solid(Math.floor(m.fx), Math.floor(m.fy))) { say('Can\'t drop it into solid rock.'); return; }
-    sfx('drop', m.fx, m.fy); held.x = m.fx; held.y = m.fy; held.held = false; held.state = 'idle'; held.path = null; held.think = 0; G.held = null; syncHandCursor(); return;
+const REACH = 1.3;                                                // how near the cursor must be to a creature or imp to pick it up (tiles)
+function unitAt(m) {                                              // the creature or imp under (near) a world position, or null
+  let best = null, bd = REACH;
+  for (const u of G.creatures.concat(G.imps)) { const d = Math.hypot(u.x - m.fx, u.y - m.fy); if (!u.dead && !u.held && d < bd) { best = u; bd = d; } }
+  return best;
+}
+function nearestOpen(fx, fy) {                                    // the open floor tile centre nearest a point (within 4 tiles), or null
+  let best = null, bd = Infinity;
+  for (let y = Math.floor(fy) - 4; y <= Math.floor(fy) + 4; y++) for (let x = Math.floor(fx) - 4; x <= Math.floor(fx) + 4; x++) {
+    if (solid(x, y)) continue; const d = Math.hypot(x + .5 - fx, y + .5 - fy); if (d < bd) { bd = d; best = { x: x + .5, y: y + .5 }; } }
+  return best;
+}
+function dropHeld(m, near) {                                      // put the carried creature down; near: onto the nearest open floor (right-click), else refuse rock (left-click)
+  const held = G.held; if (!held) return false; let x = m.fx, y = m.fy;
+  if (solid(Math.floor(x), Math.floor(y))) {
+    if (!near) { say('Can\'t drop it into solid rock.'); return false; }
+    const q = nearestOpen(x, y) || held.lift || { x: held.x, y: held.y }; x = q.x; y = q.y;       // no floor close by: back where it was lifted
   }
-  let best = null, bd = 1.3;
-  for (const u of G.creatures.concat(G.imps)) { const d = Math.hypot(u.x - m.fx, u.y - m.fy); if (!u.dead && d < bd) { best = u; bd = d; } }
-  if (best) pickUp(best);
+  sfx('drop', x, y); held.x = x; held.y = y; held.held = false; held.state = 'idle'; held.path = null; held.think = 0; G.held = null; syncHandCursor(); return true;
+}
+function handClick(m) {
+  if (G.held) { dropHeld(m, false); return; }
+  const best = unitAt(m); if (best) pickUp(best);
 }
 function pickUp(u) {                                              // the Hand, or the Monsters tab, lifts a creature or imp
   if (G.held || G.over || u.dead) return false;
-  sfx('pickup', u.x, u.y); if (u.isImp) u.drop(); u.held = true; u.path = null; G.held = u; syncHandCursor(); return true;
+  sfx('pickup', u.x, u.y); if (u.isImp) u.drop(); u.lift = { x: u.x, y: u.y }; u.held = true; u.path = null; G.held = u; syncHandCursor(); return true;
 }
 function renderLog(isNew) { const el = $('log'); el.innerHTML = G.log.slice(0, 12).map((m, i) => '<div' + (i === 0 && isNew ? ' class="new"' : '') + '>' + m + '</div>').join(''); }
 function renderHud() {
@@ -1396,5 +1423,6 @@ function frame(now) {
   renderHud(); requestAnimationFrame(frame);
 }
 requestAnimationFrame(frame);
-window.__ui = { get mouse() { return mouse; }, get tool() { return tool; }, inputDown, inputMove, inputUp, guideTarget };
-window.__game = { LV, LEVEL_TABLE, CAMPAIGN, startFlee, TABS, TAB_OF, setTab, pickUp, renderRoster, finishGame, renderEnd, COND, OBJECTIVES, GUIDE, condState, updateObjectives, guideNow, guideTarget, showBriefing, validateLevel, buildMap, levelSize, levelPos, strike, Chicken, updateHatchery, prayRate, spriteOf, pickKind, RESEARCH, isAvail, unlockAll, addResearch, SKELETON, freeSlot, updateJail, knockOut, KO_SECONDS, TORTURE_SECONDS, SPELLS, SPELL_ORDER, castSpell, TRAPS, DOOR, placeThings, removeThings, doorAt, trapAt, HERO_LAND, W, H, G, HEROES, KINDS, spawnWave, Creature, Imp, Hero, hurt, los, T, TERRAIN, step, tagRect, build, scanTasks, findPath, capacity, goldReleased, damageTile, perApplication, VAR, audioMood, SPELL_SND, release };
+const hoverUnit = () => (tool === DEFAULT_TOOL || tool === 'hand') && !G.held && !G.over && mouse.x >= 0 && !mouse.down && mouse.fx !== undefined ? unitAt(mouse) : null;       // the creature the cursor could pick up (a ring under it shows it)
+window.__ui = { get mouse() { return mouse; }, get tool() { return tool; }, inputDown, inputMove, inputUp, guideTarget, hoverUnit };
+window.__game = { unitAt, dropHeld, cancelTool, LV, LEVEL_TABLE, CAMPAIGN, startFlee, TABS, TAB_OF, setTab, pickUp, renderRoster, finishGame, renderEnd, COND, OBJECTIVES, GUIDE, condState, updateObjectives, guideNow, guideTarget, showBriefing, validateLevel, buildMap, levelSize, levelPos, strike, Chicken, updateHatchery, prayRate, spriteOf, pickKind, RESEARCH, isAvail, unlockAll, addResearch, SKELETON, freeSlot, updateJail, knockOut, KO_SECONDS, TORTURE_SECONDS, SPELLS, SPELL_ORDER, castSpell, TRAPS, DOOR, placeThings, removeThings, doorAt, trapAt, HERO_LAND, W, H, G, HEROES, KINDS, spawnWave, Creature, Imp, Hero, hurt, los, T, TERRAIN, step, tagRect, build, scanTasks, findPath, capacity, goldReleased, damageTile, perApplication, VAR, audioMood, SPELL_SND, release };

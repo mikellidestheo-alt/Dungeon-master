@@ -33,7 +33,7 @@ completing its objectives (every chapter includes surviving all its waves) and l
 | Where | What |
 |---|---|
 | Top bar | Gold (held / what your Treasuries can bank), Imps, Creatures (of 15), Payday countdown, Time, Mana, Heart, then Wave, heroes alive and a countdown to the next wave (it says *tunnel to Gate* until a Gate is linked, and *gates 1/2* when a level has more). A **☰ Chapters** (or **☰ Sandbox**) button, **Retire** in endless mode, **⛶ Full screen**, and the sound controls |
-| Toolbar | Always in view: **Dig**, three tabs and **Pause / 1× / 3× / 8×**. The tabs open their own commands under the strip (above it in full screen): **🏰 Buildings** (the seven rooms, then the Defences: Door, Gas Trap, Lightning Trap), **✨ Spells** (the five spells with mana cost and hotkey) and **👹 Monsters** (the ✋ Hand and a roster of your creatures). Click a tab again, or press `Esc`, to close it. Anything not yet researched is greyed out |
+| Toolbar | Always in view: **Dig / grab** (the default mode), three tabs and **Pause / 1× / 3× / 8×**. The tabs open their own commands under the strip (above it in full screen): **🏰 Buildings** (the seven rooms, then the Defences: Door, Gas Trap, Lightning Trap), **✨ Spells** (the five spells with mana cost and hotkey) and **👹 Monsters** (the ✋ Hand and a roster of your creatures). Click a tab again, or press `Esc`, to close it. Anything not yet researched is greyed out |
 | Dungeon view | Top left: the **objectives** (ticked as you go, with counters). Bottom: the **hint banner** (✕ hides it; the highlighted toolbar button and the gold marker on the map show what it means) |
 | Below the view | **Task board** (digging queue, chickens, hungry, praying, prisoners, and the mood of every creature), **Log**, **Research** panel, and a short help scroll (the basics: digging, rooms, creatures, the invasion, objectives, camera) |
 
@@ -41,12 +41,13 @@ completing its objectives (every chapter includes surviving all its waves) and l
 
 | To do this | Do this |
 |---|---|
-| Dig or mine | Choose **Dig**, then drag a box over earth or gold. Imps do the rest. Right-drag **untags**. Rock and gem seams cannot be dug through |
+| Dig or mine | **Dig / grab** is the default mode (it is lit when nothing else is chosen): drag a box over earth or gold and imps do the rest. Right-drag **untags** (and sells any door or trap in the box). Rock and gem seams cannot be dug through |
+| Cancel a tool | **Right-click** (a click, not a drag) with any room, door, trap, spell or the Hand chosen: the tool is dropped and you are back in **Dig / grab**. `Esc` does the same once no tab is left to close |
 | Open a tab | Click **Buildings**, **Spells** or **Monsters**, or press `B`, `C` or `H` (`H` also takes the Hand). Click the tab again or press `Esc` to close it. The number keys `1`-`5` open Spells for you. A dot on a tab means the tool you chose lives there. The tutorial's hints open the right tab themselves |
 | Build a room | In the **Buildings** tab choose the room, drag a box over **your claimed floor** (bare floor you have not claimed yet does not count). It costs gold per tile. Rooms cannot be sold |
-| Doors and traps | In the **Buildings** tab (Defences) choose it and click or drag over claimed floor, usually in a tunnel. **Right-click sells for half.** Imps repair doors and re-arm traps for gold |
+| Doors and traps | In the **Buildings** tab (Defences) choose it and click or drag over claimed floor, usually in a tunnel. **Right-click a door or trap (in the default mode) sells it for half**, and right-dragging over several sells them all. Imps repair doors and re-arm traps for gold |
 | Cast a spell | In the **Spells** tab click its button, or press `1` Lightning, `2` Heal, `3` Speed, `4` Call to Arms, `5` Create Imp, then click the dungeon. Lightning needs a hero under the cursor. A refused cast costs nothing |
-| Move a creature or imp | **✋ Hand** (in the **Monsters** tab, or press `H`): click one on the map to pick it up (your cursor, the Keeper's evil hand, closes into a fist holding an imp, and the creature disappears from the map while you carry it), click again to drop it, for example into a fight |
+| Move a creature or imp | In the default mode **left-click** one on the map to pick it up (a gold ring under it shows what a click would grab; your cursor, the Keeper's evil hand, closes into a fist holding an imp, and the creature disappears from the map while you carry it), click again to drop it, for example into a fight. A **right-click while carrying** puts it down on the nearest open floor under the cursor (or back where it was lifted) and returns to the default. Pressing on a creature and dragging still tags. The **✋ Hand** in the **Monsters** tab (or `H`) keeps working as a tool of its own |
 | Choose research | Click an item in the **Research** panel (only once you have a Library) |
 | Camera (3D) | `W A S D` or the arrow keys pan, **or push the mouse to the edge of the map** (hold it there a moment; nearer the edge is faster; in full screen it is the edge of the screen, under the bars too); the wheel zooms, middle-drag pans |
 | Full screen | The **⛶ Full screen** button in the top bar, or `F`. The map fills the screen, the numbers bar and the toolbar float over its top and bottom, and the Task board, Log and Research slide in from the right with **☰ Panels** or `P`. `Esc` leaves it. It is remembered, so *Begin* on the next briefing takes you back into it |
@@ -120,7 +121,7 @@ Tick as you go; write down anything surprising in the template at the end.
 - [ ] Is the objective list (top left) readable and does it tick and count as you work?
 - [ ] Do you understand why you must claim the Portal, build a Lair, and what the countdown after tunnelling to the Gate means?
 - [ ] A Knight stands idle on the Hero Gate pad from the first second (3D and `?view=2d`), the score stays calm, and he does not move until the tunnel is open. Digging the last tile makes him attack at once, with the horn. Is it clear from the hints that you should raise a creature first?
-- [ ] Did the Knight feel like a lesson rather than a threat? Did you use the **Hand**? Did the Heart take any damage?
+- [ ] Did the Knight feel like a lesson rather than a threat? Did you pick a creature up with a click? Did the Heart take any damage?
 - [ ] The victory screen shows three stars, *First victory!*, and Next chapter opens chapter II behind its briefing.
 
 **3. For every chapter** (copy this block per chapter)
@@ -158,7 +159,8 @@ Tick as you go; write down anything surprising in the template at the end.
 - [ ] **Prison and Torture:** knocked-out heroes are carried to the Prison, tortured and converted, or starve into skeletons.
 - [ ] **Temple:** creatures pray, mana rises, the Temple art looks right at 3x3 and larger.
 - [ ] **Spells:** every spell works and refuses politely (no mana, cooling down, no target). Hotkeys `1` to `5`.
-- [ ] **Hand:** pick up and drop creatures and imps; dropping into rock is refused.
+- [ ] **Mouse modes:** with nothing chosen, left-drag tags walls and a left-click on a creature or imp picks it up (a gold ring shows which one), the next click drops it, dropping into rock is refused. Right-click cancels any chosen tool, in both views; right-click while carrying drops it nearby. Right-click sells a door or trap. Does it ever pick up an imp when you only meant to tag a wall? Is the ring easy to see?
+- [ ] **Hand:** the ✋ Hand tool still picks up and drops creatures and imps.
 - [ ] **Gates:** the countdown starts at the first link; with two or more Gates each wave is split; fleeing heroes escape through their own Gate; *gates 1/2* in the bar.
 - [ ] **Speed:** 3x and 8x stay smooth in a big fight; Pause really pauses (including the end of a wave).
 
@@ -261,6 +263,7 @@ Tick as you go; write down anything surprising in the template at the end.
 | `tools/test_chapters.js` | Headless Chromium checks for the ten campaign chapters, plus a scripted playthrough of the Tutorial: `node tools/test_chapters.js` |
 | `tools/test_arrivals.js` | Headless Chromium checks for which creature kinds the Portal draws, by the rooms you have built, and the Monsters tab's *Who will come*: `node tools/test_arrivals.js` |
 | `tools/test_capacity.js` | Headless Chromium checks for the army limit (beds, food, Portal), the Heart's larder and ten minutes without starvation: `node tools/test_capacity.js` |
+| `tools/test_input.js` | Headless Chromium checks for the default mouse mode (Dig / grab), right-click cancelling a tool, carrying and dropping, selling doors and traps, and the hover ring: `node tools/test_input.js` |
 | `tools/test_gates.js` | Headless Chromium checks for several Hero Gates (linking, split waves, fleeing, 3D): `node tools/test_gates.js` |
 | `tools/test_sandbox.js` | Headless Chromium checks for the sandbox, the wave generator and endless mode: `node tools/test_sandbox.js` |
 | `tools/test_campaign.js` | Headless Chromium checks for the chapter menu, saved progress, stars and the Victory / Defeat screens: `node tools/test_campaign.js` |
@@ -317,7 +320,7 @@ seams, room building, lair assignment, mood/anger, sleep and payday, free-imp sp
   "hear" intruders on their own land) → flee when below 25 % hp → chase until in range → strike on recharge.
   Imps never fight, they run to the Heart. Heroes that get weak run back to the Gate and escape.
 * Creatures heal on your land, sleep in lairs below 50 % hp, and **level up** from kills.
-* **✋ Hand**: pick up an imp or creature and drop it into the fight.
+* **Pick up** (left-click a creature or imp in the default mode, or the **✋ Hand** tool): carry it and drop it into the fight; right-click cancels the tool or drops what you carry.
 * **Doors and traps** (build on your claimed floor, right-click to sell for half): heroes can't walk through a closed
   **Door** (100g, 400 hp), they stop and smash it while your units pass freely and imps repair it. **Gas Traps** (150g,
   poison cloud) and **Lightning Traps** (200g, burst + stun) are hidden from heroes, fire when stepped on, hold a few

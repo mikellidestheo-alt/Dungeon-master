@@ -367,6 +367,9 @@ function start() {
   sel.rotation.x = -Math.PI / 2; sel.renderOrder = 5; scene.add(sel);
   const mark = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), new THREE.MeshBasicMaterial({ color: 0xffd36b, transparent: true, opacity: .3, depthWrite: false }));
   mark.rotation.x = -Math.PI / 2; mark.visible = false; scene.add(mark);
+  const hoverRing = new THREE.Mesh(new THREE.RingGeometry(.42, .52, 32), new THREE.MeshBasicMaterial({ color: 0xffe070, transparent: true, opacity: .9, side: THREE.DoubleSide, depthWrite: false, depthTest: false }));    // under the creature a click would pick up
+  hoverRing.rotation.x = -Math.PI / 2; hoverRing.renderOrder = 9; hoverRing.visible = false; scene.add(hoverRing);
+  function syncHover() { const u = UI.hoverUnit(); hoverRing.visible = !!u; if (u) { hoverRing.position.set(u.x, .05, u.y); hoverRing.scale.setScalar(1 + .06 * Math.sin(G.time * 8 + performance.now() / 120)); } }
   function syncGuide() {                                              // the tutorial guide's target (game.js guideTarget)
     const t = UI.guideTarget(); mark.visible = !!t && !G.guideHidden && !G.over; if (!mark.visible) return;
     const tl = G.map[t.y0 * W + t.x0], top = tl && TERRAIN[tl.t].solid ? (tl.t === T.ROCK ? ROCK_H : WALL_H) : 0;
@@ -451,7 +454,7 @@ function start() {
     const ed = edgePush(performance.now()); if (ed) { mv(r, ed.x * sp * ed.k); mv(u, ed.y * sp * ed.k); }
     cam.x = Math.max(0, Math.min(W, cam.x)); cam.z = Math.max(0, Math.min(H, cam.z)); placeCamera();
     if (window.Sound) Sound.setListener(cam.x, cam.z, cam.dist * 0.28, r.x, r.z);     // effects get quieter and pan with distance from the camera
-    updateTiles(); syncProps(); syncUnits(); syncEffects(); syncSelection(); syncGuide();
+    updateTiles(); syncProps(); syncUnits(); syncEffects(); syncSelection(); syncHover(); syncGuide();
     // landmarks
     const pulse = 1 + Math.sin(G.time * 4) * .035 + (G.heartFlash > 0 ? .1 : 0);
     placeSprite(heartSpr, G.heart.x + .5, 0, G.heart.y + .5, pulse); heartSpr.material.color.setScalar(G.heartFlash > 0 ? 2.4 : 1);

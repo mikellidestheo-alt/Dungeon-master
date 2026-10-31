@@ -85,7 +85,7 @@ const sleep = (ms) => new Promise(r => setTimeout(r, ms));
     let s = await info();
     check('starts at guide step 0, nothing done', s.step === 0 && s.done === 0 && /Welcome/.test(s.text));
     await page.click('#guideNext'); s = await info();
-    check('"Got it" moves to the Dig step', s.step === 1 && /Dig \(tag\)/.test(s.text));
+    check('"Got it" moves to the Dig step', s.step === 1 && /Dig \/ grab/.test(s.text));
     check('the Dig button pulses and the marker points east of the Heart', await page.evaluate(() => document.getElementById('b_dig').classList.contains('hint') && JSON.stringify(window.__ui.guideTarget()) === '{"x0":9,"y0":5,"x1":12,"y1":5}'));
     await page.evaluate(() => window.__game.tagRect(9, 5, 12, 5, true)); await run(120, 'G.stats.dug >= 4'); s = await info();
     check('digging 4 tiles advances the guide by itself', s.step === 2 && /gold seam/.test(s.text), 'step ' + s.step);

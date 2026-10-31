@@ -106,7 +106,7 @@ window.LEVELS = {
     ],
     guide: [
       { text: 'Welcome, Keeper! These hints will show you the basics. You command <b>imps</b>; they dig, mine, claim and carry. Press <b>Got it</b> to begin.' },
-      { text: 'Choose <b>Dig (tag)</b>, then drag a box over the earth just east of your Heart. Imps dig whatever is tagged. Right-drag untags.', tool: 'dig', at: [9, 5, 12, 5], when: { type: 'dug', n: 4 } },
+      { text: '<b>Dig / grab</b> is already chosen: drag a box over the earth just east of your Heart. Imps dig whatever is tagged. Right-drag untags.', tool: 'dig', at: [9, 5, 12, 5], when: { type: 'dug', n: 4 } },
       { text: 'Gold! Tag the glittering <b>gold seam</b> too. Imps mine it and carry the gold home.', tool: 'dig', at: [13, 5], when: { type: 'dug', n: 5 } },
       { text: 'Imps turn bare floor into your territory by <b>claiming</b> it. Watch them work, or keep digging.', at: [9, 5, 13, 5], when: { type: 'claimed', n: 3 } },
       { text: 'Gold needs somewhere to live. Choose <b>Treasury</b> and drag over two floor tiles inside your cavern.', tool: 'treasury', at: [2, 3, 3, 3], when: { type: 'room', room: 'treasury', n: 2 } },

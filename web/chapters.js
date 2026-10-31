@@ -60,7 +60,7 @@
     ],
     guide: [
       { text: 'Welcome, Keeper! You command <b>imps</b>: they dig, mine, claim and carry. <b>Dig</b> is on the toolbar; <b>Buildings</b>, <b>Spells</b> and <b>Monsters</b> are tabs that open their commands. These hints will walk you through your first dungeon. Press <b>Got it</b> to begin.' },
-      { text: 'Choose <b>Dig (tag)</b>, then drag a box over the earth just east of your Heart. Imps dig whatever is tagged. Right-drag untags.', tool: 'dig', at: [9, 8, 11, 8], when: { type: 'dug', n: 3 } },
+      { text: '<b>Dig / grab</b> is already chosen: drag a box over the earth just east of your Heart. Imps dig whatever is tagged. Right-drag untags.', tool: 'dig', at: [9, 8, 11, 8], when: { type: 'dug', n: 3 } },
       { text: 'Gold! Tag the glittering <b>gold seam</b> too. Imps mine it and carry the gold home.', tool: 'dig', at: [12, 8], when: { type: 'dug', n: 4 } },
       { text: 'Bare floor is not yours yet. Imps <b>claim</b> it, turning it into your territory. Watch them work.', at: [9, 8, 12, 8], when: { type: 'claimed', n: 3 } },
       { text: 'Gold needs somewhere to live. In the <b>Buildings</b> tab choose <b>Treasury</b> and drag over two floor tiles inside your cavern.', tool: 'treasury', at: [2, 5, 3, 5], when: { type: 'room', room: 'treasury', n: 2 } },
@@ -69,7 +69,7 @@
       { text: 'Now dig east to the purple <b>Portal</b>. Once your imps claim it, creatures will arrive to fight for you.', tool: 'dig', at: [13, 8, 20, 8], when: { type: 'portal' } },
       { text: 'The Portal is yours. A new creature will step through every so often; they sleep in the Lair and are paid at <b>payday</b>.', when: { type: 'creatures', n: 1 } },
       { text: 'Look south: a lone <b>Knight</b> stands in the Hero Gate cavern, shut out by the rock. He cannot reach you until you dig through, and then he attacks <b>at once</b>. With a creature at your side, tag this last stretch of earth and let him in.', tool: 'dig', at: [9, 11, 12, 11], when: { type: 'gate' } },
-      { text: 'The tunnel is open and the Knight is coming! Your creatures will fight him. The <b>✋ Hand</b> lets you pick one up and drop it right where it is needed.', tool: 'hand', when: { type: 'survive' } },
+      { text: 'The tunnel is open and the Knight is coming! Your creatures will fight him. <b>Left-click</b> one to pick it up and click again to drop it right where it is needed. A right-click cancels any tool you are holding.', tool: 'dig', when: { type: 'survive' } },
     ],
     victory: 'The Knight is dead. You have learnt the first lesson of dungeon keeping.',
   };
@@ -116,7 +116,7 @@
       { text: 'Dig east to the <b>Portal</b> and claim it. The rock ridges have gaps: tunnel through them.', tool: 'dig', when: { type: 'portal' } },
       { text: 'Every creature needs a bed, and a Lair tile is one bed: your army can be no bigger than your Lair. Build a <b>Lair</b> and a <b>Treasury</b> in your cavern: rooms need your claimed floor. Only Goblins, Spiders and Flies come to a bare Lair; a Treasury of 3 tiles draws Trolls too (see <b>Monsters</b> &gt; <i>Who will come</i>).', tool: 'lair', when: { type: 'room', room: 'lair', n: 5 } },
       { text: 'A creature steps through every 25 seconds. They grow angry without a bed or wages: <b>payday</b> comes every 90 seconds. Check their moods in the task board below.', when: { type: 'creatures', n: 5 } },
-      { text: 'Creatures level up from fights. When you are ready, tunnel south to the Hero Gate. The <b>✋ Hand</b> can drop creatures into a fight.', when: { type: 'gate' } },
+      { text: 'Creatures level up from fights. When you are ready, tunnel south to the Hero Gate. Left-click a creature to pick it up, click again to drop it into a fight.', when: { type: 'gate' } },
     ],
   };
 

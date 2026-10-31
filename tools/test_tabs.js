@@ -37,6 +37,7 @@ const ROOMS = ['treasury', 'lair', 'library', 'hatchery', 'temple', 'prison', 't
     let page = await open('level=classic', 1500, 1300);
     let v = await visible(page);
     check('closed: only Dig, the three tabs and the speed buttons are in view', v.join() === 'b_dig,tab_build,tab_spells,tab_monsters,b_sp1,b_sp2,b_sp3,b_sp4', v.join());
+    check('the help scroll\'s text fits its 152 px panel without scrolling', await page.evaluate(() => { const h = document.getElementById('help'); return h.scrollHeight <= h.clientHeight; }), await page.evaluate(() => { const h = document.getElementById('help'); return h.scrollHeight + '/' + h.clientHeight; }));
     check('the commands are all still there, just hidden (ids unchanged)', await page.evaluate((ids) => ids.every(id => document.getElementById('b_' + id)), [...ROOMS, ...DEF, ...SPELLS, 'hand', 'dig', 'sp1']));
     check('the panel is closed and the tabs say so', await page.evaluate(() => getComputedStyle(document.getElementById('tabpanel')).display === 'none' && ['build', 'spells', 'monsters'].every(t => document.getElementById('tab_' + t).getAttribute('aria-expanded') === 'false')));
 
@@ -94,7 +95,7 @@ const ROOMS = ['treasury', 'lair', 'library', 'hatchery', 'temple', 'prison', 't
     await page.evaluate(() => { __game.G.guideStep = 7; }); await sleep(500);
     check('a Dig hint pulses Dig and leaves the tab as it is, without a stray pulse on the others', await page.evaluate(() => document.getElementById('b_dig').classList.contains('hint') && !document.getElementById('tab_build').classList.contains('hint')));
     await page.evaluate(() => { __game.G.guideStep = 10; }); await sleep(500);
-    check('the last hint (the Hand) opens Monsters', await page.evaluate(() => document.getElementById('tab_monsters').classList.contains('open') && document.getElementById('b_hand').classList.contains('hint')));
+    check('the last hint (pick a creature up with a click, in the default mode) pulses Dig / grab and no longer needs the Monsters tab', await page.evaluate(() => document.getElementById('b_dig').classList.contains('hint') && /pick it up/.test(document.getElementById('guideText').textContent)));
     await page.context().close();
 
     console.log('6. the Monsters tab');

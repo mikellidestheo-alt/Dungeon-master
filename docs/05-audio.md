@@ -41,7 +41,7 @@ audio.js   voices (V)  ->  per-play gain + stereo pan  ->  sfx bus ----+
 | Voice id | Played when |
 |---|---|
 | `click` | any HUD button |
-| `tag` / `untag` | digging tiles tagged / untagged |
+| `tag` / `untag` | digging tiles tagged / untagged; `untag` is also the soft sound of a right-click cancelling a tool |
 | `deny` | a refused cast or build (locked, no mana, on cooldown, no target) |
 | `build` | rooms, doors or traps placed |
 | `coins` / `coin` / `payday` | imp drops gold in a Treasury / a gem seam pays out / payday |

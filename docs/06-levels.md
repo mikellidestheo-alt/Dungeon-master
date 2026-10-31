@@ -46,7 +46,7 @@ keeper. Winning means beating every wave; losing means the Dungeon Heart falls.
                                                                                 // food: true (default) = the Hatchery limits your army (see "How many creatures you can keep"); false = beds only
 
   objectives: [ { type: 'room', room: 'treasury', n: 2 }, { type: 'survive' } ],   // optional, see "Objectives"
-  guide: [ { text: 'Choose <b>Dig</b>...', tool: 'dig', at: [9, 5, 12, 5], when: { type: 'dug', n: 4 } } ],   // optional, see "The guide"
+  guide: [ { text: '<b>Dig / grab</b> is chosen...', tool: 'dig', at: [9, 5, 12, 5], when: { type: 'dug', n: 4 } } ],   // optional, see "The guide"
 }
 ```
 `terrain`, `heart` (a grid's `H`) and `start` are required. **`portal`, `gates` and `waves` are optional**: a level with no Hero Gate
@@ -85,7 +85,7 @@ ticks them off, and the victory text is `LV.victory` if the level sets one.
 `guide` is a list of tutorial steps, shown one at a time in a parchment banner at the bottom of the dungeon view:
 
 ```js
-{ text: 'Choose <b>Dig</b> and drag over the earth east of your Heart.',   // HTML allowed
+{ text: 'Drag over the earth east of your Heart.',   // HTML allowed
   tool: 'dig',               // optional: the toolbar button with this id (dig, treasury, lair, door, ...) pulses; if it lives in a tab (Buildings, Spells, Monsters) that tab opens and pulses too
   at: [9, 5, 12, 5],         // optional: a pulsing marker on that tile [x, y] or box [x0, y0, x1, y1]
   when: { type: 'dug', n: 4 } }   // optional: any objective condition. Without it the step shows a "Got it" button.
