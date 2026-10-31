@@ -2,7 +2,7 @@
  * the difficulty rises through data alone:
  *
  *   #   chapter                 new                    waves  hero x  prep  gap   Gates  start unlock
- *   1   The Awakening           dig, mine, claim, build   1     0.50   180   110    1     nothing
+ *   1   The Awakening           dig, mine, claim, build   1     0.50    -    110    1     nothing   (its Knight waits on the Gate pad: no countdown)
  *   2   Creatures of the Dark   the Portal                3     0.70   160   110    1     nothing
  *   3   Mouths to Feed          Hatchery                  4     0.90   120   110    1     nothing
  *   4   The Library             research                  4     1.05   100   100    1     nothing (you research Gas Trap, Heal)
@@ -13,7 +13,7 @@
  *   9   The Siege               Prince, Stone Knight      8     1.20    70   100    2     everything
  *   10  The King's Crusade      the King; three Gates    10     1.30    60    90    3     everything
  *
- * "hero x" is waves.heroMult, "prep" the seconds from the first linked Gate to wave 1, "gap" the seconds between waves.
+ * "hero x" is waves.heroMult, "prep" the seconds from the first linked Gate to wave 1 (none in the Tutorial: waves.waiting), "gap" the seconds between waves.
  * The maps are text grids (legend in levels.js). Ridges of rock (#) with gaps cut each map into chambers, so every tunnel to a Gate has
  * choke points for doors and traps. tools/test_chapters.js checks that every chapter validates and teaches what the table says;
  * tools/test_bots.js plays every chapter with scripted players to check that each is winnable but not trivial (docs/06-levels.md, "Balance").
@@ -25,7 +25,7 @@
 
   L.tutorial = {
     id: 'tutorial', name: 'The Awakening', seed: 101, tagline: 'Dig, mine, build. One lone Knight.',
-    briefing: 'You wake beneath the mountain and your Dungeon Heart beats again. Command your imps: dig east, mine the gold seam, bank the gold in a Treasury and make a Lair. Then claim the purple Portal so that creatures come to serve you, and tunnel south to the Hero Gate. A lone Knight is on his way; be ready for him.',
+    briefing: 'You wake beneath the mountain and your Dungeon Heart beats again. Command your imps: dig east, mine the gold seam, bank the gold in a Treasury and make a Lair. Then claim the purple Portal so that creatures come to serve you, and tunnel south to the Hero Gate. A lone Knight already stands in the Hero Gate cavern, shut out by the rock; the moment your tunnel reaches him he will attack, so raise a creature first.',
     stars: { heart: 0.5 },
     terrain: { grid: [
       '##############################',
@@ -47,7 +47,7 @@
       '##############################'
     ] },
     start: { gold: 800, mana: 300, imps: 3, unlock: 'none', research: null, pretag: [], welcome: 'Welcome, Keeper. Follow the hints at the bottom of the view.' },
-    waves: { prep: 180, interval: 110, scale: 0, heroMult: 0.5, plan: W('K') },
+    waves: { waiting: true, prep: 0, interval: 110, scale: 0, heroMult: 0.5, plan: W('K') },     // waiting: the Knight is on the Gate pad from the first second; linking the Gate releases him at once
     rules: { heartHp: 3000 },
     objectives: [
       { type: 'dug', n: 5, text: 'Dig out 5 tiles of earth and gold' },
@@ -68,8 +68,8 @@
       { text: 'Creatures need beds. Choose <b>Lair</b> and drag over two more floor tiles.', tool: 'lair', at: [2, 11, 3, 11], when: { type: 'room', room: 'lair', n: 2 } },
       { text: 'Now dig east to the purple <b>Portal</b>. Once your imps claim it, creatures will arrive to fight for you.', tool: 'dig', at: [13, 8, 20, 8], when: { type: 'portal' } },
       { text: 'The Portal is yours. A new creature will step through every so often; they sleep in the Lair and are paid at <b>payday</b>.', when: { type: 'creatures', n: 1 } },
-      { text: 'Heroes come from the <b>Hero Gate</b> in the south, but only once your dungeon is linked to it. One weak Knight is coming. Dig a tunnel from your cavern to the Gate when you are ready.', tool: 'dig', at: [9, 11, 12, 11], when: { type: 'gate' } },
-      { text: 'The Knight arrives soon! Your creatures will fight him. The <b>✋ Hand</b> lets you pick one up and drop it right where it is needed.', tool: 'hand', when: { type: 'survive' } },
+      { text: 'Look south: a lone <b>Knight</b> stands in the Hero Gate cavern, shut out by the rock. He cannot reach you until you dig through, and then he attacks <b>at once</b>. With a creature at your side, tag this last stretch of earth and let him in.', tool: 'dig', at: [9, 11, 12, 11], when: { type: 'gate' } },
+      { text: 'The tunnel is open and the Knight is coming! Your creatures will fight him. The <b>✋ Hand</b> lets you pick one up and drop it right where it is needed.', tool: 'hand', when: { type: 'survive' } },
     ],
     victory: 'The Knight is dead. You have learnt the first lesson of dungeon keeping.',
   };

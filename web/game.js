@@ -133,7 +133,8 @@ function validateLevel(lv) {
   need(plan.length || endless || objs.some(o => !o.optional), 'the level needs a way to win: a non-empty waves.plan or some objectives');
   need(!(plan.length || endless) || gates.length, 'waves need at least one Hero Gate for the heroes to arrive from');
   plan.forEach((wv, i) => wv.forEach(nm => need(HEROES.some(k => k.name === nm), 'wave ' + (i + 1) + ': no hero called ' + nm)));
-  need(!lv.waves || (lv.waves.prep >= 0 && lv.waves.interval > 0), 'waves.prep and waves.interval'); need(lv.start && typeof lv.start.gold === 'number', 'start.gold'); need(lv.rules && lv.rules.heartHp > 0, 'rules.heartHp');
+  need(!lv.waves || (lv.waves.prep >= 0 && lv.waves.interval > 0), 'waves.prep and waves.interval');
+  if (lv.waves && lv.waves.waiting !== undefined) { need(typeof lv.waves.waiting === 'boolean', 'waves.waiting must be true or false'); need(!lv.waves.waiting || (plan.length && !endless), 'waves.waiting needs a waves.plan (and cannot be endless): wave 1 is the party that waits'); } need(lv.start && typeof lv.start.gold === 'number', 'start.gold'); need(lv.rules && lv.rules.heartHp > 0, 'rules.heartHp');
   if (lv.stars) { need(lv.stars.heart === undefined || (lv.stars.heart > 0 && lv.stars.heart <= 1), 'stars.heart must be between 0 and 1'); need(lv.stars.par === undefined || lv.stars.par > 0, 'stars.par must be positive seconds'); }
   const cond = (c, where) => {                                   // an objective or a guide condition
     const d = c && COND[c.type]; if (!d) { errs.push(where + ': unknown condition type "' + (c && c.type) + '"'); return; }
@@ -635,6 +636,7 @@ class Hero extends Mover {
       if (ally) { const amt = this.healAmt || 22; ally.hp = Math.min(ally.maxHp, ally.hp + amt); this.healCd = this.healEvery || 2.5; G.fx.push({ x: ally.x, y: ally.y - 0.4, txt: '+' + amt, life: 0.7, color: '#8fffa0' }); G.fx.push({ x: ally.x, y: ally.y, ring: true, r: 0.9, color: '#8fffa0', life: 0.5, max: 0.5 }); }
     }
     if (fightBrain(this, dt)) return;
+    if (this.waiting) return;                                                                         // waves.waiting: stands on the pad until the Gate is linked
     if (dist(this, heartTarget) <= this.range + 1.5 && los(this.x, this.y, heartTarget.x, heartTarget.y)) {   // the objective: KILL_PLAYER
       this.path = null; this.face = Math.atan2(heartTarget.y - this.y, heartTarget.x - this.x); if (this.cd <= 0) strike(this, heartTarget); return;
     }
@@ -645,33 +647,43 @@ class Hero extends Mover {
     if (this.blocker && !this.blocker.dead) { this.face = Math.atan2(this.blocker.y - this.y, this.blocker.x - this.x); if (this.cd <= 0) strike(this, this.blocker); }   // smash the door
   }
 }
-function spawnWave() {
-  const n = G.wave, scale = (1 + LV.waves.scale * n) * (LV.waves.heroMult || 1);
-  const kinds = waveNames(n).map(nm => HEROES.find(h => h.name === nm));
-  /* The wave comes out of every linked Hero Gate: its heroes are dealt out between them (the wave is no bigger, it is split), starting
-   * from a different gate each wave so the boss does not always arrive at the same one. Each gate's group has its own leader. If the
-   * level flags the invasion as open without any gate linked (tests), the first gate is used. */
-  let gates = G.gates.filter(g => g.open); if (!gates.length) gates = [G.gate];
-  const parties = gates.map(() => []);
+/* Builds wave n's party and deals it out between the given Hero Gates (starting from a different gate each wave so the boss does not always arrive
+ * at the same one; each gate's group has its own leader). `waiting` parks them on the pad, idle, until their Gate is linked (waves.waiting). */
+function makeParty(n, gates, waiting) {
+  const scale = (1 + LV.waves.scale * n) * (LV.waves.heroMult || 1), kinds = waveNames(n).map(nm => HEROES.find(h => h.name === nm)), parties = gates.map(() => []);
   kinds.forEach((kind, j) => {
     const gi = (j + n) % gates.length, gt = gates[gi], party = parties[gi], slot = party.length;
-    const h = new Hero(gt.x - 1 + (slot % 3), gt.y - 1 + ((slot / 3) | 0), kind, scale, party); h.homeGate = gt; party.push(h); G.heroes.push(h);
+    // a waiting party fills the pad from the front (the side facing the camera) so the Gate's big sprite does not hide it
+    const ox = slot % 3, oy = (slot / 3) | 0, h = new Hero(waiting ? gt.x + 1 - ox : gt.x - 1 + ox, waiting ? gt.y + 1 - oy : gt.y - 1 + oy, kind, scale, party); h.homeGate = gt; h.waiting = !!waiting; party.push(h); G.heroes.push(h);
   });
+  return kinds;
+}
+function spawnWave() {
+  const n = G.wave;
+  /* The wave comes out of every linked Hero Gate: its heroes are dealt out between them (the wave is no bigger, it is split). If the
+   * level flags the invasion as open without any gate linked (tests), the first gate is used. */
+  let gates = G.gates.filter(g => g.open); if (!gates.length) gates = [G.gate];
+  const kinds = makeParty(n, gates, false);
   if (window.Sound) Sound.stinger(kinds[0].boss ? 'boss' : 'wave');
   G.wave++; G.nextWave = G.wave < VAR.WAVES ? G.time + waveInterval(n) : Infinity;
   say('⚔ ' + waveText() + ': ' + kinds.length + ' heroes pour out of ' + (gates.length > 1 ? 'the ' + gates.length + ' Hero Gates' : 'the Hero Gate') + (kinds[0].boss ? ', led by the ' + kinds[0].name + '!' : '!'));
 }
 function heroLogic(dt) {
   if (!G.gates.length) return;
-  if (G.gates.some(g => !g.open)) {                    // every 2 s: has a tunnel reached a Gate that was still shut?
+  if (G.gates.some(g => !g.open)) {                    // every 2 s (every half second while heroes stand waiting): has a tunnel reached a Gate that was still shut?
     G.gateT -= dt;
     if (G.gateT <= 0) {
-      G.gateT = 2;
+      G.gateT = G.heroes.some(h => h.waiting) ? 0.5 : 2;
       G.gates.forEach((gt, i) => {
         if (gt.open || !findPath(gt.x, gt.y, G.heart.x, G.heart.y)) return;
         gt.open = true; sfx('gong');
-        if (!G.gateOpen) { G.gateOpen = true; G.nextWave = G.time + VAR.FIRST_WAVE_DELAY;       // the first link starts the invasion clock
-          say('The Hero Gate is linked to your dungeon! Heroes will invade in ' + VAR.FIRST_WAVE_DELAY + 's.'); }
+        const freed = G.heroes.filter(h => h.waiting && h.homeGate === gt); for (const h of freed) h.waiting = false;       // waves.waiting: the party on the pad has its way in
+        if (freed.length && window.Sound) Sound.stinger(freed.some(h => h.boss) ? 'boss' : 'wave');
+        if (!G.gateOpen) { G.gateOpen = true;
+          if (WV.waiting) { G.wave = 1; G.nextWave = G.wave < VAR.WAVES ? G.time + waveInterval(0) : Infinity;                // the party that was waiting is wave 1: no countdown
+            say('⚔ The Hero Gate is linked to your dungeon! ' + freed.length + ' hero' + (freed.length > 1 ? 'es' : '') + ' attack' + (freed.length > 1 ? '' : 's') + ' at once!'); }
+          else { G.nextWave = G.time + VAR.FIRST_WAVE_DELAY;                                                                    // the first link starts the invasion clock
+            say('The Hero Gate is linked to your dungeon! Heroes will invade in ' + VAR.FIRST_WAVE_DELAY + 's.'); } }
         else say('Hero Gate ' + (i + 1) + ' is linked too: heroes will now arrive there as well.');
       });
     }
@@ -1226,7 +1238,7 @@ function renderHud() {
   for (const id of SPELL_ORDER) $('b_' + id).style.opacity = G.mana >= SPELLS[id].cost && !(G.spellCd[id] > 0) ? 1 : 0.45;
   for (const id in RESEARCH) { const b = $('b_' + id); if (!isAvail(id)) { b.style.opacity = 0.3; b.title = 'Locked — research it in a Library'; } else { b.title = ''; if (!SPELLS[id]) b.style.opacity = ''; } }
   renderResearch(); renderObjectives(); renderGuide(); renderEnd(); syncHandCursor(); renderRoster();
-  $('hHeart').textContent = Math.ceil(G.heartHp); $('hHeroes').textContent = G.heroes.length; $('hWave').textContent = !VAR.WAVES ? '—' : VAR.WAVES === Infinity ? G.wave + ' / ∞' : G.wave + '/' + VAR.WAVES;
+  $('hHeart').textContent = Math.ceil(G.heartHp); $('hHeroes').textContent = G.heroes.filter(h => !h.waiting).length; $('hWave').textContent = !VAR.WAVES ? '—' : VAR.WAVES === Infinity ? G.wave + ' / ∞' : G.wave + '/' + VAR.WAVES;
   $('hNext').textContent = !VAR.WAVES ? '—' : !G.gateOpen ? 'tunnel to Gate' : G.nextWave === Infinity ? '—' : Math.max(0, Math.ceil(G.nextWave - G.time)) + 's' + (G.gates.length > 1 ? ' · gates ' + G.gates.filter(g => g.open).length + '/' + G.gates.length : '');
   let dig = 0, claim = 0, busy = 0, upkeep = 0; for (const t of G.tasks.values()) { if (t.type === 'DIG') dig++; else if (t.type === 'CLAIM') claim++; else upkeep++; if (t.who.size) busy++; }
   const mood = G.creatures.map(c => c.name + ' #' + c.id + ' Lv' + c.level + ' ' + Math.ceil(c.hp) + '/' + c.maxHp + 'hp: ' + c.mood + (c.lair || c.noLair ? '' : ' (no bed)')).join('<br>');
@@ -1316,7 +1328,12 @@ function applyStart() {                                                         
   for (let i = 0; i < (st.imps === undefined ? 3 : st.imps); i++) G.imps.push(new Imp(G.heart.x - 1 + i, G.heart.y + 2));
   say(st.welcome || 'Welcome, Keeper.');
 }
-buildMap(); scanTasks(); applyStart();
+function placeWaiting() {                                                            // waves.waiting: wave 1 is already standing on the Gate pad(s), shut out by the rock, and attacks the moment a tunnel links its Gate
+  if (!WV.waiting || !G.gates.length || !WAVE_PLAN.length || WV.endless) return;
+  const kinds = makeParty(0, G.gates, true), who = kinds.length > 1 ? kinds.length + ' heroes wait' : 'A ' + kinds[0].name + ' waits';
+  say(who + ' at the Hero Gate, shut out by the rock. A tunnel to your Heart lets ' + (kinds.length > 1 ? 'them' : 'him') + ' in.');
+}
+buildMap(); scanTasks(); applyStart(); placeWaiting();
 const LEVEL_ERRORS = validateLevel(LV); if (LEVEL_ERRORS.length) console.warn('Level "' + LV.id + '" has problems:\n - ' + LEVEL_ERRORS.join('\n - '));
 refreshButtons();
 if (qs.get('brief') === '1') showBriefing();
@@ -1324,7 +1341,7 @@ if (qs.get('brief') === '1') showBriefing();
 /* What the score should feel: calm until invaders are alive and awake, then tension grows with their number and their distance to the
  * Heart; a boss alive pins it high and brings the brass and timpani in (see Music in audio.js). A quiet dread precedes each wave. */
 function audioMood() {
-  const live = G.heroes.filter(h => !h.dead && !h.unconscious && h.state !== 'flee');
+  const live = G.heroes.filter(h => !h.dead && !h.unconscious && h.state !== 'flee' && !h.waiting);       // a hero waiting behind the rock is no threat yet
   let tension = 0, boss = 0;
   if (live.length) {
     let near = Infinity; for (const h of live) near = Math.min(near, Math.hypot(h.x - G.heart.x, h.y - G.heart.y));

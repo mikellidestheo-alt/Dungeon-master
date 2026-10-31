@@ -35,6 +35,7 @@ keeper. Winning means beating every wave; losing means the Dungeon Heart falls.
   waves: {
     endless: false,              // true = no plan: generated waves that never stop (see "The sandbox and endless mode")
     prep: 75,                    // seconds from linking the Hero Gate to the first wave
+    waiting: false,              // true = wave 1 is already standing on the Gate pad from the first second (see "A party that waits at the Gate")
     interval: 110,               // seconds between waves
     scale: 0.12,                 // each wave's heroes are this much stronger than the last (1 + scale * waveNumber)
     heroMult: 1,                 // multiplies every hero's strength: the main difficulty dial
@@ -106,6 +107,21 @@ joins it to your Heart. Rules:
 - 3D: every Gate has its own sprite and light, dim until linked, glowing once linked.
 - Sandbox: `&gates=2` adds a second hero cavern and Gate in the north of the classic map (the sandbox page has a "Two Gates" switch).
 
+## A party that waits at the Gate
+
+`waves.waiting: true` turns the first wave into a party that is **already there**. When the level opens, wave 1's heroes stand on the
+Hero Gate's pad, idle and visible in both views, shut out by the rock: they have no path to you, so they cannot walk. The moment a
+tunnel links their Gate (the check runs twice a second while anyone waits) they are released and attack: there is no countdown, the
+wave horn sounds and the log says so. Details:
+
+- The waiting party **is wave 1**. `G.wave` stays 0 until the link, then becomes 1, and `waves.interval` is the gap before wave 2.
+  `waves.prep` is not used (the Tutorial sets 0); `survive` and the `wave` objective count it like any wave.
+- With several Gates the party is dealt out between *all* of them; each Gate's heroes are released when that Gate is linked.
+- A waiting hero still fights what comes to him (a creature you drop into the cavern with the Hand), but never walks to your Heart.
+- Waiting heroes are not counted in the HUD's "heroes" figure and do not tense the music; the score turns tense when they are released.
+- `validateLevel` requires a non-empty `waves.plan` and rejects `endless` (the sandbox's generated waves have no wave 1 to place).
+- Only the Tutorial uses it. It works for any chapter with a plain edit of the data: `waiting: true`.
+
 ## The campaign
 
 The ten chapters live in `web/chapters.js` (loaded after `levels.js`), which also sets `window.CAMPAIGN`, their order. Each teaches one
@@ -113,7 +129,7 @@ thing, and the difficulty rises through data alone:
 
 | # | id | chapter | new | waves | hero x | prep | gap | Gates | unlocked at the start |
 |---|---|---|---|---|---|---|---|---|---|
-| 1 | `tutorial` | The Awakening | dig, mine, claim, Treasury, Lair, Portal; one weak Knight | 1 | 0.50 | 180 | 110 | 1 | nothing |
+| 1 | `tutorial` | The Awakening | dig, mine, claim, Treasury, Lair, Portal; one weak Knight, waiting at the Gate | 1 | 0.50 | - (waits) | 110 | 1 | nothing |
 | 2 | `portal` | Creatures of the Dark | the Portal, beds, wages | 3 | 0.70 | 160 | 110 | 1 | nothing |
 | 3 | `hatchery` | Mouths to Feed | hunger, the Hatchery | 4 | 0.90 | 120 | 110 | 1 | nothing |
 | 4 | `library` | The Library | research (you study Gas Trap and Heal) | 4 | 1.05 | 100 | 100 | 1 | nothing |
@@ -124,9 +140,9 @@ thing, and the difficulty rises through data alone:
 | 9 | `siege` | The Siege | **Prince**, **Stone Knight** | 8 | 1.20 | 70 | 100 | 2 | everything |
 | 10 | `crusade` | The King's Crusade | the **King**; three entrances | 10 | 1.30 | 60 | 90 | 3 | everything |
 
-"hero x" is `waves.heroMult`, "prep" the seconds from the first linked Gate to wave 1, "gap" the seconds between waves. Starting gold rises
+"hero x" is `waves.heroMult`, "prep" the seconds from the first linked Gate to wave 1 (the Tutorial has none: its Knight waits at the Gate and attacks the moment you link it), "gap" the seconds between waves. Starting gold rises
 from 800 to 2500. `waves.scale` (extra strength per wave) is a balancing dial, 0 to 0.14: it is higher where a chapter's early waves are light.
-The Heart shrinks from 3000 to 2500 by chapter 5. Parties never exceed the Gate pad's nine heroes. **Length targets**: the Tutorial 5-8
+The Heart shrinks from 3000 to 2500 by chapter 5. Parties never exceed the Gate pad's nine heroes. **Length targets**: the Tutorial 3-5
 minutes, chapters 2-4 10-12, 5-7 12-16, 8-9 16-22, the finale 22-28, about 2.5-3 hours in all (see "Balance" for how that was checked).
 
 Things every chapter shares:

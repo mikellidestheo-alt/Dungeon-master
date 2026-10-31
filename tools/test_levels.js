@@ -39,6 +39,7 @@ const sleep = (ms) => new Promise(r => setTimeout(r, ms));
       out.noHeart = bad(l => { l.heart = null; }); out.badHero = bad(l => { l.waves.plan[0] = ['Goblin Lord']; }); out.noGate = bad(l => { l.gates = []; });
       out.ragged = (() => { const lv = JSON.parse(JSON.stringify(g.LEVEL_TABLE.tiny)); lv.terrain.grid[3] = lv.terrain.grid[3].slice(1); return g.validateLevel(lv); })();
       out.noWaves = bad(l => { l.waves.plan = []; });
+      out.waitStr = bad(l => { l.waves.waiting = 'yes'; }); out.waitEmpty = bad(l => { l.waves.waiting = true; l.waves.plan = []; l.waves.endless = true; }); out.waitOk = bad(l => { l.waves.waiting = true; });
       return out;
     });
     check('levels present: ' + v.levels.join(', '), v.levels.includes('classic') && v.levels.includes('tiny'));
@@ -48,6 +49,7 @@ const sleep = (ms) => new Promise(r => setTimeout(r, ms));
     check('no Hero Gate is reported', v.noGate.some(e => /Hero Gate/.test(e)));
     check('ragged grid is reported', v.ragged.some(e => /grid row/.test(e)));
     check('empty wave plan is reported', v.noWaves.some(e => /waves.plan/.test(e)));
+    check('waves.waiting must be a boolean, needs a plan and cannot be endless; a plain true is fine', v.waitStr.some(e => /waves.waiting must be/.test(e)) && v.waitEmpty.some(e => /waves.waiting needs a waves.plan/.test(e)) && v.waitOk.length === 0, JSON.stringify([v.waitStr, v.waitEmpty, v.waitOk]));
     await page.close();
 
     console.log('2. classic equals the original level');

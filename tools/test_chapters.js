@@ -60,11 +60,11 @@ const IDS = ['tutorial', 'portal', 'hatchery', 'library', 'traps', 'prison', 'te
     check('a roomy home cavern in every map', maps.every(m => m.keeperFloor >= 40), maps.map(m => m.keeperFloor).join());
 
     console.log('3. the difficulty curve');
-    const cur = await page.evaluate((IDS) => IDS.map(id => { const lv = window.__game.LEVEL_TABLE[id], w = lv.waves; return { waves: w.plan.length, mult: w.heroMult, prep: w.prep, gap: w.interval, scale: w.scale, heart: lv.rules.heartHp, gold: lv.start.gold, size: w.plan.reduce((n, p) => n + p.length, 0), maxParty: Math.max(...w.plan.map(p => p.length)) }; }), IDS);
+    const cur = await page.evaluate((IDS) => IDS.map(id => { const lv = window.__game.LEVEL_TABLE[id], w = lv.waves; return { waves: w.plan.length, waiting: !!w.waiting, mult: w.heroMult, prep: w.prep, gap: w.interval, scale: w.scale, heart: lv.rules.heartHp, gold: lv.start.gold, size: w.plan.reduce((n, p) => n + p.length, 0), maxParty: Math.max(...w.plan.map(p => p.length)) }; }), IDS);
     const up = (k, from = 0) => cur.every((c, i) => i <= from || c[k] >= cur[i - 1][k]), down = (k, from = 0) => cur.every((c, i) => i <= from || c[k] <= cur[i - 1][k]);
     check('waves per chapter rise: 1, 3, 4, 4, 5, 6, 6, 7, 8, 10', cur.map(c => c.waves).join() === '1,3,4,4,5,6,6,7,8,10', cur.map(c => c.waves).join());
     check('hero strength never falls: x0.5 ... x1.3', up('mult') && cur[0].mult === 0.5 && cur[9].mult === 1.3, cur.map(c => c.mult).join());
-    check('preparation never grows: 180 s down to 60 s', down('prep') && cur[0].prep === 180 && cur[9].prep === 60, cur.map(c => c.prep).join());
+    check('preparation never grows from chapter 2 on: 160 s down to 60 s; the Tutorial has none because its Knight is already waiting at the Gate', down('prep', 1) && cur[1].prep === 160 && cur[9].prep === 60 && cur[0].waiting && cur[0].prep === 0 && cur.slice(1).every(c => !c.waiting), cur.map(c => c.prep).join());
     check('the gap between waves never grows: 110 down to 90', down('gap') && cur[0].gap === 110 && cur[9].gap === 90, cur.map(c => c.gap).join());
     check('extra strength per wave stays between 0 and 0.15 (it is also used to balance chapters whose waves are heavy early or late)', cur.every(c => c.scale >= 0 && c.scale <= 0.15), cur.map(c => c.scale).join());
     check('the Heart is tougher in the early chapters, never above 3000', cur[0].heart === 3000 && cur.every(c => c.heart <= 3000) && down('heart'), cur.map(c => c.heart).join());
@@ -108,6 +108,8 @@ const IDS = ['tutorial', 'portal', 'hatchery', 'library', 'traps', 'prison', 'te
     const play = await page.evaluate(() => {
       const g = window.__game, G = g.G, out = { steps: [], marks: [] }, run = (secs, until) => { for (let s = 0; s < secs && !G.over; s += 0.05) { g.step(0.05); if (until && until()) return true; } return !!(until && until()); };
       const mark = (what) => out.marks.push([what, Math.round(G.time), G.guideStep]);
+      const k0 = G.heroes[0], gt = G.gates[0];                                           // the Knight waiting on the pad from the first second
+      out.wait = { n: G.heroes.length, name: k0 && k0.name, waiting: !!(k0 && k0.waiting), onPad: !!k0 && Math.abs(k0.x - gt.x) <= 1.6 && Math.abs(k0.y - gt.y) <= 1.6, hud: G.heroes.filter(h => !h.waiting).length, wave: G.wave, tension: g.audioMood().tension, log: G.log.some(m => /waits at the Hero Gate/.test(m)), x: k0.x, y: k0.y };
       mark('start'); G.guideStep++;                                                       // "Got it"
       g.tagRect(9, 8, 11, 8, true); run(60, () => G.stats.dug >= 3); mark('dug 3');
       g.tagRect(12, 8, 12, 8, true); run(60, () => G.stats.dug >= 4 && G.stats.claimed >= 3); mark('seam, claimed');
@@ -116,17 +118,23 @@ const IDS = ['tutorial', 'portal', 'hatchery', 'library', 'traps', 'prison', 'te
       g.build(g.T.LAIR, 2, 11, 3, 11); run(2); mark('lair');
       g.tagRect(13, 8, 20, 8, true); run(120, () => G.portalOwned); mark('portal');
       run(60, () => G.creatures.length >= 1); mark('first creature');
+      out.still = { dx: Math.hypot(k0.x - out.wait.x, k0.y - out.wait.y), hp: k0.hp === k0.maxHp, tension: g.audioMood().tension, wave: G.wave, over: G.over };      // minutes later, still standing there, still calm
       g.tagRect(9, 11, 12, 11, true); out.gateAt = run(120, () => G.gateOpen); mark('gate linked'); out.guideAtGate = G.guideStep;
-      out.creaturesAtGate = G.creatures.length; const linked = G.time;
+      out.creaturesAtGate = G.creatures.length; const linked = G.time; out.rel = { waiting: k0.waiting, wave: G.wave, nextWave: G.nextWave, tension: g.audioMood().tension, hud: G.heroes.filter(h => !h.waiting).length };
+      run(1); out.moved = { path: !!k0.path || k0.state === 'fight', state: k0.state, d: Math.hypot(k0.x - out.wait.x, k0.y - out.wait.y) };      // one second after the link he is on his way
       out.won = run(400, () => G.over === 'victory'); mark('over'); out.over = G.over; out.since = Math.round(G.time - linked); out.heart = G.heartHp; out.kills = G.kills;
       out.guideEnd = G.guideStep; out.guideLen = g.GUIDE.length; out.done = Object.keys(G.objDone).length; out.nobj = g.OBJECTIVES.length; out.result = G.result; out.log = G.log.slice(0, 4);
       return out; });
     check('the script follows each guide step in order, never skipping ahead', play.marks.map(m => m[2]).every((v, i, a) => i === 0 || v >= a[i - 1]), JSON.stringify(play.marks));
     check('it reached the Portal, a creature and the Gate', play.gateAt && play.marks.some(m => m[0] === 'first creature'), JSON.stringify(play.marks.map(m => m[0] + '@' + m[1])));
-    check('the Knight came 180 s after the link and the level was won', play.won && play.over === 'victory' && play.since >= 180 && play.since < 330, `${play.since}s after the link`);
+    check('the Knight stood on the Gate pad from the first second: idle, counted by neither the HUD nor wave 0, and the score was calm', play.wait.n === 1 && play.wait.name === 'Knight' && play.wait.waiting && play.wait.onPad && play.wait.hud === 0 && play.wait.wave === 0 && play.wait.tension === 0 && play.wait.log, JSON.stringify(play.wait));
+    check('minutes later he had not moved a step or taken damage, and the score was still calm', play.still.dx === 0 && play.still.hp && play.still.tension === 0 && play.still.wave === 0 && !play.still.over, JSON.stringify(play.still));
+    check('the moment the tunnel linked the Gate he was released as wave 1 with no countdown, and the music turned tense', !play.rel.waiting && play.rel.wave === 1 && play.rel.nextWave === Infinity && play.rel.tension > 0.3 && play.rel.hud === 1, JSON.stringify(play.rel));
+    check('one second after the link he is walking towards the Heart', play.moved.path && play.moved.d > 0.3, JSON.stringify(play.moved));
+    check('the Knight was beaten within two minutes of the link and the level was won', play.won && play.over === 'victory' && play.since < 120, `${play.since}s after the link`);
     check('every one of the 7 objectives and all 11 guide steps were completed', play.done === 7 && play.nobj === 7 && play.guideEnd === play.guideLen, `${play.done}/${play.nobj}, guide ${play.guideEnd}/${play.guideLen}`);
     check('the Heart is untouched: three stars', play.result && play.result.stars === 3 && play.heart === 3000, `heart ${play.heart}, stars ${play.result && play.result.stars}`);
-    check('even a script that never hesitates needs 5 to 8 minutes of game time (a first-time player more)', play.result.time >= 300 && play.result.time <= 480, play.result.time + ' s (' + Math.round(play.result.time / 6) / 10 + ' min)');
+    check('even a script that never hesitates needs over a minute of game time (the countdown is gone, so a first-time player takes about 3 to 5)', play.result.time >= 60 && play.result.time <= 240, play.result.time + ' s (' + Math.round(play.result.time / 6) / 10 + ' min)');
     await page.close();
 
     check('no page errors or warnings in any run', problems.length === 0, problems.slice(0, 3).join(' | '));

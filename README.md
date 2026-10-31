@@ -59,7 +59,7 @@ completing its objectives (every chapter includes surviving all its waves) and l
 3. **Claim the Portal** by digging to it and letting your imps claim the floor. A creature arrives about every 25 seconds, up to 15.
 4. **Look after them.** Each creature needs a **Lair** tile to sleep in, **food** (a **Hatchery** raises chickens, they get hungry about every two minutes) and **wages** at every **payday** (every 90 seconds, 60 to 220 gold each; fifteen creatures cost about 1650 a payday). Unhappy creatures turn angry and eventually leave. The Task board shows every creature's mood.
 5. **Prepare.** Build what the chapter teaches: Library and research, Prison and Torture, Temple, doors and traps. The gaps in the rock ridges are natural choke points.
-6. **Open a Gate.** Tunnel to the red-tinted **Hero Gate** (a path of open floor from Gate to Heart). The first wave arrives after the chapter's preparation countdown. *Tip:* dig the whole tunnel except its last tile, set your doors and traps, and only then dig the last tile.
+6. **Open a Gate.** Tunnel to the red-tinted **Hero Gate** (a path of open floor from Gate to Heart). The first wave arrives after the chapter's preparation countdown (in the Tutorial the Knight is already standing in the Gate cavern and attacks the moment you break through). *Tip:* dig the whole tunnel except its last tile, set your doors and traps, and only then dig the last tile.
 7. **Fight.** Creatures fight on their own and level up from kills. You cast spells, move creatures with the Hand and keep a few imps alive (they re-arm traps and mend doors, and they run from heroes, so replace them with `5`). Heroes that get weak run back to their Gate and escape, so you will slay only a part of each wave.
 8. **Win or lose.** The end screen shows time, heroes slain, Heart left, and up to three stars. Next chapter, Retry and Chapters are one click away.
 
@@ -113,12 +113,13 @@ Tick as you go; write down anything surprising in the template at the end.
 - [ ] *Begin chapter* shows the briefing card with the right title, text and goals, and the game is paused behind it. *Begin* starts the game.
 - [ ] The sound controls on the menu work (the score plays after your first click; `M` mutes).
 
-**2. Chapter I, played as a stranger would** (target 5 to 8 minutes)
+**2. Chapter I, played as a stranger would** (target 3 to 5 minutes)
 
 - [ ] Can you tell what to do from the hint banner alone, at every step? Where did you hesitate? Is any hint wrong, late or missing?
 - [ ] Does the pulsing toolbar button and the gold marker on the map point at the right thing every time (including in the 3D view)?
 - [ ] Is the objective list (top left) readable and does it tick and count as you work?
 - [ ] Do you understand why you must claim the Portal, build a Lair, and what the countdown after tunnelling to the Gate means?
+- [ ] A Knight stands idle on the Hero Gate pad from the first second (3D and `?view=2d`), the score stays calm, and he does not move until the tunnel is open. Digging the last tile makes him attack at once, with the horn. Is it clear from the hints that you should raise a creature first?
 - [ ] Did the Knight feel like a lesson rather than a threat? Did you use the **Hand**? Did the Heart take any damage?
 - [ ] The victory screen shows three stars, *First victory!*, and Next chapter opens chapter II behind its briefing.
 
