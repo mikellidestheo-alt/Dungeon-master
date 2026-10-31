@@ -38,6 +38,7 @@ const sleep = (ms) => new Promise(r => setTimeout(r, ms));
       };
     };
 
+    const frames = (page, n = 4) => page.evaluate((n) => new Promise(r => { let k = 0; const f = () => (++k >= n ? r() : requestAnimationFrame(f)); requestAnimationFrame(f); }), n);       // wait for the render loop, whatever the machine's speed
     console.log('1. the numbers');
     let page = await open('level=classic&seed=7'); await page.evaluate(SETUP);
     const n = await page.evaluate(() => {
@@ -150,9 +151,10 @@ const sleep = (ms) => new Promise(r => setTimeout(r, ms));
     await sleep(500);
     const chip = await page.evaluate(() => { const c = document.querySelector('#roster .chip'); return c && { text: c.textContent.replace(/\s+/g, ' ').trim(), title: c.title, xp: c.querySelector('.xp u') && c.querySelector('.xp u').style.width, state: __game.G.creatures[0].state }; });
     check('the roster chip shows the level, an XP bar, and a tooltip with level, XP and wage', chip && /Troll 4/.test(chip.text) && /^\d+%$/.test(chip.xp) && /level 4 \(\d+\/100 XP\)/.test(chip.title) && /Wage \d+/.test(chip.title), JSON.stringify(chip));
+    await frames(page);
     const dummies = await page.evaluate(() => { let n = 0; __three.scene.traverse(o => { if (o.isGroup && o.userData && o.userData.pivot) n++; }); return { n, rooms: __game.G.map.filter(q => q.t === __game.T.TRAINING).length }; });
     check('3D: every Training Room tile has a dummy (built from primitives: no art exists yet)', dummies.n === dummies.rooms && dummies.n >= 3, JSON.stringify(dummies));
-    await page.evaluate(() => { __game.G.map.filter(q => q.t === __game.T.TRAINING).forEach(q => { q.t = __game.T.PATH; }); }); await sleep(400);
+    await page.evaluate(() => { __game.G.map.filter(q => q.t === __game.T.TRAINING).forEach(q => { q.t = __game.T.PATH; }); }); await frames(page);
     check('3D: the dummies go when the room does', await page.evaluate(() => { let n = 0; __three.scene.traverse(o => { if (o.isGroup && o.userData && o.userData.pivot) n++; }); return n === 0; }));
     await page.close();
     page = await open('level=classic&seed=7', '2d', false); await page.evaluate(SETUP);
