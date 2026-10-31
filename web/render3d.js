@@ -24,7 +24,7 @@ function start() {
   const canvas = document.createElement('canvas');
   const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });   // throws without WebGL -> caught above
   renderer.setPixelRatio(Math.min(2, window.devicePixelRatio || 1));
-  canvas.style.cssText = 'width:100%;display:block;border-radius:6px;touch-action:none;cursor:crosshair';
+  canvas.style.cssText = 'width:100%;display:block;border-radius:6px;touch-action:none';      // the cursor comes from cursor.css
   cv2d.style.display = 'none'; stage.appendChild(canvas);
 
   const scene = new THREE.Scene();

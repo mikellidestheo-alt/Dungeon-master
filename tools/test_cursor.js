@@ -1,0 +1,114 @@
+#!/usr/bin/env node
+/* Headless checks for the Keeper's-hand mouse cursor (web/cursor.css, web/assets/cursors/*, tools/make_cursors.py).
+ *   node tools/test_cursor.js     (needs playwright with chromium)
+ * A headless browser has no visible mouse pointer, so this checks what decides it: the images (real transparency, under the browsers'
+ * 128 px limit, hotspot inside), the CSS that the browser computes for every kind of element on the three pages, and the switch to the
+ * fist while a creature is carried.
+ *   1. the four PNGs: sizes, 2x is twice 1x, transparent background, an opaque hand, hotspots inside the image
+ *   2. cursor.css is the generated one and covers hand, fist and fallbacks; all four files are served
+ *   3. every page: the body, buttons, range sliders, locked buttons and canvases use the hand; a number field keeps the text cursor
+ *   4. carrying a creature switches to the fist; dropping it, its death or the end of the game switches back
+ */
+const { spawn } = require('child_process');
+const path = require('path');
+const fs = require('fs');
+const { chromium } = require('playwright');
+
+const PORT = process.env.PORT || 8774, ROOT = `http://localhost:${PORT}/`, WEB = path.join(__dirname, '..', 'web');
+let fails = 0;
+const check = (name, ok, detail) => { console.log((ok ? '  ok   ' : '  FAIL ') + name + (detail ? '  ' + detail : '')); if (!ok) fails++; };
+const sleep = (ms) => new Promise(r => setTimeout(r, ms));
+
+(async () => {
+  const server = spawn('python3', ['-m', 'http.server', '-d', WEB, String(PORT)], { stdio: 'ignore' });
+  const browser = await chromium.launch({ args: ['--no-sandbox', '--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist'] });
+  try {
+    await sleep(800);
+    const problems = [];
+    const open = async (url, query) => {
+      const page = await (await browser.newContext({ viewport: { width: 1500, height: 1000 } })).newPage();
+      page.on('pageerror', e => problems.push('pageerror: ' + e)); page.on('console', m => { if (['error', 'warning'].includes(m.type()) && !/GL Driver Message/.test(m.text())) problems.push(m.type() + ': ' + m.text()); });
+      page.on('response', r => { if (r.status() >= 400) problems.push(r.status() + ' ' + r.url()); });
+      await page.goto(ROOT + url + (query || ''), { waitUntil: 'load' }); await sleep(500); return page;
+    };
+
+    console.log('1. the images');
+    const page0 = await open('menu.html', '?sound=0');
+    const css = fs.readFileSync(path.join(WEB, 'cursor.css'), 'utf8');
+    const hot = (name) => { const m = css.match(new RegExp('url\\(assets/cursors/' + name + '\\.png\\) (\\d+) (\\d+)')); return m ? [+m[1], +m[2]] : null; };
+    const imgs = await page0.evaluate(async () => {
+      const out = {};
+      for (const n of ['hand', 'hand@2x', 'grab', 'grab@2x']) {
+        const im = new Image(); im.src = 'assets/cursors/' + n + '.png'; await im.decode(); const c = document.createElement('canvas'); c.width = im.width; c.height = im.height; const g = c.getContext('2d'); g.drawImage(im, 0, 0);
+        const d = g.getImageData(0, 0, c.width, c.height).data; let opaque = 0, clear = 0, partial = 0; for (let i = 3; i < d.length; i += 4) { if (d[i] > 240) opaque++; else if (d[i] < 8) clear++; else partial++; }
+        const corner = (x, y) => d[(y * c.width + x) * 4 + 3]; out[n] = { w: im.width, h: im.height, opaque, clear, partial, corners: [corner(c.width - 1, 0), corner(0, c.height - 1)] };      // top right and bottom left: always background (the wrist reaches the bottom right)
+      }
+      return out; });
+    for (const n of ['hand', 'grab']) {
+      const a = imgs[n], b = imgs[n + '@2x'], h = hot(n);
+      check(`${n}.png is under the 128 px limit and 2x is twice as large`, a.w <= 128 && a.h <= 128 && b.w <= 128 && b.h <= 128 && Math.abs(b.w - 2 * a.w) <= 1 && Math.abs(b.h - 2 * a.h) <= 1, `${a.w}x${a.h} / ${b.w}x${b.h}`);
+      check(`${n}.png has a real transparent background around an opaque hand`, a.clear > a.w * a.h * 0.3 && a.opaque > a.w * a.h * 0.25 && a.corners.every(v => v < 8), `clear ${a.clear}, opaque ${a.opaque}, partial ${a.partial} of ${a.w * a.h}`);
+      check(`${n} hotspot ${JSON.stringify(h)} is inside the image`, h && h[0] >= 0 && h[1] >= 0 && h[0] < a.w && h[1] < a.h);
+    }
+    check('the pointing hand is the taller, the fist the wider (they are different paintings at one scale)', imgs.hand.h > imgs.grab.h && imgs.grab.w >= imgs.hand.w, `${imgs.hand.w}x${imgs.hand.h} vs ${imgs.grab.w}x${imgs.grab.h}`);
+    const hh = hot('hand'), gh = hot('grab');
+    check('the hand points with its claw tip (top left) and the fist grips at the imp (inside the image, not at the corner)', hh[0] <= 3 && hh[1] <= 3 && gh[0] > 5 && gh[1] > 5, JSON.stringify([hh, gh]));
+
+    console.log('2. the stylesheet');
+    check('cursor.css is generated, has the hand, the fist, the 2x fallbacks and keeps a text cursor for number fields', /GENERATED by tools\/make_cursors\.py/.test(css) && /hand\.png/.test(css) && /grab\.png/.test(css) && /image-set\(/.test(css) && /input\[type=number\][^}]*text/.test(css));
+    check('every cursor image is served (and as a PNG)', (await page0.evaluate(async () => (await Promise.all(['hand', 'hand@2x', 'grab', 'grab@2x'].map(n => fetch('assets/cursors/' + n + '.png').then(r => r.ok && /png/.test(r.headers.get('content-type')))))).every(Boolean))));
+    check('the source paintings and the build script are in the repo', fs.existsSync(path.join(__dirname, 'source', 'cursor-hand.jpg')) && fs.existsSync(path.join(__dirname, 'source', 'cursor-grab.jpg')) && fs.existsSync(path.join(__dirname, 'make_cursors.py')));
+    await page0.context().close();
+
+    console.log('3. every page uses the hand');
+    const computed = (page, sel) => page.evaluate((sel) => { const el = document.querySelector(sel); return el ? getComputedStyle(el).cursor : null; }, sel);
+    const isHand = (c) => !!c && /hand(@2x)?\.png/.test(c) && !/crosshair|pointer|not-allowed/.test(c);
+    let page = await open('menu.html', '?sound=0&unlock=all');
+    const menu = { body: await computed(page, 'body'), chap: await computed(page, '.chap'), play: await computed(page, '#play'), sb: await computed(page, '#sandbox'), mute: await computed(page, '#bMute'), vol: await computed(page, '#vol') };
+    check('menu: the page, chapter cards, Play, the Sandbox link, mute and the volume sliders', Object.values(menu).every(isHand), JSON.stringify(Object.fromEntries(Object.entries(menu).map(([k, v]) => [k, isHand(v)]))));
+    await page.context().close();
+    page = await open('menu.html', '?sound=0');
+    check('menu: a locked chapter shows the hand too (not a "not-allowed" sign)', isHand(await computed(page, '.chap.locked')));
+    await page.context().close();
+    page = await open('sandbox.html', '?sound=0');
+    const sb = { body: await computed(page, 'body'), opt: await computed(page, '.opt'), range: await computed(page, '#gold'), check: await computed(page, '.check'), dice: await computed(page, '#dice'), go: await computed(page, '#begin'), back: await computed(page, '.back') };
+    check('sandbox: option buttons, sliders, checkbox, dice, Begin and the back link', Object.values(sb).every(isHand), JSON.stringify(Object.fromEntries(Object.entries(sb).map(([k, v]) => [k, isHand(v)]))));
+    await page.click('.opt[data-v="endless"]');
+    check('sandbox: a disabled slider shows the hand, not "not-allowed"', isHand(await computed(page, '#waves')));
+    const seed = await computed(page, '#seed'); check('sandbox: the seed number field keeps the text cursor', /text/.test(seed) && !/hand\.png/.test(seed), seed);
+    await page.context().close();
+    page = await open('index.html', '?sound=0&level=tutorial&view=2d');
+    const g2 = { body: await computed(page, 'body'), canvas: await computed(page, '#cv'), tool: await computed(page, '#b_dig'), speed: await computed(page, '#b_sp2'), research: await computed(page, '.ritem'), guideX: await computed(page, '#guideX'), menu: await computed(page, '#bMenu') };
+    check('game (2D): page, canvas, toolbar, speed, research, hint and menu buttons', Object.values(g2).every(isHand), JSON.stringify(Object.fromEntries(Object.entries(g2).map(([k, v]) => [k, isHand(v)]))));
+    await page.context().close();
+    page = await open('index.html', '?sound=0&level=tutorial'); await sleep(2000);
+    const c3 = await page.evaluate(() => { const cs = [...document.querySelectorAll('#stage canvas')].filter(c => c.id !== 'cv'); return cs.map(c => ({ inline: c.style.cursor, css: getComputedStyle(c).cursor })); });
+    check('game (3D): the WebGL canvas has no inline crosshair and uses the hand', c3.length === 1 && c3[0].inline === '' && isHand(c3[0].css), JSON.stringify(c3));
+    await page.context().close();
+
+    console.log('4. carrying a creature');
+    page = await open('index.html', '?sound=0&view=2d&level=classic');
+    await page.evaluate(() => { __game.G.speed = 0; });
+    const state = () => page.evaluate(() => ({ holding: document.documentElement.classList.contains('holding'), canvas: getComputedStyle(document.getElementById('cv')).cursor, button: getComputedStyle(document.getElementById('b_dig')).cursor, held: !!__game.G.held }));
+    const s0 = await state();
+    check('before: the pointing hand', !s0.holding && /hand\.png/.test(s0.canvas) && !s0.held);
+    const pick = () => page.evaluate(() => { const g = __game, G = g.G; document.getElementById('b_hand').click(); let c = G.creatures[0]; if (!c) { c = new g.Creature(G.heart.x + 2, G.heart.y + 3, g.KINDS[1]); G.creatures.push(c); }
+      const p = { x: c.tx, y: c.ty }, f = { fx: c.x, fy: c.y }; __ui.inputDown(p, f, 0); __ui.inputUp(p, f); return !!G.held; });
+    check('the Hand picks a creature up', await pick());
+    const s1 = await state();
+    check('carrying: the fist holding an imp, on the canvas and on the buttons', s1.holding && /grab\.png/.test(s1.canvas) && /grab\.png/.test(s1.button) && s1.held, JSON.stringify([s1.canvas.slice(0, 60)]));
+    await page.evaluate(() => { const G = __game.G, x = G.heart.x + 3.5, y = G.heart.y + 0.5; const p = { x: Math.floor(x), y: Math.floor(y) }, f = { fx: x, fy: y }; __ui.inputDown(p, f, 0); __ui.inputUp(p, f); });
+    const s2 = await state();
+    check('dropping it: back to the pointing hand', !s2.holding && /hand\.png/.test(s2.canvas) && !s2.held);
+    await pick(); await page.evaluate(() => { __game.G.held.dead = true; }); await sleep(300);
+    const s3 = await state();
+    check('if the carried creature dies, the hand opens again by itself', !s3.holding && /hand\.png/.test(s3.canvas), JSON.stringify(s3.holding));
+    await page.evaluate(() => { __game.G.held = null; }); await pick(); await page.evaluate(() => { __game.G.heartHp = 0; __game.hurt({ heart: true, dead: false, x: __game.G.heart.x, y: __game.G.heart.y }, 99999, {}); }); await sleep(300);
+    const s4 = await state();
+    check('when the game ends the hand is not stuck closed on the end screen', !s4.holding && await page.evaluate(() => __game.G.over === 'defeat'));
+    await page.context().close();
+
+    check('no page errors, warnings or failed requests in any run', problems.length === 0, problems.slice(0, 3).join(' | '));
+  } finally { await browser.close(); server.kill(); }
+  console.log(fails ? `\n${fails} check(s) FAILED` : '\nall cursor checks passed'); process.exit(fails ? 1 : 0);
+})();

@@ -7,6 +7,7 @@
 <link rel="preload" href="vendor/fonts/Cinzel-normal-400-900.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="preload" href="vendor/fonts/CinzelDecorative-normal-900.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="stylesheet" href="vendor/fonts/fonts.css">
+<link rel="stylesheet" href="cursor.css">
 <style>
   /* Fonts are vendored in vendor/fonts (SIL OFL): Cinzel Decorative for the title, Cinzel for HUD, buttons and headings,
      IM Fell English for the chronicle and the help scroll, EB Garamond for the data panels. */
@@ -80,7 +81,7 @@
   /* the dungeon view in a gilded frame, with a torchlit vignette */
   #stage { position: relative; border: 3px double var(--bronze-hi); border-radius: 3px; background: #000; box-shadow: 0 0 0 1px #000, 0 8px 26px #000d, 0 0 34px #e8742c1f; }
   #stage::after { content: ''; position: absolute; inset: 0; pointer-events: none; background: radial-gradient(ellipse at 50% 45%, transparent 58%, #000a 100%); box-shadow: inset 0 0 0 1px #000; }
-  canvas { width: 100%; height: auto; display: block; background: #000; image-rendering: pixelated; cursor: crosshair; touch-action: none; }
+  canvas { width: 100%; height: auto; display: block; background: #000; image-rendering: pixelated; touch-action: none; }      /* the cursor is the Keeper's hand: cursor.css */
 
   /* side panels */
   #side { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 12px; }

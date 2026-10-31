@@ -1138,16 +1138,18 @@ cv.addEventListener('pointerleave', () => { if (!mouse.down) mouse.x = -1; });
 cv.addEventListener('pointerup', e => inputUp(pos(e), posF(e)));
 
 /* The Hand: pick up one of your imps/creatures and drop it elsewhere (GameWorldController pick-up / drop, `InHand`). */
+/* The cursor is the Keeper's hand (cursor.css); while you carry a creature or imp it closes into a fist holding an imp. */
+function syncHandCursor() { document.documentElement.classList.toggle('holding', !!(G.held && !G.held.dead && !G.over)); }
 function handClick(m) {
   const held = G.held;
   if (held) {
     if (solid(Math.floor(m.fx), Math.floor(m.fy))) { say('Can\'t drop it into solid rock.'); return; }
-    sfx('drop', m.fx, m.fy); held.x = m.fx; held.y = m.fy; held.held = false; held.state = 'idle'; held.path = null; held.think = 0; G.held = null; return;
+    sfx('drop', m.fx, m.fy); held.x = m.fx; held.y = m.fy; held.held = false; held.state = 'idle'; held.path = null; held.think = 0; G.held = null; syncHandCursor(); return;
   }
   let best = null, bd = 1.3;
   for (const u of G.creatures.concat(G.imps)) { const d = Math.hypot(u.x - m.fx, u.y - m.fy); if (!u.dead && d < bd) { best = u; bd = d; } }
   if (!best) return;
-  sfx('pickup', best.x, best.y); if (best.isImp) best.drop(); best.held = true; best.path = null; G.held = best;
+  sfx('pickup', best.x, best.y); if (best.isImp) best.drop(); best.held = true; best.path = null; G.held = best; syncHandCursor();
 }
 function renderLog(isNew) { const el = $('log'); el.innerHTML = G.log.slice(0, 12).map((m, i) => '<div' + (i === 0 && isNew ? ' class="new"' : '') + '>' + m + '</div>').join(''); }
 function renderHud() {
@@ -1157,7 +1159,7 @@ function renderHud() {
   $('hMana').textContent = Math.floor(G.mana) + '/' + G.maxMana;
   for (const id of SPELL_ORDER) $('b_' + id).style.opacity = G.mana >= SPELLS[id].cost && !(G.spellCd[id] > 0) ? 1 : 0.45;
   for (const id in RESEARCH) { const b = $('b_' + id); if (!isAvail(id)) { b.style.opacity = 0.3; b.title = 'Locked — research it in a Library'; } else { b.title = ''; if (!SPELLS[id]) b.style.opacity = ''; } }
-  renderResearch(); renderObjectives(); renderGuide(); renderEnd();
+  renderResearch(); renderObjectives(); renderGuide(); renderEnd(); syncHandCursor();
   $('hHeart').textContent = Math.ceil(G.heartHp); $('hHeroes').textContent = G.heroes.length; $('hWave').textContent = !VAR.WAVES ? '—' : VAR.WAVES === Infinity ? G.wave + ' / ∞' : G.wave + '/' + VAR.WAVES;
   $('hNext').textContent = !VAR.WAVES ? '—' : !G.gateOpen ? 'tunnel to Gate' : G.nextWave === Infinity ? '—' : Math.max(0, Math.ceil(G.nextWave - G.time)) + 's' + (G.gates.length > 1 ? ' · gates ' + G.gates.filter(g => g.open).length + '/' + G.gates.length : '');
   let dig = 0, claim = 0, busy = 0, upkeep = 0; for (const t of G.tasks.values()) { if (t.type === 'DIG') dig++; else if (t.type === 'CLAIM') claim++; else upkeep++; if (t.who.size) busy++; }
