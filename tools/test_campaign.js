@@ -7,7 +7,7 @@
  *   3. the chapter menu: locked / unlocked chapters, stars, best times, Begin, erase progress
  *   4. winning a chapter (3D view): the Victory screen, three stars, "First victory!", Next chapter, the save
  *   5. losing: the Defeat screen, no stars, Retry, the defeat is counted
- *   6. the last chapter has no Next button; ?nosave=1 saves nothing; the HUD's Chapters button leads to the menu
+ *   6. the last chapter has no Next button; ?nosave=1 saves nothing; the HUD's Chapters button leads to the menu; a bare index.html opens the menu, with a query string it plays
  */
 const { spawn } = require('child_process');
 const path = require('path');
@@ -156,6 +156,12 @@ const sleep = (ms) => new Promise(r => setTimeout(r, ms));
     ctx = await fresh(); page = await game(ctx, 'level=lesson');
     await Promise.all([page.waitForURL(/menu\.html/), page.click('#bMenu')]);
     check('the HUD\'s Chapters button leads to the menu', /menu\.html$/.test(page.url()));
+    await ctx.close();
+    ctx = await fresh(); page = await open(ctx, 'index.html', 600);
+    check('the bare address index.html is the front door: it opens the chapter menu', /menu\.html$/.test(page.url()), page.url());
+    await ctx.close();
+    ctx = await fresh(); page = await open(ctx, 'index.html?level=classic&view=2d&sound=0', 600);
+    check('with a query string it plays directly (no redirect)', /index\.html\?level=classic/.test(page.url()), page.url());
     await ctx.close();
 
     check('no page errors or warnings in any run', problems.length === 0, problems.slice(0, 3).join(' | '));

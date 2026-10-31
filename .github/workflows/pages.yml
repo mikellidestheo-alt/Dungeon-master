@@ -1,0 +1,40 @@
+# Publishes the game (the web/ folder) to GitHub Pages whenever main changes.
+#
+# One-time setup: Settings -> Pages -> Build and deployment -> Source: "GitHub Actions".
+# The site is then at https://<owner>.github.io/<repo>/ and opens on the chapter menu. Everything is static (no build step), so web/ is
+# uploaded as it is, which is exactly the folder the tests run against. Run it by hand from the Actions tab with "Run workflow".
+name: Deploy to GitHub Pages
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:                 # one deployment at a time; a newer push waits rather than cancelling one that is half done
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/configure-pages@v5
+      - name: Check the site before publishing it
+        run: |
+          test -f web/menu.html && test -f web/index.html && test -f web/chapters.js && test -f web/assets/cursors/hand.png
+          # nothing of Dungeon Keeper II may ever be published
+          if find web -iname '*.sdt' | grep -q .; then echo "a .sdt file is in web/"; exit 1; fi
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: web
+      - id: deployment
+        uses: actions/deploy-pages@v4
