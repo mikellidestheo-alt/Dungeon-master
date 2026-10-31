@@ -59,11 +59,11 @@
       { type: 'survive', text: 'Defeat the Knight' },
     ],
     guide: [
-      { text: 'Welcome, Keeper! You command <b>imps</b>: they dig, mine, claim and carry. These hints will walk you through your first dungeon. Press <b>Got it</b> to begin.' },
+      { text: 'Welcome, Keeper! You command <b>imps</b>: they dig, mine, claim and carry. <b>Dig</b> is on the toolbar; <b>Buildings</b>, <b>Spells</b> and <b>Monsters</b> are tabs that open their commands. These hints will walk you through your first dungeon. Press <b>Got it</b> to begin.' },
       { text: 'Choose <b>Dig (tag)</b>, then drag a box over the earth just east of your Heart. Imps dig whatever is tagged. Right-drag untags.', tool: 'dig', at: [9, 8, 11, 8], when: { type: 'dug', n: 3 } },
       { text: 'Gold! Tag the glittering <b>gold seam</b> too. Imps mine it and carry the gold home.', tool: 'dig', at: [12, 8], when: { type: 'dug', n: 4 } },
       { text: 'Bare floor is not yours yet. Imps <b>claim</b> it, turning it into your territory. Watch them work.', at: [9, 8, 12, 8], when: { type: 'claimed', n: 3 } },
-      { text: 'Gold needs somewhere to live. Choose <b>Treasury</b> and drag over two floor tiles inside your cavern.', tool: 'treasury', at: [2, 5, 3, 5], when: { type: 'room', room: 'treasury', n: 2 } },
+      { text: 'Gold needs somewhere to live. In the <b>Buildings</b> tab choose <b>Treasury</b> and drag over two floor tiles inside your cavern.', tool: 'treasury', at: [2, 5, 3, 5], when: { type: 'room', room: 'treasury', n: 2 } },
       { text: 'Wait while your imps carry the gold into the Treasury. Rooms cost gold per tile, so keep an eye on your total at the top.', when: { type: 'gold', n: 1500 } },
       { text: 'Creatures need beds. Choose <b>Lair</b> and drag over two more floor tiles.', tool: 'lair', at: [2, 11, 3, 11], when: { type: 'room', room: 'lair', n: 2 } },
       { text: 'Now dig east to the purple <b>Portal</b>. Once your imps claim it, creatures will arrive to fight for you.', tool: 'dig', at: [13, 8, 20, 8], when: { type: 'portal' } },
@@ -370,7 +370,7 @@
     guide: [
       { text: 'Claim the Portal and raise your army. Creatures pray in the <b>Temple</b>; the more they pray, the faster your mana returns.', tool: 'dig', when: { type: 'portal' } },
       { text: 'Choose <b>Temple</b> and drag over four floor tiles of your territory.', tool: 'temple', when: { type: 'room', room: 'temple', n: 4 } },
-      { text: 'Spells are on the toolbar (and keys <b>1</b>-<b>5</b>). Try <b>Create Imp</b> now: click anywhere on your floor. Spells cost mana and then recharge.', tool: 'imp', when: { type: 'spells', n: 1 } },
+      { text: 'Spells are in the <b>Spells</b> tab (and on keys <b>1</b>-<b>5</b>). Try <b>Create Imp</b> now: click anywhere on your floor. Spells cost mana and then recharge.', tool: 'imp', when: { type: 'spells', n: 1 } },
       { text: 'In a fight: <b>Lightning</b> (a hero under the cursor), <b>Heal</b> and <b>Speed</b> (your creatures), <b>Call to Arms</b> (a rally point). Cast two more any time.', when: { type: 'spells', n: 3 } },
       { text: 'The <b>Fairy</b> flies over doors and floor traps and heals her friends: strike her with Lightning. Tunnel to the Gate when ready.', when: { type: 'gate' } },
     ],

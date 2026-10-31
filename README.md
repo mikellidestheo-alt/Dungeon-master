@@ -33,7 +33,7 @@ completing its objectives (every chapter includes surviving all its waves) and l
 | Where | What |
 |---|---|
 | Top bar | Gold (held / what your Treasuries can bank), Imps, Creatures (of 15), Payday countdown, Time, Mana, Heart, then Wave, heroes alive and a countdown to the next wave (it says *tunnel to Gate* until a Gate is linked, and *gates 1/2* when a level has more). A **☰ Chapters** (or **☰ Sandbox**) button, **Retire** in endless mode, **⛶ Full screen**, and the sound controls |
-| Toolbar | **Dig**, **Hand**, rooms (cost per tile), **Door** and traps, spells (mana cost and hotkey), **Pause / 1× / 3× / 8×**. Anything not yet researched is greyed out |
+| Toolbar | Always in view: **Dig**, three tabs and **Pause / 1× / 3× / 8×**. The tabs open their own commands under the strip (above it in full screen): **🏰 Buildings** (the seven rooms, then the Defences: Door, Gas Trap, Lightning Trap), **✨ Spells** (the five spells with mana cost and hotkey) and **👹 Monsters** (the ✋ Hand and a roster of your creatures). Click a tab again, or press `Esc`, to close it. Anything not yet researched is greyed out |
 | Dungeon view | Top left: the **objectives** (ticked as you go, with counters). Bottom: the **hint banner** (✕ hides it; the highlighted toolbar button and the gold marker on the map show what it means) |
 | Below the view | **Task board** (digging queue, chickens, hungry, praying, prisoners, and the mood of every creature), **Log**, **Research** panel, and a short help scroll (the basics: digging, rooms, creatures, the invasion, objectives, camera) |
 
@@ -42,10 +42,11 @@ completing its objectives (every chapter includes surviving all its waves) and l
 | To do this | Do this |
 |---|---|
 | Dig or mine | Choose **Dig**, then drag a box over earth or gold. Imps do the rest. Right-drag **untags**. Rock and gem seams cannot be dug through |
-| Build a room | Choose the room, drag a box over **your claimed floor** (bare floor you have not claimed yet does not count). It costs gold per tile. Rooms cannot be sold |
-| Doors and traps | Choose it and click or drag over claimed floor, usually in a tunnel. **Right-click sells for half.** Imps repair doors and re-arm traps for gold |
-| Cast a spell | Click its button or press `1` Lightning, `2` Heal, `3` Speed, `4` Call to Arms, `5` Create Imp, then click the dungeon. Lightning needs a hero under the cursor. A refused cast costs nothing |
-| Move a creature or imp | **✋ Hand**: click one to pick it up (your cursor, the Keeper's evil hand, closes into a fist holding an imp, and the creature disappears from the map while you carry it), click again to drop it, for example into a fight |
+| Open a tab | Click **Buildings**, **Spells** or **Monsters**, or press `B`, `C` or `H` (`H` also takes the Hand). Click the tab again or press `Esc` to close it. The number keys `1`-`5` open Spells for you. A dot on a tab means the tool you chose lives there. The tutorial's hints open the right tab themselves |
+| Build a room | In the **Buildings** tab choose the room, drag a box over **your claimed floor** (bare floor you have not claimed yet does not count). It costs gold per tile. Rooms cannot be sold |
+| Doors and traps | In the **Buildings** tab (Defences) choose it and click or drag over claimed floor, usually in a tunnel. **Right-click sells for half.** Imps repair doors and re-arm traps for gold |
+| Cast a spell | In the **Spells** tab click its button, or press `1` Lightning, `2` Heal, `3` Speed, `4` Call to Arms, `5` Create Imp, then click the dungeon. Lightning needs a hero under the cursor. A refused cast costs nothing |
+| Move a creature or imp | **✋ Hand** (in the **Monsters** tab, or press `H`): click one on the map to pick it up (your cursor, the Keeper's evil hand, closes into a fist holding an imp, and the creature disappears from the map while you carry it), click again to drop it, for example into a fight |
 | Choose research | Click an item in the **Research** panel (only once you have a Library) |
 | Camera (3D) | `W A S D` or the arrow keys pan, **or push the mouse to the edge of the map** (hold it there a moment; nearer the edge is faster; in full screen it is the edge of the screen, under the bars too); the wheel zooms, middle-drag pans |
 | Full screen | The **⛶ Full screen** button in the top bar, or `F`. The map fills the screen, the numbers bar and the toolbar float over its top and bottom, and the Task board, Log and Research slide in from the right with **☰ Panels** or `P`. `Esc` leaves it. It is remembered, so *Begin* on the next briefing takes you back into it |
@@ -182,6 +183,16 @@ Tick as you go; write down anything surprising in the template at the end.
 - [ ] New sounds feel right: objective chime, hint bell, the briefing scroll, the stars on the end screen, the new-best flourish, the quiet *retire* bell.
 - [ ] Volume balance between music and effects; anything too loud or too quiet.
 
+**7a. The toolbar tabs**
+
+- [ ] On first sight the toolbar is clean: Dig, three tabs, the speed buttons. Is it clear where to find a room, a trap, a spell?
+- [ ] **Buildings** shows the rooms and, as a second row, the defences. **Spells** shows the five spells. **Monsters** shows the Hand and your creatures. Does each tab hold what you expected to find in it? Is anything in the wrong tab?
+- [ ] Clicking a tab opens it and clicking it again closes it; `B`, `C`, `H` and `Esc` do the same. Is closing a tab by accident (or leaving one open) annoying?
+- [ ] The number keys `1`-`5` open Spells and pick the spell. A dot on a closed tab tells you which tab holds your chosen tool. Is that enough?
+- [ ] In the Tutorial each hint opens the tab it talks about and pulses the button. Later chapters: do the hints that say "choose Library / Temple / Gas Trap..." find their buttons easily?
+- [ ] **Monsters:** click a creature in the list and the camera goes to it; click its ✋ to pick it up, then click the map to put it down. Is the list readable with 10-15 creatures (it scrolls)? Do level, health and mood faces help you find the creature in trouble?
+- [ ] In a busy fight: how many clicks does it take to cast a spell, set a trap or move a creature, compared with before? Does anything you need constantly feel buried?
+
 **7b. Full screen and edge scrolling**
 
 - [ ] The **⛶ Full screen** button and the `F` key enter and leave full screen; `Esc` leaves it too. The map fills the whole screen, nothing is cut off, and the page does not scroll.
@@ -241,6 +252,7 @@ Tick as you go; write down anything surprising in the template at the end.
 | `tools/test_levels.js` | Headless Chromium checks for the level format and loader: `node tools/test_levels.js` |
 | `tools/test_audio.js` | Headless Chromium checks for the sound system: `node tools/test_audio.js` |
 | `tools/bot.js`, `tools/test_bots.js` | Scripted players (a careful one and a lazy one) that play every chapter on several seeds; the test checks each chapter is winnable but not trivial and the right length: `node tools/test_bots.js` (about 80 s) |
+| `tools/test_tabs.js` | Headless Chromium checks for the tabbed toolbar (what is in view, each tab, hotkeys, the tutorial opening tabs, the roster, full screen): `node tools/test_tabs.js` |
 | `tools/test_fullscreen.js` | Headless Chromium checks for full screen (real full screen in headless Chromium) and edge scrolling: `node tools/test_fullscreen.js` |
 | `tools/make_cursors.py`, `tools/test_cursor.js` | Cuts the checkerboard out of the two cursor paintings, crops, scales and writes the PNGs and `web/cursor.css`: `python3 tools/make_cursors.py`; and the headless checks for the cursor: `node tools/test_cursor.js` |
 | `tools/test_chapters.js` | Headless Chromium checks for the ten campaign chapters, plus a scripted playthrough of the Tutorial: `node tools/test_chapters.js` |
