@@ -268,17 +268,17 @@ Results with 8 seeds each (what the test pins, with margins, is in the file):
 | # | chapter | steady bot wins | game time | creatures lost per run | bonus star | lazy bot survives |
 |---|---|---|---|---|---|---|
 | 1 | The Awakening | 8/8 | 2.3 min | 0 | - | 8/8 (it is the Tutorial) |
-| 2 | Creatures of the Dark | 8/8 | 10.4 | 0 | 8/8 | 7/8 |
-| 3 | Mouths to Feed | 8/8 | 11.8 | 0 | 8/8 | 0/8 |
-| 4 | The Library | 8/8 | 11.0 | 0 | 8/8 | 0/8 |
-| 5 | Doors and Snares | 8/8 | 12.1 | 0 | 8/8 | 0/8 |
-| 6 | The Dungeon Below | 8/8 | 13.1 | 3 (they leave) | 8/8 | 0/8 |
-| 7 | Prayers and Power | 8/8 | 13.9 | 0 | 8/8 | 0/8 |
-| 8 | Two Gates | 8/8 | 17.5 | 0 | 8/8 | 0/8 |
-| 9 | The Siege | 5/8 | 20.4 | 11 | 3/5 wins | 0/8 |
-| 10 | The King's Crusade | 3/8 | 22.6 | 11 | 2/3 wins | 0/8 |
+| 2 | Creatures of the Dark | 8/8 | 8.1 | 0 | 8/8 | 8/8 |
+| 3 | Mouths to Feed | 8/8 | 10.9 | 0 | 8/8 | 0/8 |
+| 4 | The Library | 8/8 | 12.6 | 0 | 8/8 | 0/8 |
+| 5 | Doors and Snares | 8/8 | 12.7 | 0 | 8/8 | 0/8 |
+| 6 | The Dungeon Below | 8/8 | 14.1 | 5 | 8/8 | 0/8 |
+| 7 | Prayers and Power | 8/8 | 14.6 | 0 | 8/8 | 0/8 |
+| 8 | Two Gates | 8/8 | 16.4 | 2 | 8/8 | 0/8 |
+| 9 | The Siege | 6/8 | 18.9 | 11 | 6/6 wins | 0/8 |
+| 10 | The King's Crusade | 3/8 | 19.3 | 12 | 3/3 wins | 0/8 |
 
-The bot is a *fast* player, so a first-time human takes longer: its times add up to about 136 minutes, against the 2.5-3 hours aimed for.
+The bot is a *fast* player, so a first-time human takes longer: its times add up to about 131 minutes, against the 2.5-3 hours aimed for.
 "Not trivial" means the lazy bot never wins a chapter after the first and never survives chapters 6-10, while the finale costs even the
 careful bot about 11 creatures and more than half its runs. Chapters 1-8 are meant to be cleared cleanly by a prepared player: they teach, and
 the pressure arrives in 9 and 10.
@@ -304,6 +304,12 @@ What the bots showed, and what changed because of it:
   waits at the Gate, so its length window in `test_bots.js` moved from 4.5-8.5 to 1.8-5. The lazy bot (a Lair of three) now survives
   chapter 3 never and chapter 2 in 7 of 8: its army is capped by its three beds. With 15 creatures and six dummies a creature reaches level 2-3 in
   a chapter (average about 2); a player who builds more dummies levels faster.
+- **Bigger maps, shorter timers, digging heroes.** With the enlarged maps (chapters 3-10), wave timers cut to 90..35 s before the first wave and 75..50 s between,
+  and heroes that tunnel, the first full run had the steady bot winning 3/8 of chapter 5, 0/8 of 6 and 0/8 of 9. Two changes were the bot's: its Gate-planning goal
+  (any floor within 3 tiles of the Gate centre) missed the now 14 x 14 hero cavern, so it never opened the Gate at all, and it opened the Gate with three creatures
+  although the first wave now comes within a minute (it now waits for an army of 3 + the chapter number, at most 12). The rest was data: `heroMult` of chapters 5 and 6
+  0.85, chapter 7 1.2, chapter 8 1.0, chapter 9 1.0 with `scale` 0.11, chapter 10 1.08. Digging heroes are also why the length targets in `test_bots.js` moved
+  (chapter 2 7-12.5, chapter 4 9.5-14, chapter 10 17.5-28): the chapters are bigger but the first wave comes sooner, so most are about as long as before.
 - The bot is a yardstick, not a person. It never uses the Hand, only levels creatures by building a Training Room and does not play the spells cleverly, so a good
   player should beat it; and results move by a seed or two when anything changes, which is why the thresholds have margins.
 
