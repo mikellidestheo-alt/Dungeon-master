@@ -83,6 +83,10 @@ Prototype research (`RESEARCH`, `addResearch`, Library desks and the `research` 
 
 Prototype hatchery/temple (`Chicken`, `updateHatchery`, the `eat`/`pray` creature states in `web/game.js`): chickens hatch per tile, hungry creatures run `GoToEat` and feed `REASON_NO_FOOD`, temple prayer converts `manaGenPrayer` into mana. Not modelled: creatures dying of hunger, chickens as a spell target, the Temple's sacrifice mechanic, and heroes attacking chickens.
 
+Arrivals in the prototype (`NEEDS`, `pickKind`, the Monsters tab's *Who will come* in `web/game.js`): my own rule, not OpenKeeper's. DK2 gates creature kinds by the rooms you own (its level scripts list which creatures can be attracted); the prototype keeps that spirit with a small table of room and tile count per kind and a deterministic weighted draw over the kinds you qualify for.
+
+Capacity in the prototype (`armyLimit`, the larder in `updateHatchery`): in DK2 the Portal's supply stops at the level's creature cap and creatures leave when they have no lair or food; the prototype turns both into one visible rule, min(Portal limit, Lair tiles, 3 + 4 per Hatchery tile). The numbers are my own tuning.
+
 Creature tricks in the prototype (`ambush`, `cleave`, `armor`, `heals`, `torturer`, `flying` on the `KINDS` entries in `web/game.js`) are loosely inspired by DK2's creature specials (`Creature.SpecialAbility`, `JobType.TORTURE`); the numbers are my own tuning, not OpenKeeper's.
 
 Hero counters in the prototype (`disarms`, `flying`, `stunImmune`, `gasImmune`, `armor`, `doorBreaker` on the `HEROES` entries in `web/game.js`, and the scripted `WAVE_PLAN`) are my own design to make traps, doors and spells matter in different ways; they are not OpenKeeper behaviour.

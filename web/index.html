@@ -47,6 +47,7 @@
   #hud { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 0; padding: 9px 12px; font: 600 12px/1.3 var(--head); letter-spacing: .06em; color: var(--dim); }
   #hud > span { padding: 2px 14px; border-left: 1px solid #4a3920; }
   #hud > span:first-child { border-left: 0; padding-left: 4px; }
+  #hud small { font: 600 10px var(--head); letter-spacing: .08em; text-transform: uppercase; color: var(--dim); } #hCreaturesBox.full b, #hCreaturesBox.full #hMax { color: #ff9a5a; }          /* the Portal is waiting: the dungeon is full */
   #hud b { font: 700 15px var(--head); letter-spacing: .03em; color: var(--gold); text-shadow: 0 1px 0 #000, 0 0 8px #f2c14e33; }
   #audioCtl { margin-left: auto; display: flex; flex-wrap: wrap; justify-content: flex-end; align-items: center; gap: 4px 10px; }
   #audioCtl button { padding: 0 8px; line-height: 1.7; font-size: 14px; }
@@ -165,6 +166,9 @@
   #roster .chip em { font-style: normal; color: var(--gold); } #roster .chip .hp { width: 34px; height: 5px; background: #000a; border-radius: 2px; overflow: hidden; } #roster .chip .hp u { display: block; height: 100%; background: #5fd070; text-decoration: none; }
   #roster .chip .mood { font-size: 12px; } #roster .chip .grab { padding: 0 5px; border-left: 1px solid #5a4830; margin-left: 2px; opacity: .8; } #roster .chip .grab:hover { opacity: 1; color: #fff; }
   #roster .chip.selected { border-color: #ffd36b; }
+  #tabpanel .views { display: flex; flex-direction: column; gap: 4px; flex: none; } #tabpanel .views button { padding: 3px 8px; font-size: 10.5px; letter-spacing: .05em; } #tabpanel .views button.on { border-color: #ffd36b; color: #fff6d8; }
+  #roster .kchip { display: flex; align-items: center; gap: 6px; padding: 3px 8px; border: 1px solid #5a4830; border-radius: 3px; font: 600 11.5px var(--head); letter-spacing: .03em; background: #1a140f; }
+  #roster .kchip i { width: 9px; height: 9px; border-radius: 2px; background: var(--c); box-shadow: 0 0 0 1px #000a; } #roster .kchip b { color: #7fe08a; } #roster .kchip small { font: 600 10.5px var(--head); color: var(--dim); } #roster .kchip.no { opacity: .62; }
   #rosterSum { font: 600 12px var(--head); letter-spacing: .05em; color: var(--dim); } #rosterSum b { color: var(--gold); }
   button { font-size: 13.5px; padding: 8px 13px; --bd: #75634a; --fg: #ead9ac; background: linear-gradient(180deg, #4b4036, #2b231c);
     box-shadow: inset 0 1px 0 #ffffff26, inset 0 -2px 0 #0008, 0 1px 3px #000c; }
@@ -265,7 +269,7 @@
   <div id="hud">
     <span>Gold <b id="hGold">0</b>/<span id="hCap">0</span></span>
     <span>Imps <b id="hImps">0</b></span>
-    <span>Creatures <b id="hCreatures">0</b>/<span id="hMax">15</span></span>
+    <span id="hCreaturesBox">Creatures <b id="hCreatures">0</b>/<span id="hMax">15</span> <small id="hLimit">beds</small></span>
     <span>Payday in <b id="hPay">0</b>s</span>
     <span>Time <b id="hTime">0</b>s</span>
     <span>Mana <b id="hMana">0</b></span>
@@ -288,10 +292,10 @@
     <div class="box" id="boxResearch"><h2>Research</h2><div id="research" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:6px"></div><div id="researchInfo"></div></div>
   </div>
   <div id="help">
-    <b>Your dungeon:</b> choose <code>Dig</code> and drag over earth or gold to tag it (right-drag untags); imps dig, mine, claim floor and carry gold home. Build a <code>Treasury</code> to bank it and a <code>Lair</code> for beds,
-    then claim the purple <b>Portal</b>: creatures arrive and need a bed, food (a <code>Hatchery</code>) and wages at payday, or they grow angry and leave.<br>
-    <b>The invasion</b> starts when a tunnel links a red-tinted <b>Hero Gate</b> to your Heart, so you choose when: dig all but the last tile, set doors and traps, then open it. Your commands are in the tabs: <code>Buildings</code> (<code>B</code>), <code>Spells</code> (<code>C</code>, or keys <code>1</code>-<code>5</code>; they cost mana) and <code>Monsters</code> (<code>H</code>, with the <code>✋ Hand</code> to move them).<br>
-    <b>Winning:</b> finish the objectives (top left of the view) and keep your Dungeon Heart alive. Hints at the bottom of the view guide each chapter; <code>☰ Chapters</code> returns to the menu. Locked rooms, traps and spells are researched in a <code>Library</code>. Pan with <code>W A S D</code> or by pushing the mouse to the map's edge, zoom with the wheel; <code>F</code> is full screen.
+    <b>Your dungeon:</b> choose <code>Dig</code> and drag over earth or gold to tag it (right-drag untags); imps dig, mine, claim and haul gold. Build a <code>Treasury</code> to bank it and a <code>Lair</code> for beds,
+    then claim the purple <b>Portal</b>: creatures come (<code>Monsters</code> &gt; <i>Who will come</i>), as many as your Lair and <code>Hatchery</code> can house and feed, and want wages.<br>
+    <b>The invasion</b> starts when a tunnel links a <b>Hero Gate</b> to your Heart, so you choose when: dig all but the last tile, set doors and traps, then open it. Commands are in the tabs: <code>Buildings</code> (<code>B</code>), <code>Spells</code> (<code>C</code>, or <code>1</code>-<code>5</code>) and <code>Monsters</code> (<code>H</code>, with the <code>✋ Hand</code>).<br>
+    <b>Winning:</b> finish the objectives (top left) and keep your Heart alive. Hints guide each chapter; <code>☰ Chapters</code> is the menu. Locked items are researched in a <code>Library</code>. Pan: <code>W A S D</code> or the map's edge; wheel zooms; <code>F</code> is full screen.
   </div>
 </div></div>
 

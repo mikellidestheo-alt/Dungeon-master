@@ -56,8 +56,8 @@ completing its objectives (every chapter includes surviving all its waves) and l
 
 1. **Dig and mine.** Tag the tunnel east and the nearest **gold seam**. Each gold tile is worth 2000 gold; gem seams (blue) never run out and pay 25 gold at a time.
 2. **Bank it.** Build a **Treasury** (50 gold a tile). Your Heart holds 2000 gold on its own and each Treasury tile adds 3000; gold beyond that cannot be carried home.
-3. **Claim the Portal** by digging to it and letting your imps claim the floor. A creature arrives about every 25 seconds, up to 15.
-4. **Look after them.** Each creature needs a **Lair** tile to sleep in, **food** (a **Hatchery** raises chickens, they get hungry about every two minutes) and **wages** at every **payday** (every 90 seconds, 60 to 220 gold each; fifteen creatures cost about 1650 a payday). Unhappy creatures turn angry and eventually leave. The Task board shows every creature's mood.
+3. **Claim the Portal** by digging to it and letting your imps claim the floor. A creature arrives about every 25 seconds, up to 15, and **which kind** depends on what you have built: Goblins, Spiders and Flies come to a bare Lair, Trolls and Black Knights want a Treasury, Salamanders and Bile Demons a Hatchery, Warlocks and Dark Elves a Library, Vampires and Dark Angels a Temple, the Mistress a Torture Chamber, the Assassin a Prison and the Reaper both. The Monsters tab's *Who will come* view lists them.
+4. **Look after them.** Each creature needs a **Lair** tile to sleep in, **food** (a **Hatchery** raises chickens, they get hungry about every two minutes; the Heart's own larder feeds 3 creatures and every Hatchery tile feeds 4 more) and **wages** at every **payday** (every 90 seconds, 60 to 220 gold each; fifteen creatures cost about 1650 a payday). **The size of your Lair and Hatchery caps your army**: you can keep at most `min(15, Lair tiles, 3 + 4 per Hatchery tile)` creatures, the top bar shows `Creatures 5/9 beds` (or *food*, or *Portal*) with a tooltip naming all three limits, and the Portal waits (with a log line) while you are full. Unhappy creatures turn angry and eventually leave. The Task board shows every creature's mood.
 5. **Prepare.** Build what the chapter teaches: Library and research, Prison and Torture, Temple, doors and traps. The gaps in the rock ridges are natural choke points.
 6. **Open a Gate.** Tunnel to the red-tinted **Hero Gate** (a path of open floor from Gate to Heart). The first wave arrives after the chapter's preparation countdown (in the Tutorial the Knight is already standing in the Gate cavern and attacks the moment you break through). *Tip:* dig the whole tunnel except its last tile, set your doors and traps, and only then dig the last tile.
 7. **Fight.** Creatures fight on their own and level up from kills. You cast spells, move creatures with the Hand and keep a few imps alive (they re-arm traps and mend doors, and they run from heroes, so replace them with `5`). Heroes that get weak run back to their Gate and escape, so you will slay only a part of each wave.
@@ -149,6 +149,8 @@ Tick as you go; write down anything surprising in the template at the end.
 **4. Systems**
 
 - [ ] **Economy:** gold seams, banking, Treasury capacity, wages, running dry. Is it clear how much gold you have and need?
+- [ ] **Who will come:** with only a Lair, only Goblins, Spiders and Flies arrive. Build a Library (3 tiles) and a Warlock or Dark Elf turns up with a log line saying why. The Monsters tab > *Who will come* lists all 14 kinds, ticked or saying what they need. Is the rule easy to discover? Does a chapter ever feel stuck with weak creatures?
+- [ ] **Capacity:** with 4 Lair tiles and no Hatchery the bar says `Creatures 3/3 food` and the log says the dungeon is full; a Hatchery tile makes it `4/4 beds`; more Lair tiles raise it. Does the tooltip make clear what to build? Does anyone starve at the limit?
 - [ ] **Creatures:** arrival, beds, anger, leaving, leveling to elite sprites at level 3, healing in the Lair. Are the Task board lines understandable?
 - [ ] **Hatchery:** chickens appear, hungry creatures eat, anger drops. What happens if you never build one?
 - [ ] **Library:** research bars fill, an item completes, the toolbar unlocks it.
@@ -257,6 +259,8 @@ Tick as you go; write down anything surprising in the template at the end.
 | `tools/test_fullscreen.js` | Headless Chromium checks for full screen (real full screen in headless Chromium) and edge scrolling: `node tools/test_fullscreen.js` |
 | `tools/make_cursors.py`, `tools/test_cursor.js` | Cuts the checkerboard out of the two cursor paintings, crops, scales and writes the PNGs and `web/cursor.css`: `python3 tools/make_cursors.py`; and the headless checks for the cursor: `node tools/test_cursor.js` |
 | `tools/test_chapters.js` | Headless Chromium checks for the ten campaign chapters, plus a scripted playthrough of the Tutorial: `node tools/test_chapters.js` |
+| `tools/test_arrivals.js` | Headless Chromium checks for which creature kinds the Portal draws, by the rooms you have built, and the Monsters tab's *Who will come*: `node tools/test_arrivals.js` |
+| `tools/test_capacity.js` | Headless Chromium checks for the army limit (beds, food, Portal), the Heart's larder and ten minutes without starvation: `node tools/test_capacity.js` |
 | `tools/test_gates.js` | Headless Chromium checks for several Hero Gates (linking, split waves, fleeing, 3D): `node tools/test_gates.js` |
 | `tools/test_sandbox.js` | Headless Chromium checks for the sandbox, the wave generator and endless mode: `node tools/test_sandbox.js` |
 | `tools/test_campaign.js` | Headless Chromium checks for the chapter menu, saved progress, stars and the Victory / Defeat screens: `node tools/test_campaign.js` |
@@ -285,7 +289,7 @@ The camera is isometric (45°, narrow field of view) to match the sprite art; `?
 walk, and a faint x-ray silhouette when a wall hides them); floors, walls and effects are drawn in code. The 2D fallback view
 (`?view=2d`) does not use the sprites.
 
-**Roster (from the character art):** your creatures come through the portal weighted by kind: Goblin, Troll, Warlock (the
+**Roster (from the character art):** your creatures come through the portal weighted by kind (and only the kinds whose rooms you have built, see *Who comes through the Portal* in `docs/06-levels.md`): Goblin, Troll, Warlock (the
 best researcher), Dark Elf (fast archer), Bile Demon (slow tank), Vampire (strong caster), Salamander (fire fighter) and
 Spider (fast biter), and six more with a trick each: **Mistress** (works the rack: torture runs 60 % faster and converts 88 % of
 the time), **Assassin** (first blow on an unhurt target does double), **Black Knight** (takes 25 % less damage), **Fly** (hovers; fast
@@ -341,7 +345,7 @@ seams, room building, lair assignment, mood/anger, sleep and payday, free-imp sp
 * **Hatchery and hunger:** creatures get hungry about every two minutes (hunger 60 of 100) and grow angrier while they are
   (+8 anger/s; sleeping in a lair wipes it fast). A **Hatchery** (80g/tile, available from the start) lays a free-range **chicken**
   every 24 s per tile (up to 12); a hungry creature chases the nearest one, eats it in 2.5 s, heals 15 % and loses 300 anger.
-  Skeletons never eat. Without a Hatchery your creatures stew and eventually leave, so build one before you rely on a crew.
+  Skeletons never eat. Without a Hatchery your creatures stew and eventually leave, so build one before you rely on a crew. **Food caps the army** (`armyLimit()` in `game.js`): the Dungeon Heart's larder lays like a fifth of a tile (`FREE_FEED` 3 creatures, with at most 3 chickens about), and each Hatchery tile feeds `FEED_PER_HATCHERY_TILE` 4 more: a tile lays a chicken every 24 s and a creature eats about every 120 s, which is 5 per tile in theory, 4 with room for the walk. `tools/test_capacity.js` checks that nobody starves at the limit over ten minutes. The Tutorial and chapter 2 set `rules.food: false` (no food limit: the Hatchery is chapter 3's lesson).
 * **Temple** (120g, research it first): idle creatures kneel at its altars (one per tile) for 15 s at a time, turning prayer into
   **mana** (Warlock 1.4/s, Vampire 1.2, Dark Elf 0.8, Goblin 0.5 ... each +10 % per level) and calming down. The Task board shows who
   is praying and the mana per second they add. A Temple room is drawn as **one building** (your gothic temple art) scaled to the

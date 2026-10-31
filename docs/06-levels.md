@@ -42,7 +42,8 @@ keeper. Winning means beating every wave; losing means the Dungeon Heart falls.
     plan: [['Knight', 'Archer'], ['Knight', 'Mage', 'Thief'], ...],   // one list of hero names per wave
   },
 
-  rules: { heartHp: 2500 },
+  rules: { heartHp: 2500, arrivals: 'rooms', food: true },   // arrivals: 'rooms' (default) = the Portal draws only kinds whose rooms you have built; 'any' = every kind, as before
+                                                                                // food: true (default) = the Hatchery limits your army (see "How many creatures you can keep"); false = beds only
 
   objectives: [ { type: 'room', room: 'treasury', n: 2 }, { type: 'survive' } ],   // optional, see "Objectives"
   guide: [ { text: 'Choose <b>Dig</b>...', tool: 'dig', at: [9, 5, 12, 5], when: { type: 'dug', n: 4 } } ],   // optional, see "The guide"
@@ -106,6 +107,49 @@ joins it to your Heart. Rules:
 - The `gate` objective can ask for several: `{ type: 'gate', n: 2 }` ("Link tunnels to 2 Hero Gates").
 - 3D: every Gate has its own sprite and light, dim until linked, glowing once linked.
 - Sandbox: `&gates=2` adds a second hero cavern and Gate in the north of the classic map (the sandbox page has a "Two Gates" switch).
+
+## Who comes through the Portal
+
+The Portal no longer draws every creature kind from the start. Each kind lists the rooms it wants and how many of your tiles of that room it
+needs (the `NEEDS` table in `game.js`, right under `KINDS`); the Portal draws only among the kinds whose needs are met, still weighted
+by `weight` and still with one `rand()` call per arrival, so a seed is reproducible. A kind with no entry comes to a bare Lair, so the
+Portal never goes quiet. Converted prisoners and Skeletons do not come through the Portal and are unaffected.
+
+| kind | needs | why |
+|---|---|---|
+| Goblin, Spider, Fly | nothing | they come for a bed |
+| Troll | Treasury 3 | a hoard to guard |
+| Black Knight | Treasury 5 | a hoard worth a knight |
+| Salamander | Hatchery 2 | big eaters |
+| Bile Demon | Hatchery 4 | the biggest mouth |
+| Warlock, Dark Elf | Library 3 | thinkers come for books |
+| Vampire, Dark Angel | Temple 3 | believers come for an altar |
+| Mistress | Torture Chamber 2 | she comes for the rack |
+| Assassin | Prison 2 | he comes for the captives |
+| Reaper | Prison 2 **and** Torture Chamber 2 | the rarest, drawn by a whole dungeon of pain |
+
+The numbers are tile counts of rooms you own. The **Monsters** tab has a *Who will come* view that lists every kind, ticked when it can
+come and otherwise saying what it needs ("Warlock: needs Library 3", hover for a sentence). The first time a kind that needed a room
+arrives, the log says why ("A Warlock has heard of your Library."). `rules.arrivals: 'any'` switches the rule off for a level (the
+old behaviour); `?unlock=1` is unrelated and still means "research everything". Chapters 1-3 have no Library, so their
+armies are Goblins, Spiders and Flies until you build Treasury and Hatchery tiles for Trolls, Salamanders and Bile Demons; chapter 4
+teaches the Library, chapter 6 the Prison and Torture Chamber, chapter 7 the Temple.
+
+## How many creatures you can keep
+
+The army is capped at `min(15, beds, food)`: **beds** are your owned Lair tiles (one creature each); **food** is a larder allowance of 3 plus
+4 per owned Hatchery tile (`VAR.FREE_FEED`, `VAR.FEED_PER_HATCHERY_TILE`); 15 is the Portal's own limit. The Portal stops drawing creatures
+at the limit and logs "Your dungeon is full" once (the line says whether beds or food are the limit); it resumes when the limit rises.
+Nobody is thrown out if it later falls, the surplus is just not replaced. The top bar reads `Creatures 5/9 beds` and the Monsters tab shows the
+same, both with a tooltip naming the three limits.
+
+The food number is derived from the sim, not guessed: a creature is hungry about every 120 s (`HUNGER_PER_SECOND` 0.5, `HUNGRY_AT` 60) and a
+Hatchery tile lays a chicken every `CHICKEN_SECONDS` 24 s, so a tile feeds 5 creatures in theory; 4 leaves room for walking, eating and the
+12-chicken world cap. The 3-creature allowance is real food: the Dungeon Heart's larder lays chickens like a fifth of a Hatchery tile (at most
+3 about when there is no Hatchery). `node tools/test_capacity.js` plays ten minutes at the limit with 0, 1, 2 and 4 Hatchery tiles and nobody
+starves or leaves. `rules.food: false` removes the food limit (beds still apply): the Tutorial and chapter 2 use it, because the Hatchery is
+chapter 3's lesson. Chapter objectives were adjusted so the army they ask for fits: chapter 2 asks for a Lair of 5 (five creatures) and chapter 3
+a Lair of 6 and a Hatchery of 4 (food for 19).
 
 ## A party that waits at the Gate
 

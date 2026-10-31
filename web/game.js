@@ -26,6 +26,7 @@ const VAR = {                                         // Variable.MiscVariable.M
   MODIFY_ANGER_OF_CREATURE_IN_LAIR_PER_SECOND: -550,
   MINIMUM_IMP_THRESHOLD: 4, TIME_BEFORE_FREE_IMP_GENERATED_SECONDS: 5,
   CREATURES_SUPPORTED_BY_FIRST_PORTAL: 15,
+  FREE_FEED: 3, FEED_PER_HATCHERY_TILE: 4,            // food limit on the army: 3 creatures live off the Heart's larder; each Hatchery tile feeds 4 more (a tile lays a chicken every 24 s, a creature eats about every 120 s: 5 per tile in theory, 4 leaves room for the walk and the 12-chicken cap)
   PAY_DAY_FREQUENCY_SECONDS: 90,                      // stock is 600; shortened so you see it
   IMP_EFFICIENCY: 80,                                 // TileWork.FULL_EFFICIENCY comment: "80% for a fresh imp"
   IMP_MAX_GOLD: 400,
@@ -78,7 +79,7 @@ const G = {
   gates: POS.gates.map(g => ({ x: g[0], y: g[1], open: false })), gate: null,
   heroes: [], prisoners: [], shots: [], fx: [], doors: [], traps: [], clouds: [], mana: LV.start.mana, maxMana: 1000, manaRate: 3, spellCd: {}, rally: null, ownedTiles: 0, manaT: 0, research: { current: LV.start.research || null, points: {}, done: {} }, chickens: [], hatchT: 0, hatchTiles: [], hatchScan: 0, heartHp: VAR.HEART_HEALTH, heartFlash: 0, gateOpen: false, gateT: 0,
   wave: 0, nextWave: Infinity, over: null, kills: 0, held: null, nextId: 0,
-  stats: { dug: 0, mined: 0, claimed: 0, spells: 0 }, objDone: {}, objProg: {}, guideStep: 0, guideHidden: false,   // counters the objectives read; which objectives are done; where the tutorial guide is
+  heardOf: {}, stats: { dug: 0, mined: 0, claimed: 0, spells: 0 }, objDone: {}, objProg: {}, guideStep: 0, guideHidden: false,   // counters the objectives read; which objectives are done; where the tutorial guide is
 };
 G.gate = G.gates[0] || null;                          // the first Hero Gate (the one a single-Gate level has); G.gates holds them all, each with its own `open` flag
 const idx = (x, y) => y * W + x;
@@ -134,7 +135,7 @@ function validateLevel(lv) {
   need(!(plan.length || endless) || gates.length, 'waves need at least one Hero Gate for the heroes to arrive from');
   plan.forEach((wv, i) => wv.forEach(nm => need(HEROES.some(k => k.name === nm), 'wave ' + (i + 1) + ': no hero called ' + nm)));
   need(!lv.waves || (lv.waves.prep >= 0 && lv.waves.interval > 0), 'waves.prep and waves.interval');
-  if (lv.waves && lv.waves.waiting !== undefined) { need(typeof lv.waves.waiting === 'boolean', 'waves.waiting must be true or false'); need(!lv.waves.waiting || (plan.length && !endless), 'waves.waiting needs a waves.plan (and cannot be endless): wave 1 is the party that waits'); } need(lv.start && typeof lv.start.gold === 'number', 'start.gold'); need(lv.rules && lv.rules.heartHp > 0, 'rules.heartHp');
+  if (lv.waves && lv.waves.waiting !== undefined) { need(typeof lv.waves.waiting === 'boolean', 'waves.waiting must be true or false'); need(!lv.waves.waiting || (plan.length && !endless), 'waves.waiting needs a waves.plan (and cannot be endless): wave 1 is the party that waits'); } need(lv.start && typeof lv.start.gold === 'number', 'start.gold'); need(lv.rules && lv.rules.heartHp > 0, 'rules.heartHp'); need(!lv.rules || lv.rules.food === undefined || typeof lv.rules.food === 'boolean', 'rules.food must be true or false'); need(!lv.rules || lv.rules.arrivals === undefined || ['any', 'rooms'].includes(lv.rules.arrivals), 'rules.arrivals must be "rooms" (the default) or "any"');
   if (lv.stars) { need(lv.stars.heart === undefined || (lv.stars.heart > 0 && lv.stars.heart <= 1), 'stars.heart must be between 0 and 1'); need(lv.stars.par === undefined || lv.stars.par > 0, 'stars.par must be positive seconds'); }
   const cond = (c, where) => {                                   // an objective or a guide condition
     const d = c && COND[c.type]; if (!d) { errs.push(where + ': unknown condition type "' + (c && c.type) + '"'); return; }
@@ -385,10 +386,23 @@ const KINDS = [
 ];
 const PRAY = { Goblin: 0.5, Troll: 0.3, Warlock: 1.4, 'Dark Elf': 0.8, 'Bile Demon': 0.3, Vampire: 1.2, Salamander: 0.4, Spider: 0.3, Mistress: 0.6, Assassin: 0.2, 'Black Knight': 0.3, Fly: 0.2, Reaper: 0.2, 'Dark Angel': 1.0 };   // Attributes.manaGenPrayer
 for (const k of KINDS) k.pray = PRAY[k.name];
-function pickKind() {                              // portal arrivals, weighted so the common kinds show up more
-  let r = rand() * KINDS.reduce((s, k) => s + k.weight, 0);
-  for (const k of KINDS) { r -= k.weight; if (r <= 0) return k; }
-  return KINDS[0];
+/* Who comes through the Portal depends on what you have built (the player's own rule, not OpenKeeper's): each kind lists the rooms it wants
+ * and the size they must have, counted in tiles you own. A kind with no entry (Goblin, Spider, Fly) comes to a bare Lair. The reasons are meant
+ * to be guessable: thinkers come for books, believers for an altar, the cruel for a Prison or a rack, the big eaters for a Hatchery. */
+const NEEDS = { Troll: [['treasury', 3]], Salamander: [['hatchery', 2]], 'Bile Demon': [['hatchery', 4]], 'Black Knight': [['treasury', 5]],     // a hoard to guard, and the biggest mouths
+  Warlock: [['library', 3]], 'Dark Elf': [['library', 3]], Vampire: [['temple', 3]], 'Dark Angel': [['temple', 3]],
+  Mistress: [['torture', 2]], Assassin: [['prison', 2]], Reaper: [['prison', 2], ['torture', 2]] };
+for (const k of KINDS) k.needs = NEEDS[k.name] || [];
+const ownedRooms = () => { const n = {}; for (const t of G.map) if (t.owner === 1 && TERRAIN[t.t].room) n[t.t] = (n[t.t] || 0) + 1; return n; };      // tiles you own, by terrain id
+const unmetNeeds = (k, have = ownedRooms()) => k.needs.filter(([room, n]) => (have[ROOM_TOOLS[room]] || 0) < n);
+const arrivalsOpen = () => LV.rules.arrivals === 'any';              // a level can switch the rule off
+const roomName = (room) => TERRAIN[ROOM_TOOLS[room]].name;
+const needText = (needs) => needs.map(([room, n]) => 'a ' + roomName(room) + ' of ' + n + ' tile' + (n > 1 ? 's' : '')).join(' and ');
+function pickKind() {                              // portal arrivals, weighted so the common kinds show up more; only kinds whose rooms you have built
+  const have = ownedRooms(), pool = KINDS.filter(k => arrivalsOpen() || !unmetNeeds(k, have).length);
+  let r = rand() * pool.reduce((s, k) => s + k.weight, 0);
+  for (const k of pool) { r -= k.weight; if (r <= 0) return k; }
+  return pool[0];
 }
 const spriteOf = (u) => (u.level >= 3 && u.elite) ? u.elite : u.sprite;      // level-ups swap in the elite art
 class Creature extends Mover {                    // CreatureMoodSystem / CreatureSleepSystem: reduced to one lair + payday
@@ -495,6 +509,14 @@ function freeBed() {
   for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) { const t = G.map[idx(x, y)];
     if (t.t === T.LAIR && t.owner === 1) { t.bed = t.bed || { x, y, occupant: null }; if (!t.bed.occupant) return t.bed; } }
   return null;
+}
+
+/* How many creatures you can keep: min(Portal limit, beds, food). Beds are your Lair tiles (one creature each); food is the Heart's larder plus
+ * FEED_PER_HATCHERY_TILE per Hatchery tile (levels may switch it off with rules.food: false, the early chapters that come before the Hatchery
+ * lesson). The Portal stops drawing creatures at the limit; nobody is thrown out if it later drops, the surplus is just not replaced. */
+function armyLimit() {
+  const have = ownedRooms(), beds = have[T.LAIR] || 0, food = LV.rules.food === false ? Infinity : VAR.FREE_FEED + VAR.FEED_PER_HATCHERY_TILE * (have[T.HATCHERY] || 0), portal = VAR.CREATURES_SUPPORTED_BY_FIRST_PORTAL;
+  const cap = Math.min(portal, beds, food); return { beds, food, portal, cap, by: cap === beds ? 'beds' : cap === food ? 'food' : 'Portal' };      // `by`: which limit bites (beds first when tied)
 }
 
 /* ===================================================================================== combat
@@ -697,7 +719,7 @@ function heroLogic(dt) {
  * the original "beat every wave". Objectives and guide steps share one table of named conditions: each returns [value, goal] and is met
  * once value >= goal. A finished objective stays finished (a room you later lose does not un-win the level). The tutorial guide is a
  * list of steps shown one at a time; a step moves on when its `when` condition is met (or when the player presses "Got it"). */
-const roomCount = (room) => { const id = ROOM_TOOLS[room]; let n = 0; for (const t of G.map) if (t.t === id && t.owner === 1) n++; return n; };
+const roomCount = (room) => ownedRooms()[ROOM_TOOLS[room]] || 0;
 const COND = {
   survive:   { needs: 'waves',  f: () => [G.wave >= VAR.WAVES && !G.heroes.length ? 1 : 0, 1], label: () => 'Defeat every wave of invaders' },
   portal:    { needs: 'portal', f: () => [G.portalOwned ? 1 : 0, 1], label: () => 'Claim the Portal' },
@@ -846,17 +868,18 @@ class Chicken extends Mover {
     if (this.frozen) { this.path = null; return; }                       // being eaten
     this.cluckT -= dt; if (this.cluckT <= 0) { this.cluckT = 7 + Math.random() * 12; sfx('cluck', this.x, this.y); }
     this.t -= dt;
-    if (!this.path && this.t <= 0 && G.hatchTiles.length) { this.t = 1.5 + rand() * 3; const t = G.hatchTiles[(rand() * G.hatchTiles.length) | 0]; this.go(findPath(this.tx, this.ty, t.x, t.y)); }
+    if (!this.path && this.t <= 0) { this.t = 1.5 + rand() * 3; const t = G.hatchTiles.length ? G.hatchTiles[(rand() * G.hatchTiles.length) | 0] : ownedFloor(); if (t) this.go(findPath(this.tx, this.ty, t.x, t.y)); }       // free-range: round the Hatchery, or round your floor when only the larder lays
     this.stepMove(dt);
   }
 }
 function updateHatchery(dt) {
   G.hatchScan -= dt;
   if (G.hatchScan <= 0) { G.hatchScan = 1; G.hatchTiles = []; for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) { const t = G.map[idx(x, y)]; if (t.t === T.HATCHERY && t.owner === 1) G.hatchTiles.push({ x, y }); } }
-  if (G.hatchTiles.length) {
-    G.hatchT += dt * G.hatchTiles.length;                                // more tiles hatch faster
-    if (G.hatchT >= VAR.CHICKEN_SECONDS && G.chickens.length < VAR.MAX_CHICKENS) { G.hatchT = 0; const t = G.hatchTiles[(rand() * G.hatchTiles.length) | 0]; G.chickens.push(new Chicken(t.x, t.y)); }
-  }
+  const larder = VAR.FREE_FEED / VAR.FEED_PER_HATCHERY_TILE;           // the Heart's own larder lays like a fraction of a tile, so the creatures its free food allowance covers really are fed
+  G.hatchT += dt * (G.hatchTiles.length + larder);                    // more tiles hatch faster
+  if (G.hatchT >= VAR.CHICKEN_SECONDS && G.chickens.length < (G.hatchTiles.length ? VAR.MAX_CHICKENS : VAR.FREE_FEED)) {       // with no Hatchery the larder keeps just a few chickens about
+    G.hatchT = 0; const t = G.hatchTiles.length ? G.hatchTiles[(rand() * G.hatchTiles.length) | 0] : { x: G.heart.x, y: G.heart.y + 2 };
+    G.chickens.push(new Chicken(t.x, t.y)); }
   for (const c of G.chickens) c.update(dt);
   G.chickens = G.chickens.filter(c => !c.dead);
 }
@@ -1005,8 +1028,14 @@ function step(dt) {
   for (const i of G.imps) i.update(dt);
   // portal spawning (CreatureSpawnSystem), only once claimed
   G.nextSpawn -= dt;
-  if (G.portalOwned && G.nextSpawn <= 0 && G.creatures.length < VAR.CREATURES_SUPPORTED_BY_FIRST_PORTAL) {
-    G.nextSpawn = 25; const k = pickKind(); sfx('portal', G.portal.x + .5, G.portal.y + .5); G.creatures.push(new Creature(G.portal.x, G.portal.y, k)); say('A ' + k.name + ' enters through the portal.');
+  if (G.portalOwned && G.nextSpawn <= 0) {
+    const lim = armyLimit();
+    if (G.creatures.length >= lim.cap) {                               // the Portal waits: say so once, until somebody can be taken in again
+      if (!G.fullSaid) { G.fullSaid = true; say(lim.by === 'Portal' ? 'The Portal draws no more than ' + lim.portal + ' creatures.' : 'Your dungeon is full (' + (lim.by === 'beds' ? 'every bed is taken' : 'there is food for no more') + '): build more ' + (lim.by === 'beds' ? 'Lair' : 'Hatchery') + ' tiles.'); }
+    } else {
+      G.fullSaid = false; G.nextSpawn = 25; const k = pickKind(); sfx('portal', G.portal.x + .5, G.portal.y + .5); G.creatures.push(new Creature(G.portal.x, G.portal.y, k)); say('A ' + k.name + ' enters through the portal.');
+      if (k.needs.length && !G.heardOf[k.name]) { G.heardOf[k.name] = 1; say('A ' + k.name + ' has heard of your ' + k.needs.map(([room]) => roomName(room)).join(' and ') + '.'); }       // the first of each kind that needed a room says why it came
+    }
   }
   G.creatures = G.creatures.filter(c => c.dead ? false : c.update(dt) !== 'leave');
   for (const h of G.heroes) h.update(dt);
@@ -1154,7 +1183,8 @@ function makeToolButton(id) {
       if (t.roster) { const sum = document.createElement('span'); sum.id = 'rosterSum'; g.appendChild(sum); }
       tp.appendChild(g);
     }
-    if (t.roster) { const g = document.createElement('div'); g.className = 'grp'; g.innerHTML = '<span class="lbl">Creatures</span><div id="roster"></div>'; tp.appendChild(g); }
+    if (t.roster) { const g = document.createElement('div'); g.className = 'grp'; g.innerHTML = '<span class="views"><button id="rv_creatures" class="on">Creatures</button><button id="rv_arrivals" title="Which creatures the Portal will draw, and what you must build for the others">Who will come</button></span><div id="roster"></div>'; tp.appendChild(g);
+      for (const v of ['creatures', 'arrivals']) g.querySelector('#rv_' + v).onclick = () => { rosterView = v; renderRoster(true); }; }
     panel.appendChild(tp);
   }
   const grow = document.createElement('span'); grow.className = 'grow'; row.appendChild(grow);
@@ -1171,14 +1201,18 @@ function refreshButtons() {
 }
 /* The Monsters tab: how many you have and a chip for each creature (kind, level, health, mood). Click a chip to look at it (the camera goes
  * there); click its hand to pick it up, then click the map to put it down. */
-let rosterHtml = '';
+let rosterHtml = '', rosterView = 'creatures';
+const limitText = (lim) => 'You can keep ' + lim.cap + ' creatures: beds ' + lim.beds + ', food ' + (lim.food === Infinity ? 'unlimited' : lim.food) + ', Portal ' + lim.portal + '. The smallest sets the limit.';
 function renderRoster(force) {
   if (openTab !== 'monsters') return;
-  const hungry = G.creatures.filter(c => !c.noFood && c.hunger >= VAR.HUNGRY_AT).length, angry = G.creatures.filter(c => c.mood !== 'content').length;
-  const sum = 'Imps <b>' + G.imps.length + '</b> · Creatures <b>' + G.creatures.length + '</b>/' + VAR.CREATURES_SUPPORTED_BY_FIRST_PORTAL + ' · hungry <b>' + hungry + '</b> · upset <b>' + angry + '</b>';
+  const hungry = G.creatures.filter(c => !c.noFood && c.hunger >= VAR.HUNGRY_AT).length, angry = G.creatures.filter(c => c.mood !== 'content').length, lim = armyLimit(), limTitle = limitText(lim);
+  const sum = 'Imps <b>' + G.imps.length + '</b> · Creatures <b>' + G.creatures.length + '</b>/' + lim.cap + ' <small title="' + limTitle + '">' + lim.by + '</small> · hungry <b>' + hungry + '</b> · upset <b>' + angry + '</b>';
   const chips = G.creatures.map(c => '<button class="chip' + (c.id === selectedUnit ? ' selected' : '') + '" data-id="' + c.id + '" style="--c:' + c.color + '" title="' + c.name + ' #' + c.id + ': ' + c.mood + (c.state ? ', ' + c.state : '') + '. Click to look at it; the hand picks it up."><i></i>' + c.name + ' <em>' + c.level + '</em><span class="hp"><u style="width:' + Math.max(0, Math.round(c.hp / c.maxHp * 100)) + '%"></u></span>' +
     '<span class="mood">' + (c.unconscious ? '✖' : c.mood === 'angry' ? '😠' : c.mood === 'unhappy' ? '😐' : '') + '</span><span class="grab" data-grab="' + c.id + '">✋</span></button>').join('') || '<span class="none">No creatures yet. Claim the Portal and they will come.</span>';
-  const html = sum + '|' + chips; if (html === rosterHtml && !force) return; rosterHtml = html; $('rosterSum').innerHTML = sum; $('roster').innerHTML = chips;
+  const have = ownedRooms(), kinds = KINDS.map(k => ({ k, ok: arrivalsOpen() || !unmetNeeds(k, have).length })).sort((a, b) => b.ok - a.ok).map(({ k, ok }) => {          // the kinds that can come first
+    return '<span class="kchip ' + (ok ? 'ok' : 'no') + '" style="--c:' + k.color + '" title="' + k.name + (ok ? ': the Portal can draw it.' : ': comes once you own ' + needText(k.needs) + '.') + '"><i></i>' + k.name + (ok ? ' <b>✓</b>' : ' <small>needs ' + k.needs.map(([room, n]) => roomName(room) + ' ' + n).join(' + ') + '</small>') + '</span>'; }).join('');
+  const body = rosterView === 'arrivals' ? kinds : chips, html = sum + '|' + rosterView + '|' + body; if (html === rosterHtml && !force) return; rosterHtml = html; $('rosterSum').innerHTML = sum; $('roster').innerHTML = body;
+  $('rv_creatures').classList.toggle('on', rosterView === 'creatures'); $('rv_arrivals').classList.toggle('on', rosterView === 'arrivals');
 }
 $('roster').addEventListener('click', e => {
   const grab = e.target.closest('[data-grab]'), chip = e.target.closest('.chip'); if (!chip) return; const u = G.creatures.find(c => c.id === +chip.dataset.id); if (!u) return;
@@ -1232,7 +1266,8 @@ function pickUp(u) {                                              // the Hand, o
 function renderLog(isNew) { const el = $('log'); el.innerHTML = G.log.slice(0, 12).map((m, i) => '<div' + (i === 0 && isNew ? ' class="new"' : '') + '>' + m + '</div>').join(''); }
 function renderHud() {
   $('hGold').textContent = Math.floor(G.gold); $('hCap').textContent = capacity(); $('hImps').textContent = G.imps.length;
-  $('hCreatures').textContent = G.creatures.length; $('hMax').textContent = VAR.CREATURES_SUPPORTED_BY_FIRST_PORTAL;
+  const lim = armyLimit(); $('hCreatures').textContent = G.creatures.length; $('hMax').textContent = lim.cap; $('hLimit').textContent = lim.by;
+  $('hCreaturesBox').title = limitText(lim) + ' Build Lair tiles for beds and Hatchery tiles for food.'; $('hCreaturesBox').classList.toggle('full', G.creatures.length >= lim.cap);
   $('hPay').textContent = Math.max(0, Math.ceil(G.nextPay)); $('hTime').textContent = Math.floor(G.time);
   $('hMana').textContent = Math.floor(G.mana) + '/' + G.maxMana;
   for (const id of SPELL_ORDER) $('b_' + id).style.opacity = G.mana >= SPELLS[id].cost && !(G.spellCd[id] > 0) ? 1 : 0.45;

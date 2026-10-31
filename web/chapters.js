@@ -48,7 +48,7 @@
     ] },
     start: { gold: 800, mana: 300, imps: 3, unlock: 'none', research: null, pretag: [], welcome: 'Welcome, Keeper. Follow the hints at the bottom of the view.' },
     waves: { waiting: true, prep: 0, interval: 110, scale: 0, heroMult: 0.5, plan: W('K') },     // waiting: the Knight is on the Gate pad from the first second; linking the Gate releases him at once
-    rules: { heartHp: 3000 },
+    rules: { heartHp: 3000, food: false },       // food: false = the Hatchery's food limit on your army comes later (chapter 3)
     objectives: [
       { type: 'dug', n: 5, text: 'Dig out 5 tiles of earth and gold' },
       { type: 'room', room: 'treasury', n: 2, text: 'Build a Treasury of 2 tiles' },
@@ -76,7 +76,7 @@
 
   L.portal = {
     id: 'portal', name: 'Creatures of the Dark', seed: 102, tagline: 'The Portal, wages and beds.',
-    briefing: 'Creatures are drawn to a claimed Portal, but they want beds and wages. Keep them housed and paid, and keep their number growing: you will need an army when the heroes come through the Gate in the south.',
+    briefing: 'Creatures are drawn to a claimed Portal, but they want beds and wages. Goblins, Spiders and Flies come to any Lair; a Treasury of 3 tiles also draws Trolls. Every Lair tile is one bed, and you can keep no more creatures than you have beds, so keep them housed and paid and keep their number growing: you will need an army when the heroes come through the Gate in the south.',
     stars: { heart: 0.5 },
     terrain: { grid: [
       '####################################',
@@ -102,11 +102,11 @@
     ] },
     start: { gold: 1000, mana: 300, imps: 3, unlock: 'none', research: null, pretag: [], welcome: 'Claim the Portal in the east, then raise an army.' },
     waves: { prep: 160, interval: 110, scale: 0.06, heroMult: 0.7, plan: W('K A', 'K K A', 'K A A T') },
-    rules: { heartHp: 2800 },
+    rules: { heartHp: 2800, food: false },
     objectives: [
       { type: 'portal', text: 'Claim the Portal' },
       { type: 'room', room: 'treasury', n: 2, text: 'Build a Treasury of 2 tiles' },
-      { type: 'room', room: 'lair', n: 4, text: 'Build a Lair of 4 tiles' },
+      { type: 'room', room: 'lair', n: 5, text: 'Build a Lair of 5 tiles' },
       { type: 'creatures', n: 5, text: 'Keep 5 creatures' },
       { type: 'gate', text: 'Tunnel to the Hero Gate' },
       { type: 'survive', text: 'Defeat all 3 waves' },
@@ -114,7 +114,7 @@
     ],
     guide: [
       { text: 'Dig east to the <b>Portal</b> and claim it. The rock ridges have gaps: tunnel through them.', tool: 'dig', when: { type: 'portal' } },
-      { text: 'Every creature needs a bed. Build a <b>Lair</b> and a <b>Treasury</b> in your cavern: rooms need your claimed floor.', tool: 'lair', when: { type: 'room', room: 'lair', n: 4 } },
+      { text: 'Every creature needs a bed, and a Lair tile is one bed: your army can be no bigger than your Lair. Build a <b>Lair</b> and a <b>Treasury</b> in your cavern: rooms need your claimed floor. Only Goblins, Spiders and Flies come to a bare Lair; a Treasury of 3 tiles draws Trolls too (see <b>Monsters</b> &gt; <i>Who will come</i>).', tool: 'lair', when: { type: 'room', room: 'lair', n: 5 } },
       { text: 'A creature steps through every 25 seconds. They grow angry without a bed or wages: <b>payday</b> comes every 90 seconds. Check their moods in the task board below.', when: { type: 'creatures', n: 5 } },
       { text: 'Creatures level up from fights. When you are ready, tunnel south to the Hero Gate. The <b>✋ Hand</b> can drop creatures into a fight.', when: { type: 'gate' } },
     ],
@@ -122,7 +122,7 @@
 
   L.hatchery = {
     id: 'hatchery', name: 'Mouths to Feed', seed: 103, tagline: 'Hunger, chickens and the Hatchery.',
-    briefing: 'A fed creature is a loyal creature. Every couple of minutes your army grows hungry; a Hatchery raises the chickens they eat. Neglect it and your creatures will turn on you.',
+    briefing: 'A fed creature is a loyal creature. Every couple of minutes your army grows hungry; a Hatchery raises the chickens they eat. From now on food limits your army as beds do: the Heart\'s larder feeds three creatures, and each Hatchery tile feeds four more. Neglect it and your creatures will turn on you. Big eaters are drawn to a Hatchery: Salamanders to 2 tiles, Bile Demons to 4.',
     stars: { heart: 0.5 },
     terrain: { grid: [
       '######################################',
@@ -154,7 +154,7 @@
     objectives: [
       { type: 'portal', text: 'Claim the Portal' },
       { type: 'room', room: 'treasury', n: 2, text: 'Build a Treasury of 2 tiles' },
-      { type: 'room', room: 'lair', n: 4, text: 'Build a Lair of 4 tiles' },
+      { type: 'room', room: 'lair', n: 6, text: 'Build a Lair of 6 tiles' },
       { type: 'room', room: 'hatchery', n: 4, text: 'Build a Hatchery of 4 tiles' },
       { type: 'creatures', n: 6, text: 'Keep 6 creatures' },
       { type: 'gate', text: 'Tunnel to the Hero Gate' },
@@ -162,8 +162,8 @@
       { type: 'creatures', n: 10, optional: true, text: 'Feed an army of 10 creatures' },
     ],
     guide: [
-      { text: 'Claim the Portal and house your first creatures. Hunger comes about every two minutes, so get the <b>Hatchery</b> up early.', tool: 'dig', when: { type: 'portal' } },
-      { text: 'Choose <b>Hatchery</b> and drag over four floor tiles. Chickens hatch there and wander; hungry creatures catch and eat them.', tool: 'hatchery', when: { type: 'room', room: 'hatchery', n: 4 } },
+      { text: 'Claim the Portal and house your first creatures. Hunger comes about every two minutes, so get the <b>Hatchery</b> up early; Salamanders and Bile Demons only come to a dungeon that can feed them.', tool: 'dig', when: { type: 'portal' } },
+      { text: 'Choose <b>Hatchery</b> and drag over four floor tiles. Chickens hatch there and wander; hungry creatures catch and eat them. Each tile feeds four creatures; the top bar shows whether <i>beds</i> or <i>food</i> is your limit.', tool: 'hatchery', when: { type: 'room', room: 'hatchery', n: 4 } },
       { text: 'The task board below counts your chickens and hungry creatures. A creature left hungry grows angry fast. Build more Hatchery tiles for a bigger army.', when: { type: 'creatures', n: 6 } },
       { text: 'Heroes will come from the Gate in the south once you tunnel to it. Fed creatures fight and heal better.', when: { type: 'gate' } },
     ],
@@ -171,7 +171,7 @@
 
   L.library = {
     id: 'library', name: 'The Library', seed: 104, tagline: 'Research new rooms, traps and spells.',
-    briefing: 'Knowledge is power. Build a Library and your thinkers will sit at its desks and study. Choose what to research in the panel below the view: begin with the Gas Trap and the Heal spell, and let them serve you when the heroes arrive.',
+    briefing: 'Knowledge is power. Build a Library and your thinkers will sit at its desks and study. Choose what to research in the panel below the view: begin with the Gas Trap and the Heal spell, and let them serve you when the heroes arrive. A Library of 3 tiles also draws Warlocks and Dark Elves through the Portal.',
     stars: { heart: 0.5 },
     terrain: { grid: [
       '########################################',
@@ -213,7 +213,7 @@
     ],
     guide: [
       { text: 'Claim the Portal and raise a few creatures. Thinkers (Warlocks study best) will sit at Library desks.', tool: 'dig', when: { type: 'portal' } },
-      { text: 'Choose <b>Library</b> and drag over four floor tiles. Each tile holds a desk.', tool: 'library', when: { type: 'room', room: 'library', n: 4 } },
+      { text: 'Choose <b>Library</b> and drag over four floor tiles. Each tile holds a desk, and three tiles draw Warlocks and Dark Elves to your Portal.', tool: 'library', when: { type: 'room', room: 'library', n: 4 } },
       { text: 'Open the <b>Research</b> panel below the view and click <b>Gas Trap</b>. Creatures studying at desks add progress; the bar fills as they work.', when: { type: 'research', item: 'gas' } },
       { text: 'Now click <b>Heal</b> in the Research panel. Spells cost mana, which rises with your territory.', when: { type: 'research', item: 'heal' } },
       { text: 'Well studied. Tunnel to the Hero Gate in the south when your army is ready.', when: { type: 'gate' } },
@@ -317,7 +317,7 @@
     guide: [
       { text: 'Claim the Portal and raise an army first. Then build the Prison where hero captives will be kept.', tool: 'dig', when: { type: 'portal' } },
       { text: 'Choose <b>Prison</b> and drag over four floor tiles. Creatures that beat a hero senseless carry him here instead of killing him.', tool: 'prison', when: { type: 'room', room: 'prison', n: 4 } },
-      { text: 'Choose <b>Torture Chamber</b>. Prisoners are tortured until they switch sides (a Mistress works faster). Heroes that bleed out in the dungeon are lost.', tool: 'torture', when: { type: 'room', room: 'torture', n: 3 } },
+      { text: 'Choose <b>Torture Chamber</b>. Prisoners are tortured until they switch sides (a Mistress works faster). Heroes that bleed out in the dungeon are lost. A Torture Chamber draws the Mistress, a Prison the Assassin, and both together the Reaper.', tool: 'torture', when: { type: 'room', room: 'torture', n: 3 } },
       { text: 'The <b>Monk</b> heals other heroes: kill him first. Tunnel to the Hero Gate when you are ready.', when: { type: 'gate' } },
     ],
   };
@@ -369,7 +369,7 @@
     ],
     guide: [
       { text: 'Claim the Portal and raise your army. Creatures pray in the <b>Temple</b>; the more they pray, the faster your mana returns.', tool: 'dig', when: { type: 'portal' } },
-      { text: 'Choose <b>Temple</b> and drag over four floor tiles of your territory.', tool: 'temple', when: { type: 'room', room: 'temple', n: 4 } },
+      { text: 'Choose <b>Temple</b> and drag over four floor tiles of your territory. Vampires and Dark Angels come to a Temple of 3 tiles.', tool: 'temple', when: { type: 'room', room: 'temple', n: 4 } },
       { text: 'Spells are in the <b>Spells</b> tab (and on keys <b>1</b>-<b>5</b>). Try <b>Create Imp</b> now: click anywhere on your floor. Spells cost mana and then recharge.', tool: 'imp', when: { type: 'spells', n: 1 } },
       { text: 'In a fight: <b>Lightning</b> (a hero under the cursor), <b>Heal</b> and <b>Speed</b> (your creatures), <b>Call to Arms</b> (a rally point). Cast two more any time.', when: { type: 'spells', n: 3 } },
       { text: 'The <b>Fairy</b> flies over doors and floor traps and heals her friends: strike her with Lightning. Tunnel to the Gate when ready.', when: { type: 'gate' } },
