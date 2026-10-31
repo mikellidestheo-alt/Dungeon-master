@@ -8,6 +8,7 @@
  *   2. cursor.css is the generated one and covers hand, fist and fallbacks; all four files are served
  *   3. every page: the body, buttons, range sliders, locked buttons and canvases use the hand; a number field keeps the text cursor
  *   4. carrying a creature switches to the fist; dropping it, its death or the end of the game switches back
+ *   5. while it is carried the creature itself is not drawn in the world (2D: pixels on the canvas; 3D: its mesh group is hidden), and it returns when dropped
  */
 const { spawn } = require('child_process');
 const path = require('path');
@@ -27,7 +28,7 @@ const sleep = (ms) => new Promise(r => setTimeout(r, ms));
     const problems = [];
     const open = async (url, query) => {
       const page = await (await browser.newContext({ viewport: { width: 1500, height: 1000 } })).newPage();
-      page.on('pageerror', e => problems.push('pageerror: ' + e)); page.on('console', m => { if (['error', 'warning'].includes(m.type()) && !/GL Driver Message/.test(m.text())) problems.push(m.type() + ': ' + m.text()); });
+      page.on('pageerror', e => problems.push('pageerror: ' + e)); page.on('console', m => { if (['error', 'warning'].includes(m.type()) && !/GL Driver Message|willReadFrequently/.test(m.text())) problems.push(m.type() + ': ' + m.text()); });
       page.on('response', r => { if (r.status() >= 400) problems.push(r.status() + ' ' + r.url()); });
       await page.goto(ROOT + url + (query || ''), { waitUntil: 'load' }); await sleep(500); return page;
     };
@@ -106,6 +107,39 @@ const sleep = (ms) => new Promise(r => setTimeout(r, ms));
     await page.evaluate(() => { __game.G.held = null; }); await pick(); await page.evaluate(() => { __game.G.heartHp = 0; __game.hurt({ heart: true, dead: false, x: __game.G.heart.x, y: __game.G.heart.y }, 99999, {}); }); await sleep(300);
     const s4 = await state();
     check('when the game ends the hand is not stuck closed on the end screen', !s4.holding && await page.evaluate(() => __game.G.over === 'defeat'));
+    await page.context().close();
+
+    console.log('5. the carried creature is not drawn in the world');
+    const carry = (pg, where) => pg.evaluate((where) => { const g = __game, G = g.G; document.getElementById('b_hand').click();
+      const c = new g.Creature(G.heart.x + 2, G.heart.y + 3, g.KINDS[1]); c.lair = null; c.noLair = true; G.creatures.push(c); window.__troll = c;
+      const p = { x: c.tx, y: c.ty }, f = { fx: c.x, fy: c.y }; __ui.inputDown(p, f, 0); __ui.inputUp(p, f);
+      const q = { x: Math.floor(where.x), y: Math.floor(where.y) }, h = { fx: where.x, fy: where.y }; __ui.inputMove(q, h); return { held: !!G.held, x: c.x, y: c.y }; }, where);
+    const drop = (pg, where) => pg.evaluate((where) => { const q = { x: Math.floor(where.x), y: Math.floor(where.y) }, h = { fx: where.x, fy: where.y }; __ui.inputMove(q, h); __ui.inputDown(q, h, 0); __ui.inputUp(q, h); return !__game.G.held; }, where);
+    page = await open('index.html', '?sound=0&view=2d&level=classic'); await page.evaluate(() => { __game.G.speed = 0; });
+    // 2D: the Troll is a brown square (#b08850); count that colour in a box round a point of the canvas
+    const troll = (x, y) => page.evaluate(([x, y]) => { const cv = document.getElementById('cv'), TS = cv.width / __game.W, d = cv.getContext('2d').getImageData(Math.round(x * TS - 14), Math.round(y * TS - 20), 28, 34).data; let n = 0;
+      for (let i = 0; i < d.length; i += 4) if (Math.abs(d[i] - 176) < 10 && Math.abs(d[i + 1] - 136) < 10 && Math.abs(d[i + 2] - 80) < 10) n++; return n; }, [x, y]);
+    const home = await page.evaluate(() => { const G = __game.G; return { x: G.heart.x + 2, y: G.heart.y + 3 }; }), far = await page.evaluate(() => { const G = __game.G; return { x: G.heart.x + 3.5, y: G.heart.y - 2.5 }; });
+    await page.evaluate((h) => { const g = __game, c = new g.Creature(h.x, h.y, g.KINDS[1]); c.noLair = true; g.G.creatures.push(c); window.__probe = c; }, home); await sleep(300);
+    const before = await troll(home.x + 0.5, home.y + 0.5);
+    check('2D, before: the Troll is drawn where it stands', before > 40, before + ' brown pixels');
+    await page.evaluate(() => { __game.G.creatures.pop(); });                                     // remove the probe; carry() adds its own
+    const c1 = await carry(page, far); await sleep(300);
+    const nearCursor = await troll(far.x, far.y), nearOld = await troll(c1.x, c1.y);
+    check('2D, carried: nothing of it is drawn at the cursor, or where it stood', c1.held && nearCursor === 0 && nearOld === 0, `at cursor ${nearCursor}, at its old place ${nearOld}`);
+    check('2D, dropped: it is drawn again where it was dropped', (await drop(page, far)) && (await sleep(300), await troll(far.x, far.y)) > 40, (await troll(far.x, far.y)) + ' brown pixels');
+    await page.context().close();
+    // 3D: unit groups in the scene (they carry userData.spr and .bar); the carried one is hidden
+    page = await open('index.html', '?sound=0&level=classic'); await sleep(2000); await page.evaluate(() => { __game.G.speed = 0; });
+    const visibleUnits = () => page.evaluate(() => { const out = { total: 0, shown: 0 }; window.__three.scene.traverse(o => { if (o.userData && o.userData.spr && o.userData.bar) { out.total++; if (o.visible) out.shown++; } }); return out; });
+    const farAt = await page.evaluate(() => { const G = __game.G; return { x: G.heart.x + 3.5, y: G.heart.y - 2.5 }; });
+    await page.evaluate(() => { const g = __game, G = g.G; G.creatures.push(new g.Creature(G.heart.x + 2, G.heart.y + 3, g.KINDS[1])); }); await sleep(400);
+    const u0 = await visibleUnits();
+    await page.evaluate(() => { __game.G.creatures.pop(); }); await sleep(300);
+    const c3d = await carry(page, farAt); await sleep(400); const u1 = await visibleUnits();
+    check('3D, carried: its whole group (sprite, shadow, health bar, x-ray outline) is hidden', c3d.held && u1.shown === u0.shown - 1 + 0 && u1.total >= u0.total, `${u0.shown} visible before, ${u1.shown} while carried`);
+    await drop(page, farAt); await sleep(400); const u2 = await visibleUnits();
+    check('3D, dropped: it is back in the world', u2.shown === u0.shown, `${u2.shown} visible`);
     await page.context().close();
 
     check('no page errors, warnings or failed requests in any run', problems.length === 0, problems.slice(0, 3).join(' | '));

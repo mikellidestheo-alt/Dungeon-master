@@ -1021,7 +1021,8 @@ if (document.fonts) for (const f of ['700 9px Cinzel', '900 40px "Cinzel Decorat
 const hash = (x, y) => { let h = x * 374761393 + y * 668265263; h = (h ^ (h >> 13)) * 1274126177; return ((h ^ (h >> 16)) >>> 0) / 4294967295; };
 const COL = { [T.ROCK]: '#1c1a1a', [T.EARTH]: '#6a4a2c', [T.GOLD]: '#6a4a2c', [T.GEM]: '#4a3a4a', [T.PATH]: '#3b3128' };
 const ROOMCOL = { [T.TREASURY]: '#7a6420', [T.LAIR]: '#4a3a6a', [T.HEART]: '#8a2a2a', [T.PORTAL]: '#5a2a7a', [T.GATE]: '#6a3a2a', [T.PRISON]: '#4a5560', [T.TORTURE]: '#5a2020', [T.LIBRARY]: '#3a4a6a', [T.HATCHERY]: '#6a5a30', [T.TEMPLE]: '#5a4a7a' };
-const scr = (u) => u.held && mouse.fx !== undefined ? [mouse.fx * TS, mouse.fy * TS - 6] : [u.x * TS, u.y * TS];
+const carried = (u) => u.held && mouse.fx !== undefined;                       // a carried unit is the fist in the cursor, so the world does not draw it (see cursor.css)
+const scr = (u) => [u.x * TS, u.y * TS];
 function bar(px, py, u) {                                     // health bar above any damaged unit
   if (u.hp >= u.maxHp) return; ctx.fillStyle = 'rgba(0,0,0,.7)'; ctx.fillRect(px - 7, py - 12, 14, 3);
   ctx.fillStyle = u.team === 'h' ? '#5aa0ff' : '#5fd070'; ctx.fillRect(px - 7, py - 12, 14 * Math.max(0, u.hp) / u.maxHp, 3);
@@ -1067,12 +1068,12 @@ function draw() {
   for (const f of G.fx) if (f.ring) { const k = 1 - f.life / f.max; ctx.strokeStyle = f.color; ctx.globalAlpha = 1 - k; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(f.x * TS, f.y * TS, f.r * TS * (0.3 + 0.7 * k), 0, 7); ctx.stroke(); ctx.lineWidth = 1; ctx.globalAlpha = 1; }
   for (const f of G.fx) if (f.bolt) { ctx.strokeStyle = '#fff6a0'; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(f.x * TS - 3, f.y * TS - 14); ctx.lineTo(f.x * TS + 3, f.y * TS - 6); ctx.lineTo(f.x * TS - 2, f.y * TS - 2); ctx.lineTo(f.x * TS + 2, f.y * TS + 4); ctx.stroke(); ctx.lineWidth = 1; }
   for (const f of G.fx) if (f.splat) { ctx.fillStyle = `rgba(140,20,20,${Math.min(.5, f.life / 6)})`; ctx.beginPath(); ctx.arc(f.x * TS, f.y * TS, 6, 0, 7); ctx.fill(); }
-  for (const i of G.imps) { const [px, py] = scr(i); ctx.fillStyle = i.flash > 0 ? '#fff' : i.state === 'flee' ? '#ff9060' : '#d04040'; ctx.beginPath(); ctx.arc(px, py, 4.2, 0, 7); ctx.fill();
+  for (const i of G.imps) { if (carried(i)) continue; const [px, py] = scr(i); ctx.fillStyle = i.flash > 0 ? '#fff' : i.state === 'flee' ? '#ff9060' : '#d04040'; ctx.beginPath(); ctx.arc(px, py, 4.2, 0, 7); ctx.fill();
     ctx.fillStyle = '#fff'; ctx.fillRect(px + Math.cos(i.face) * 2.5 - .5, py + Math.sin(i.face) * 2.5 - .5, 2, 2);
     if (i.gold) { ctx.fillStyle = '#f4c430'; ctx.fillRect(px - 2, py - 8, 4, 3); }
     if (i.state === 'work') { ctx.strokeStyle = '#fff6'; ctx.beginPath(); ctx.arc(px, py, 6 + Math.sin(G.time * 18) * 1.5, 0, 7); ctx.stroke(); }
     bar(px, py, i); }
-  for (const c of G.creatures) { const [px, py] = scr(c); ctx.fillStyle = c.flash > 0 ? '#fff' : c.color; ctx.fillRect(px - 5, py - 5, 10, 10);
+  for (const c of G.creatures) { if (carried(c)) continue; const [px, py] = scr(c); ctx.fillStyle = c.flash > 0 ? '#fff' : c.color; ctx.fillRect(px - 5, py - 5, 10, 10);
     if (c.state === 'fight' || c.state === 'flee') { ctx.strokeStyle = c.state === 'flee' ? '#ffb030' : '#ff4040'; ctx.strokeRect(px - 6.5, py - 6.5, 13, 13); }
     if (c.haste > 0) { ctx.strokeStyle = '#6aa0ff'; ctx.strokeRect(px - 7.5, py - 7.5, 15, 15); }
     for (let l = 1; l < c.level; l++) { ctx.fillStyle = '#ffe070'; ctx.fillRect(px - 5 + (l - 1) * 3, py + 6, 2, 2); }

@@ -254,6 +254,7 @@ function start() {
     for (const u of all) {
       seen.add(u); let g = unitMeshes.get(u); if (!g) { g = makeUnit(u); unitMeshes.set(u, g); }
       const d = g.userData, held = u.held && mouse.fx !== undefined, name = spriteOf(u) || 'imp';
+      g.visible = !held; if (held) continue;                     // a carried creature is the fist in the cursor (cursor.css): nothing of it is drawn in the world, shadow and health bar included
       const lying = u.unconscious || u.imprisoned, moving = !!u.path && !lying;
       // which way to face on screen: mirror when walking or fighting towards the left
       const sx = Math.cos(u.face || 0) * r.x + Math.sin(u.face || 0) * r.z; if (sx < -0.25) d.flip = true; else if (sx > 0.25) d.flip = false;
