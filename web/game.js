@@ -1105,17 +1105,79 @@ function draw() {
 
 /* ===================================================================================== UI wiring */
 const $ = (id) => document.getElementById(id);
-const TOOLS = [ ['dig', 'Dig (tag)'], ['hand', '✋ Hand'], ['treasury', 'Treasury ' + TERRAIN[T.TREASURY].cost + 'g/tile'], ['lair', 'Lair ' + TERRAIN[T.LAIR].cost + 'g/tile'],
-  ['library', 'Library ' + TERRAIN[T.LIBRARY].cost + 'g/tile'], ['hatchery', 'Hatchery ' + TERRAIN[T.HATCHERY].cost + 'g/tile'], ['temple', 'Temple ' + TERRAIN[T.TEMPLE].cost + 'g/tile'], ['prison', 'Prison ' + TERRAIN[T.PRISON].cost + 'g/tile'], ['torture', 'Torture ' + TERRAIN[T.TORTURE].cost + 'g/tile'],
+const TOOLS = [ ['dig', 'Dig (tag)'], ['hand', '✋ Hand'], ['treasury', 'Treasury ' + TERRAIN[T.TREASURY].cost + 'g'], ['lair', 'Lair ' + TERRAIN[T.LAIR].cost + 'g'],
+  ['library', 'Library ' + TERRAIN[T.LIBRARY].cost + 'g'], ['hatchery', 'Hatchery ' + TERRAIN[T.HATCHERY].cost + 'g'], ['temple', 'Temple ' + TERRAIN[T.TEMPLE].cost + 'g'], ['prison', 'Prison ' + TERRAIN[T.PRISON].cost + 'g'], ['torture', 'Torture ' + TERRAIN[T.TORTURE].cost + 'g'],
   ['door', 'Door ' + DOOR.cost + 'g'], ['gas', 'Gas Trap ' + TRAPS.gas.cost + 'g'], ['bolt', 'Lightning Trap ' + TRAPS.bolt.cost + 'g'],
   ...SPELL_ORDER.map((id, i) => [id, SPELLS[id].icon + ' ' + SPELLS[id].name + ' ' + SPELLS[id].cost + ' [' + (i + 1) + ']']),
   ['sp1', '⏸ Pause'], ['sp2', '1×'], ['sp3', '3×'], ['sp4', '8×'] ];
 const TOOL_GROUP = (id) => id.startsWith('sp') ? 'speed' : SPELLS[id] ? 'spell' : ['door', 'gas', 'bolt'].includes(id) ? 'trap' : ['dig', 'hand'].includes(id) ? 'act' : 'room';     // only styling: which accent a button gets
-let prevGroup = null;
-for (const [id, label] of TOOLS) { const grp = TOOL_GROUP(id); if (prevGroup && grp !== prevGroup) { const sep = document.createElement('span'); sep.className = 'sep'; $('tools').appendChild(sep); } prevGroup = grp;
-  const b = document.createElement('button'); b.className = 'g-' + grp; b.textContent = label; b.id = 'b_' + id; b.onclick = () => {
-  if (id.startsWith('sp')) { G.speed = [0, 1, 3, 8][+id[2] - 1]; } else if (RESEARCH[id] && !isAvail(id)) needs(id); else tool = id; refreshButtons(); }; $('tools').appendChild(b); }
-function refreshButtons() { for (const [id] of TOOLS) { const b = $('b_' + id); b.classList.toggle('on', id === tool || (id.startsWith('sp') && [0, 1, 3, 8][+id[2] - 1] === G.speed)); } }
+/* The toolbar. In view all the time: Dig, three tabs and the speed buttons. A tab opens its commands in a panel under the strip (above it in
+ * full screen): Buildings = the rooms and the defences (doors and traps), Spells = the five spells, Monsters = the Hand and a roster of your
+ * creatures. Click a tab again (or press Esc) to close it. Keys: B, C (cast) and H (Hand) open the tabs; 1-5 open Spells and pick a spell. */
+const TABS = [
+  { id: 'build', label: '🏰 Buildings', key: 'B', groups: [['Rooms', ['treasury', 'lair', 'library', 'hatchery', 'temple', 'prison', 'torture']], ['Defences', ['door', 'gas', 'bolt']]] },
+  { id: 'spells', label: '✨ Spells', key: 'C', groups: [['', SPELL_ORDER]] },
+  { id: 'monsters', label: '👹 Monsters', key: 'H', groups: [['Carry', ['hand']]], roster: true },
+];
+const TAB_OF = {}; for (const t of TABS) for (const [, ids] of t.groups) for (const id of ids) TAB_OF[id] = t.id;
+const LABEL = Object.fromEntries(TOOLS);
+const ROOM_COST = { treasury: TERRAIN[T.TREASURY].cost, lair: TERRAIN[T.LAIR].cost, library: TERRAIN[T.LIBRARY].cost, hatchery: TERRAIN[T.HATCHERY].cost, temple: TERRAIN[T.TEMPLE].cost, prison: TERRAIN[T.PRISON].cost, torture: TERRAIN[T.TORTURE].cost };
+let openTab = null, selectedUnit = null;
+function makeToolButton(id) {
+  const b = document.createElement('button'); b.className = 'g-' + TOOL_GROUP(id); b.textContent = LABEL[id]; b.id = 'b_' + id;
+  if (ROOM_COST[id]) b.title = ROOM_COST[id] + ' gold for every tile you build';
+  b.onclick = () => { if (id.startsWith('sp')) { G.speed = [0, 1, 3, 8][+id[2] - 1]; } else if (RESEARCH[id] && !isAvail(id)) needs(id); else tool = id; refreshButtons(); };
+  return b;
+}
+{
+  const row = $('tabrow'), panel = $('tabpanel'), sep = () => { const e = document.createElement('span'); e.className = 'sep'; return e; };
+  row.appendChild(makeToolButton('dig')); row.appendChild(sep());
+  for (const t of TABS) {
+    const b = document.createElement('button'); b.className = 'tab'; b.id = 'tab_' + t.id; b.setAttribute('aria-expanded', 'false'); b.title = t.label.replace(/^\S+ /, '') + ' [' + t.key + ']';
+    b.innerHTML = t.label + '<small>' + t.key + '</small>'; b.onclick = () => setTab(t.id); row.appendChild(b);
+    const tp = document.createElement('div'); tp.className = 'tp' + (t.roster ? ' stack' : ''); tp.id = 'tp_' + t.id;
+    for (const [name, ids] of t.groups) {
+      const g = document.createElement('div'); g.className = 'grp'; if (name) { const l = document.createElement('span'); l.className = 'lbl'; l.textContent = name; g.appendChild(l); }
+      for (const id of ids) g.appendChild(makeToolButton(id));
+      if (t.roster) { const sum = document.createElement('span'); sum.id = 'rosterSum'; g.appendChild(sum); }
+      tp.appendChild(g);
+    }
+    if (t.roster) { const g = document.createElement('div'); g.className = 'grp'; g.innerHTML = '<span class="lbl">Creatures</span><div id="roster"></div>'; tp.appendChild(g); }
+    panel.appendChild(tp);
+  }
+  const grow = document.createElement('span'); grow.className = 'grow'; row.appendChild(grow);
+  for (const id of ['sp1', 'sp2', 'sp3', 'sp4']) row.appendChild(makeToolButton(id));
+}
+function setTab(id, keepOpen) {                                  // toggles a tab (keepOpen: open it, never close it)
+  openTab = keepOpen ? id : (openTab === id ? null : id);
+  for (const t of TABS) { $('tab_' + t.id).classList.toggle('open', t.id === openTab); $('tab_' + t.id).setAttribute('aria-expanded', String(t.id === openTab)); $('tp_' + t.id).classList.toggle('open', t.id === openTab); }
+  $('tabpanel').classList.toggle('open', !!openTab); if (openTab === 'monsters') renderRoster(true);
+}
+function refreshButtons() {
+  for (const [id] of TOOLS) { const b = $('b_' + id); b.classList.toggle('on', id === tool || (id.startsWith('sp') && [0, 1, 3, 8][+id[2] - 1] === G.speed)); }
+  for (const t of TABS) $('tab_' + t.id).classList.toggle('has', TAB_OF[tool] === t.id);                  // a dot on the tab that holds the tool you have chosen
+}
+/* The Monsters tab: how many you have and a chip for each creature (kind, level, health, mood). Click a chip to look at it (the camera goes
+ * there); click its hand to pick it up, then click the map to put it down. */
+let rosterHtml = '';
+function renderRoster(force) {
+  if (openTab !== 'monsters') return;
+  const hungry = G.creatures.filter(c => !c.noFood && c.hunger >= VAR.HUNGRY_AT).length, angry = G.creatures.filter(c => c.mood !== 'content').length;
+  const sum = 'Imps <b>' + G.imps.length + '</b> · Creatures <b>' + G.creatures.length + '</b>/' + VAR.CREATURES_SUPPORTED_BY_FIRST_PORTAL + ' · hungry <b>' + hungry + '</b> · upset <b>' + angry + '</b>';
+  const chips = G.creatures.map(c => '<button class="chip' + (c.id === selectedUnit ? ' selected' : '') + '" data-id="' + c.id + '" style="--c:' + c.color + '" title="' + c.name + ' #' + c.id + ': ' + c.mood + (c.state ? ', ' + c.state : '') + '. Click to look at it; the hand picks it up."><i></i>' + c.name + ' <em>' + c.level + '</em><span class="hp"><u style="width:' + Math.max(0, Math.round(c.hp / c.maxHp * 100)) + '%"></u></span>' +
+    '<span class="mood">' + (c.unconscious ? '✖' : c.mood === 'angry' ? '😠' : c.mood === 'unhappy' ? '😐' : '') + '</span><span class="grab" data-grab="' + c.id + '">✋</span></button>').join('') || '<span class="none">No creatures yet. Claim the Portal and they will come.</span>';
+  const html = sum + '|' + chips; if (html === rosterHtml && !force) return; rosterHtml = html; $('rosterSum').innerHTML = sum; $('roster').innerHTML = chips;
+}
+$('roster').addEventListener('click', e => {
+  const grab = e.target.closest('[data-grab]'), chip = e.target.closest('.chip'); if (!chip) return; const u = G.creatures.find(c => c.id === +chip.dataset.id); if (!u) return;
+  if (grab) { if (G.held) { say('You are already carrying something: put it down first.'); return; } tool = 'hand'; pickUp(u); refreshButtons(); }
+  else { selectedUnit = u.id; const cam = window.__three && __three.cam; if (cam) { cam.x = u.x; cam.z = u.y; } renderRoster(true); }
+});
+addEventListener('keydown', e => {                                // B, C, H open the tabs; Esc closes the open one
+  if (e.target.tagName === 'INPUT' || e.ctrlKey || e.metaKey || e.altKey) return; const k = e.key.toLowerCase(), t = TABS.find(t => t.key.toLowerCase() === k);
+  if (t) { if (t.id === 'monsters') { tool = 'hand'; setTab('monsters', true); refreshButtons(); } else setTab(t.id); }
+  else if (k === 'escape' && openTab) setTab(openTab);
+});
 function posF(e) { const r = cv.getBoundingClientRect(); return { fx: (e.clientX - r.left) / r.width * W, fy: (e.clientY - r.top) / r.height * H }; }
 function pos(e) { const r = cv.getBoundingClientRect(); return { x: Math.max(0, Math.min(W - 1, Math.floor((e.clientX - r.left) / r.width * W))), y: Math.max(0, Math.min(H - 1, Math.floor((e.clientY - r.top) / r.height * H))) }; }
 /* Input is expressed in world terms ({x,y} tile, {fx,fy} float tile coords) so the 2D and the 3D view share it. */
@@ -1131,7 +1193,7 @@ function inputUp(p, f) {
   else if (!right && ROOM_TOOLS[tool]) build(ROOM_TOOLS[tool], mouse.sx, mouse.sy, p.x, p.y);
   mouse.down = 0;
 }
-addEventListener('keydown', e => { const i = '12345'.indexOf(e.key); if (i >= 0 && e.target.tagName !== 'INPUT') { if (isAvail(SPELL_ORDER[i])) tool = SPELL_ORDER[i]; else needs(SPELL_ORDER[i]); refreshButtons(); } });
+addEventListener('keydown', e => { const i = '12345'.indexOf(e.key); if (i >= 0 && e.target.tagName !== 'INPUT') { if (isAvail(SPELL_ORDER[i])) tool = SPELL_ORDER[i]; else needs(SPELL_ORDER[i]); setTab('spells', true); refreshButtons(); } });
 cv.addEventListener('contextmenu', e => e.preventDefault());
 cv.addEventListener('pointerdown', e => { inputDown(pos(e), posF(e), e.button); cv.setPointerCapture(e.pointerId); });
 cv.addEventListener('pointermove', e => inputMove(pos(e), posF(e)));
@@ -1149,8 +1211,11 @@ function handClick(m) {
   }
   let best = null, bd = 1.3;
   for (const u of G.creatures.concat(G.imps)) { const d = Math.hypot(u.x - m.fx, u.y - m.fy); if (!u.dead && d < bd) { best = u; bd = d; } }
-  if (!best) return;
-  sfx('pickup', best.x, best.y); if (best.isImp) best.drop(); best.held = true; best.path = null; G.held = best; syncHandCursor();
+  if (best) pickUp(best);
+}
+function pickUp(u) {                                              // the Hand, or the Monsters tab, lifts a creature or imp
+  if (G.held || G.over || u.dead) return false;
+  sfx('pickup', u.x, u.y); if (u.isImp) u.drop(); u.held = true; u.path = null; G.held = u; syncHandCursor(); return true;
 }
 function renderLog(isNew) { const el = $('log'); el.innerHTML = G.log.slice(0, 12).map((m, i) => '<div' + (i === 0 && isNew ? ' class="new"' : '') + '>' + m + '</div>').join(''); }
 function renderHud() {
@@ -1160,7 +1225,7 @@ function renderHud() {
   $('hMana').textContent = Math.floor(G.mana) + '/' + G.maxMana;
   for (const id of SPELL_ORDER) $('b_' + id).style.opacity = G.mana >= SPELLS[id].cost && !(G.spellCd[id] > 0) ? 1 : 0.45;
   for (const id in RESEARCH) { const b = $('b_' + id); if (!isAvail(id)) { b.style.opacity = 0.3; b.title = 'Locked — research it in a Library'; } else { b.title = ''; if (!SPELLS[id]) b.style.opacity = ''; } }
-  renderResearch(); renderObjectives(); renderGuide(); renderEnd(); syncHandCursor();
+  renderResearch(); renderObjectives(); renderGuide(); renderEnd(); syncHandCursor(); renderRoster();
   $('hHeart').textContent = Math.ceil(G.heartHp); $('hHeroes').textContent = G.heroes.length; $('hWave').textContent = !VAR.WAVES ? '—' : VAR.WAVES === Infinity ? G.wave + ' / ∞' : G.wave + '/' + VAR.WAVES;
   $('hNext').textContent = !VAR.WAVES ? '—' : !G.gateOpen ? 'tunnel to Gate' : G.nextWave === Infinity ? '—' : Math.max(0, Math.ceil(G.nextWave - G.time)) + 's' + (G.gates.length > 1 ? ' · gates ' + G.gates.filter(g => g.open).length + '/' + G.gates.length : '');
   let dig = 0, claim = 0, busy = 0, upkeep = 0; for (const t of G.tasks.values()) { if (t.type === 'DIG') dig++; else if (t.type === 'CLAIM') claim++; else upkeep++; if (t.who.size) busy++; }
@@ -1203,7 +1268,12 @@ function renderGuide() {
   if (html !== guideHtml) { guideHtml = html; $('guideText').innerHTML = html; const nb = $('guideNext'); if (nb) nb.onclick = () => { G.guideStep++; if (G.guideStep < GUIDE.length) sfx('guide'); }; }
   el.style.display = show ? 'flex' : 'none';
   const tl = show && g.tool ? g.tool : null;                                  // pulse the tool button the step talks about
-  if (tl !== guideTool) { if (guideTool && $('b_' + guideTool)) $('b_' + guideTool).classList.remove('hint'); if (tl && $('b_' + tl)) $('b_' + tl).classList.add('hint'); guideTool = tl; }
+  if (tl !== guideTool) {
+    if (guideTool && $('b_' + guideTool)) $('b_' + guideTool).classList.remove('hint'); if (guideTool && TAB_OF[guideTool]) $('tab_' + TAB_OF[guideTool]).classList.remove('hint');
+    if (tl && $('b_' + tl)) $('b_' + tl).classList.add('hint');
+    if (tl && TAB_OF[tl]) { $('tab_' + TAB_OF[tl]).classList.add('hint'); setTab(TAB_OF[tl], true); }       // the tool is inside a tab: pulse the tab, and open it so the pulsing button is in view
+    guideTool = tl;
+  }
 }
 $('guideX').onclick = () => { G.guideHidden = true; };
 /* The end screen: VICTORY or DEFEAT, the numbers, the three stars and what to do next. Built once, when the run ends. */
@@ -1236,7 +1306,7 @@ function showBriefing(onBegin) {                          // the chapter screen:
   $('briefTitle').textContent = LV.name || LV.id; $('briefText').textContent = LV.briefing || LV.start.welcome || '';
   $('briefGoals').innerHTML = WV.endless ? '<li>Survive as many waves as you can</li><li>A boss leads every 5th wave</li>' : OBJECTIVES.map(o => '<li>' + objText(o) + (o.optional ? ' <i>(bonus)</i>' : '') + '</li>').join('');
   el.style.display = 'flex'; sfx('scroll');
-  $('briefGo').onclick = () => { el.style.display = 'none'; G.speed = was; refreshButtons(); sfx('begin'); if (onBegin) onBegin(); };
+  $('briefGo').onclick = () => { el.style.display = 'none'; G.speed = was; refreshButtons(); sfx('begin'); if (window.__fs) __fs.restore(); if (onBegin) onBegin(); };
 }
 
 function applyStart() {                                                              // what the level hands you at the start
@@ -1275,4 +1345,4 @@ function frame(now) {
 }
 requestAnimationFrame(frame);
 window.__ui = { get mouse() { return mouse; }, get tool() { return tool; }, inputDown, inputMove, inputUp, guideTarget };
-window.__game = { LV, LEVEL_TABLE, CAMPAIGN, startFlee, finishGame, renderEnd, COND, OBJECTIVES, GUIDE, condState, updateObjectives, guideNow, guideTarget, showBriefing, validateLevel, buildMap, levelSize, levelPos, strike, Chicken, updateHatchery, prayRate, spriteOf, pickKind, RESEARCH, isAvail, unlockAll, addResearch, SKELETON, freeSlot, updateJail, knockOut, KO_SECONDS, TORTURE_SECONDS, SPELLS, SPELL_ORDER, castSpell, TRAPS, DOOR, placeThings, removeThings, doorAt, trapAt, HERO_LAND, W, H, G, HEROES, KINDS, spawnWave, Creature, Imp, Hero, hurt, los, T, TERRAIN, step, tagRect, build, scanTasks, findPath, capacity, goldReleased, damageTile, perApplication, VAR, audioMood, SPELL_SND, release };
+window.__game = { LV, LEVEL_TABLE, CAMPAIGN, startFlee, TABS, TAB_OF, setTab, pickUp, renderRoster, finishGame, renderEnd, COND, OBJECTIVES, GUIDE, condState, updateObjectives, guideNow, guideTarget, showBriefing, validateLevel, buildMap, levelSize, levelPos, strike, Chicken, updateHatchery, prayRate, spriteOf, pickKind, RESEARCH, isAvail, unlockAll, addResearch, SKELETON, freeSlot, updateJail, knockOut, KO_SECONDS, TORTURE_SECONDS, SPELLS, SPELL_ORDER, castSpell, TRAPS, DOOR, placeThings, removeThings, doorAt, trapAt, HERO_LAND, W, H, G, HEROES, KINDS, spawnWave, Creature, Imp, Hero, hurt, los, T, TERRAIN, step, tagRect, build, scanTasks, findPath, capacity, goldReleased, damageTile, perApplication, VAR, audioMood, SPELL_SND, release };

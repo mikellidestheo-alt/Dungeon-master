@@ -84,7 +84,7 @@ ticks them off, and the victory text is `LV.victory` if the level sets one.
 
 ```js
 { text: 'Choose <b>Dig</b> and drag over the earth east of your Heart.',   // HTML allowed
-  tool: 'dig',               // optional: the toolbar button with this id (dig, treasury, lair, door, ...) pulses
+  tool: 'dig',               // optional: the toolbar button with this id (dig, treasury, lair, door, ...) pulses; if it lives in a tab (Buildings, Spells, Monsters) that tab opens and pulses too
   at: [9, 5, 12, 5],         // optional: a pulsing marker on that tile [x, y] or box [x0, y0, x1, y1]
   when: { type: 'dug', n: 4 } }   // optional: any objective condition. Without it the step shows a "Got it" button.
 ```
