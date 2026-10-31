@@ -1,0 +1,147 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Dungeon Master — Sandbox</title>
+<link rel="stylesheet" href="vendor/fonts/fonts.css">
+<link rel="stylesheet" href="cursor.css">
+<style>
+  :root { --bg: #070504; --ink: #eadfc6; --dim: #a8946f; --bronze: #6b5230; --bronze-hi: #b98d3e; --gold: #f2c14e;
+    --display: 'Cinzel Decorative', 'Cinzel', Georgia, serif; --head: 'Cinzel', Georgia, serif; --prose: 'IM Fell English', 'EB Garamond', Georgia, serif; --data: 'EB Garamond', Georgia, serif; }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; min-height: 100%; background: var(--bg); color: var(--ink); font: 17px/1.45 var(--data); }
+  body { background: radial-gradient(ellipse 90% 60% at 50% -10%, #3a2412 0%, #1a110a 45%, var(--bg) 100%) fixed; }
+  main { max-width: 1000px; margin: 0 auto; padding: 28px 16px 40px; }
+  h1 { margin: 0; text-align: center; font: 900 clamp(26px, 6vw, 44px)/1.1 var(--display); letter-spacing: .14em; text-transform: uppercase;
+    background: linear-gradient(180deg, #ffe9a6 10%, #e7b04a 55%, #9a6420 100%); -webkit-background-clip: text; background-clip: text; color: transparent; filter: drop-shadow(0 2px 0 #000) drop-shadow(0 0 14px #e8742c55); }
+  .sub { margin: 6px 0 22px; text-align: center; font: italic 400 17px var(--prose); color: var(--dim); }
+  .back { display: inline-block; margin-bottom: 8px; font: 600 13px var(--head); letter-spacing: .1em; color: var(--dim); text-decoration: none; } .back:hover { color: var(--gold); }
+  .layout { display: grid; grid-template-columns: 1.4fr 1fr; gap: 18px; align-items: start; }
+  @media (max-width: 800px) { .layout { grid-template-columns: 1fr; } }
+  .plate { position: relative; padding: 18px 22px 20px; border: 1px solid #54401f; border-radius: 3px; background: linear-gradient(180deg, #281f16, #17120e); box-shadow: inset 0 0 0 1px #0a0704, inset 0 0 0 2px #3a2b15, 0 4px 14px #000a; }
+  h2 { margin: 0 0 8px; font: 700 12px var(--head); letter-spacing: .2em; text-transform: uppercase; color: var(--bronze-hi); }
+  .row { margin: 0 0 16px; } .row:last-child { margin-bottom: 0; }
+  .row label.t { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 4px; font: 600 14px var(--head); letter-spacing: .05em; }
+  .row output { font: 700 17px var(--head); color: var(--gold); }
+  .hint { margin: 2px 0 0; font: italic 400 14px var(--prose); color: var(--dim); }
+  input[type=range] { -webkit-appearance: none; appearance: none; width: 100%; height: 18px; margin: 0; background: transparent; cursor: pointer; }
+  input[type=range]::-webkit-slider-runnable-track { height: 6px; border-radius: 3px; border: 1px solid #5a4424; background: linear-gradient(#0b0805, #2a2016); }
+  input[type=range]::-moz-range-track { height: 6px; border-radius: 3px; border: 1px solid #5a4424; background: linear-gradient(#0b0805, #2a2016); }
+  input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; width: 14px; height: 14px; margin-top: -6px; border: 1px solid #2a1a05; border-radius: 2px; transform: rotate(45deg); background: radial-gradient(circle at 35% 30%, #ffeab0, #c98d22 60%, #6d4a0e); box-shadow: 0 0 6px #f2c14e88; }
+  input[type=range]::-moz-range-thumb { width: 12px; height: 12px; border: 1px solid #2a1a05; border-radius: 2px; transform: rotate(45deg); background: radial-gradient(circle at 35% 30%, #ffeab0, #c98d22 60%, #6d4a0e); }
+  input[type=range]:disabled { opacity: .35; cursor: not-allowed; }
+  input:focus-visible, button:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
+  .seg { display: grid; gap: 6px; } .seg.two { grid-template-columns: 1fr 1fr; } .seg.four { grid-template-columns: repeat(4, 1fr); }
+  @media (max-width: 560px) { .seg.four { grid-template-columns: 1fr 1fr; } }
+  .opt { padding: 8px 10px; text-align: center; cursor: pointer; font: 600 13px var(--head); letter-spacing: .04em; color: #e9d6a6; background: linear-gradient(180deg, #3b2e20, #221911); border: 1px solid var(--bronze); border-radius: 3px; box-shadow: inset 0 1px 0 #ffffff1c, 0 1px 3px #000b; }
+  .opt:hover { border-color: var(--gold); } .opt.on { color: #fff6d8; border-color: #ffd36b; background: linear-gradient(180deg, #8a5d17, #4d330d); box-shadow: inset 0 0 12px #ffd36b66, 0 0 10px #f0a53a88; }
+  .opt small { display: block; margin-top: 2px; font: italic 400 12.5px var(--prose); letter-spacing: 0; color: #bda982; } .opt.on small { color: #f0dba8; }
+  .check { display: flex; gap: 10px; align-items: center; cursor: pointer; font: 600 14px var(--head); } .check input { width: 18px; height: 18px; accent-color: #c98d22; }
+  .seed { display: flex; gap: 8px; } .seed input { flex: 1; min-width: 0; padding: 6px 10px; font: 700 16px var(--head); color: var(--ink); background: #0e0a07; border: 1px solid #5a4424; border-radius: 3px; }
+  .btn { padding: 7px 14px; cursor: pointer; font: 600 14px var(--head); letter-spacing: .05em; color: #e9d6a6; background: linear-gradient(180deg, #3b2e20, #221911); border: 1px solid var(--bronze); border-radius: 3px; }
+  .btn:hover { border-color: var(--gold); }
+  .help { margin-top: 18px; padding: 18px 26px 20px; color: #2b1b0b; border: 1px solid #6a4c1d; border-radius: 3px;
+    background: radial-gradient(ellipse at 20% 0%, #ecdcb2, transparent 60%), linear-gradient(180deg, #dcc99e, #c3aa74); box-shadow: inset 0 0 36px #7a5a2a99, 0 6px 18px #000b; }
+  .help h2 { color: #6b4a1c; }
+  .help ul { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 10px 28px; font: 400 16.5px/1.42 var(--prose); }
+  .help b { font: 700 12.5px var(--head); letter-spacing: .06em; color: #5a2a08; }
+  #summary { font: 400 17px/1.5 var(--prose); margin: 0 0 14px; } #summary b { color: var(--gold); font-weight: 600; }
+  #best { width: 100%; border-collapse: collapse; margin: 0 0 16px; font: 600 14px var(--head); } #best td { padding: 3px 0; border-bottom: 1px solid #3a2b15; } #best td:last-child { text-align: right; color: var(--gold); }
+  #best tr.cur td { color: #fff3cf; }
+  .go { display: block; width: 100%; padding: 12px; cursor: pointer; font: 600 17px var(--head); letter-spacing: .1em; color: #f6e6b8; background: linear-gradient(180deg, #98661c, #55380e); border: 1px solid #2a1a05; border-radius: 3px; text-shadow: 0 1px 0 #000; box-shadow: inset 0 1px 0 #ffffff33, inset 0 -2px 0 #0008, 0 1px 3px #000c; }
+  .go:hover { color: #fff; box-shadow: inset 0 1px 0 #ffffff33, inset 0 -2px 0 #0008, 0 0 12px #f2c14ecc; }
+  /* sound controls (audio.js fills them in), fixed in the corner */
+  #audioCtl { position: fixed; right: 12px; bottom: 10px; display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 4px 10px; max-width: 520px; padding: 6px 10px; font: 600 11px var(--head); letter-spacing: .06em; color: var(--dim);
+    background: #120d09cc; border: 1px solid #3a2b15; border-radius: 3px; }
+  #audioCtl button { padding: 0 8px; line-height: 1.7; font-size: 14px; cursor: pointer; color: #e9d6a6; background: linear-gradient(180deg, #3b2e20, #221911); border: 1px solid var(--bronze); border-radius: 3px; }
+  #audioCtl button.on { border-color: #ffd36b; } #audioCtl label { display: flex; align-items: center; gap: 6px; } #audioCtl input[type=range] { width: 76px; }
+  #audioHint { font: italic 400 13px var(--prose); letter-spacing: 0; color: var(--dim); }
+</style>
+</head>
+<body>
+<div id="audioCtl"><button id="bMute" title="Mute / unmute (M)" aria-label="Mute">🔇</button><input id="vol" type="range" min="0" max="100" value="70" aria-label="Master volume" title="Master volume"><label>Music <input id="musVol" type="range" min="0" max="100" value="100" aria-label="Music volume" title="Music volume"></label><label>Effects <input id="sfxVol" type="range" min="0" max="100" value="100" aria-label="Effects volume" title="Effects volume"></label><small id="audioHint">click anywhere to start sound</small></div>
+<main>
+  <a class="back" href="menu.html">← Chapters</a>
+  <h1>Sandbox</h1>
+  <div class="sub">Set your own rules, or hold out against endless waves</div>
+  <div class="layout">
+    <div class="plate">
+      <div class="row"><h2>Mode</h2>
+        <div class="seg two" id="mode"><button class="opt" data-v="fixed">A fixed siege<small>beat every wave to win</small></button><button class="opt" data-v="endless">Endless<small>waves never stop; a boss every 5th</small></button></div></div>
+      <div class="row"><label class="t" for="waves">Waves <output id="wavesOut"></output></label><input type="range" id="waves"><div class="hint" id="wavesHint"></div></div>
+      <div class="row"><h2>Difficulty</h2><div class="seg four" id="diff"></div></div>
+      <div class="row"><h2>Hero Gates</h2><div class="seg two" id="gates"><button class="opt" data-v="1">One Gate<small>heroes come from the south</small></button><button class="opt" data-v="2">Two Gates<small>each wave is split between them</small></button></div><div class="hint">With two Gates, tunnel to one to fight on a single front or to both to split every wave. A Gate you never link sends nobody.</div></div>
+      <div class="row"><label class="t" for="gold">Starting gold <output id="goldOut"></output></label><input type="range" id="gold" step="100"><div class="hint">Your Heart holds 2000 gold by itself and every Treasury tile 3000 more.</div></div>
+      <div class="row"><label class="t" for="mana">Starting mana <output id="manaOut"></output></label><input type="range" id="mana" step="50"><div class="hint">Spells cost 80 to 150. Mana also rises with the floor you claim and with prayer in a Temple.</div></div>
+      <div class="row"><label class="check"><input type="checkbox" id="unlocks"> Everything researched from the start</label><div class="hint">Prison, Temple, Torture Chamber, traps and every spell, without a Library.</div></div>
+      <div class="row"><label class="t" for="seed">Map seed</label><div class="seed"><input type="number" id="seed" min="0" max="999999"><button class="btn" id="dice" title="Random seed" aria-label="Random seed">🎲</button></div><div class="hint">The same seed always builds the same dungeon.</div></div>
+    </div>
+    <div class="plate">
+      <h2>Your siege</h2>
+      <p id="summary"></p>
+      <h2>Endless best (waves survived)</h2>
+      <div class="hint" style="margin:-4px 0 6px">Kept for each difficulty, whatever the other settings.</div>
+      <table id="best"></table>
+      <button class="go" id="begin">Begin</button>
+    </div>
+  </div>
+  <section class="help" aria-labelledby="helpH">
+    <h2 id="helpH">How the sandbox works</h2>
+    <ul>
+      <li><b>The map.</b> You play on the classic dungeon: your Dungeon Heart in the west, the Portal in the east, a Hero Gate in the south (and one in the north with Two Gates). The seed decides the rock and the gold, so the same seed is the same dungeon every time.</li>
+      <li><b>You start the invasion.</b> Nothing happens until a tunnel links a Gate to your Heart; then the countdown to the first wave begins. Dig most of the tunnel, set doors and traps, and open the last tile when you are ready.</li>
+      <li><b>A fixed siege</b> is won by beating every wave. It gives no stars and does not unlock or change any chapter.</li>
+      <li><b>Endless</b> has no victory. Waves grow stronger and come faster, and a boss leads every fifth one (the Prince, then the King). Press <b>Retire</b> in the top bar to bank your score, or hold on until the Heart falls. The score is the waves you survived.</li>
+      <li><b>Difficulty</b> sets hero strength, the countdown before the first wave, the gap between waves and the Heart's health. Without <b>Everything researched</b> you must study Prison, Temple, traps and spells in a Library.</li>
+      <li><b>Playing</b> works as in the chapters: tag earth with Dig, build on claimed floor, keep your creatures housed, fed and paid, and keep imps alive to re-arm traps. The README has the full guide.</li>
+    </ul>
+  </section>
+</main>
+<script src="audio.js"></script>
+<script src="levels.js"></script>
+<script src="progress.js"></script>
+<script>
+(function () {
+  const qs = new URLSearchParams(location.search), $ = (id) => document.getElementById(id), L = window.SANDBOX_LIMITS, D = window.DIFFICULTY, STORE = 'dm.sandbox';
+  const def = { gates: 1, mode: 'fixed', waves: L.waves[2], diff: 'normal', gold: L.gold[2], mana: L.mana[2], unlocks: false, seed: 7 };
+  let st = Object.assign({}, def);
+  try { Object.assign(st, JSON.parse(localStorage.getItem(STORE)) || {}); } catch (e) { /* storage blocked: defaults */ }
+  const clamp = (v, k) => Math.max(L[k][0], Math.min(L[k][1], Number.isFinite(+v) ? Math.round(+v) : L[k][2]));
+  const fmt = (s) => Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0');
+  for (const k of ['waves', 'gold', 'mana']) { const el = $(k); el.min = L[k][0]; el.max = L[k][1]; el.oninput = () => { st[k] = +el.value; render(); if (window.Sound) Sound.play('tag', undefined, undefined, { pitch: 0.8 + 0.5 * (el.value - L[k][0]) / (L[k][1] - L[k][0]) }); }; }      /* a tick that rises with the slider */
+  const dEl = $('diff'); for (const id in D) { const b = document.createElement('button'); b.className = 'opt'; b.dataset.v = id; b.innerHTML = D[id].name + '<small>×' + D[id].heroMult + ' heroes</small>'; b.onclick = () => { st.diff = id; render(); }; dEl.appendChild(b); }
+  for (const b of $('mode').children) b.onclick = () => { st.mode = b.dataset.v; render(); };
+  for (const b of $('gates').children) b.onclick = () => { st.gates = +b.dataset.v; render(); };
+  $('unlocks').onchange = () => { st.unlocks = $('unlocks').checked; render(); };
+  $('seed').oninput = () => { st.seed = clamp2($('seed').value); render(true); };
+  const clamp2 = (v) => Math.max(0, Math.min(999999, Number.isFinite(parseInt(v, 10)) ? parseInt(v, 10) : 7));
+  $('dice').onclick = () => { st.seed = Math.floor(Math.random() * 1000000); render(); if (window.Sound) Sound.play('dice'); };
+
+  function params() {
+    const p = new URLSearchParams(); p.set('level', 'sandbox'); p.set('diff', st.diff); p.set('gold', st.gold); p.set('mana', st.mana); p.set('unlocks', st.unlocks ? 'all' : 'none'); p.set('seed', st.seed);
+    if (st.gates === 2) p.set('gates', '2');
+    if (st.mode === 'endless') p.set('endless', '1'); else p.set('waves', st.waves);
+    p.set('brief', '1'); for (const k of ['view', 'sound']) if (qs.get(k) !== null) p.set(k, qs.get(k)); return p;
+  }
+  function render(keepSeedField) {
+    st.waves = clamp(st.waves, 'waves'); st.gold = clamp(st.gold, 'gold'); st.mana = clamp(st.mana, 'mana'); if (!D[st.diff]) st.diff = 'normal'; if (st.mode !== 'endless') st.mode = 'fixed'; st.gates = st.gates === 2 ? 2 : 1;
+    for (const b of $('mode').children) b.classList.toggle('on', b.dataset.v === st.mode); for (const b of dEl.children) b.classList.toggle('on', b.dataset.v === st.diff); for (const b of $('gates').children) b.classList.toggle('on', +b.dataset.v === st.gates);
+    $('waves').value = st.waves; $('gold').value = st.gold; $('mana').value = st.mana; $('unlocks').checked = !!st.unlocks; if (!keepSeedField) $('seed').value = st.seed;
+    const endless = st.mode === 'endless'; $('waves').disabled = endless; $('wavesOut').textContent = endless ? '∞' : st.waves; $('wavesHint').textContent = endless ? 'Endless mode has no last wave.' : 'Boss waves (Prince, King) come every 5th wave.';
+    $('goldOut').textContent = st.gold; $('manaOut').textContent = st.mana;
+    const d = D[st.diff];
+    $('summary').innerHTML = '<b>' + d.name + '</b>: ' + d.blurb + '<br>Heroes are <b>×' + d.heroMult + '</b> strength; the first wave lands <b>' + fmt(d.prep) + '</b> after you link the Hero Gate, then one every <b>' + fmt(d.interval) + '</b>' + (endless ? ', ever faster' : '') +
+      '. The Dungeon Heart holds <b>' + d.heartHp + '</b>.' + (st.gates === 2 ? ' Heroes will pour from <b>two Hero Gates</b>.' : '') + '<br>' + (endless ? 'How long can you last?' : 'Survive <b>' + st.waves + '</b> waves.') + ' You start with <b>' + st.gold + '</b> gold' + (st.mana ? ' and <b>' + st.mana + '</b> mana' : '') + (st.unlocks ? ', everything researched' : '') + '.';
+    $('best').innerHTML = Object.keys(D).map(id => '<tr class="' + (id === st.diff ? 'cur' : '') + '"><td>' + D[id].name + '</td><td>' + (Progress.endlessBest(id) || '—') + '</td></tr>').join('');
+    $('begin').textContent = endless ? 'Begin the Endless Siege' : 'Begin sandbox';
+    try { localStorage.setItem(STORE, JSON.stringify(st)); } catch (e) { /* not remembered */ }
+  }
+  $('begin').onclick = () => { location.href = 'index.html?' + params(); };
+  if (qs.get('diff') && D[qs.get('diff')]) st.diff = qs.get('diff');
+  render();
+  window.__sandbox = { params, get state() { return st; } };
+})();
+</script>
+</body>
+</html>

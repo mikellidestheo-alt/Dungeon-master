@@ -1,0 +1,117 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Dungeon Master — Chapters</title>
+<link rel="stylesheet" href="vendor/fonts/fonts.css">
+<link rel="stylesheet" href="cursor.css">
+<style>
+  :root { --bg: #070504; --ink: #eadfc6; --dim: #a8946f; --bronze: #6b5230; --bronze-hi: #b98d3e; --gold: #f2c14e; --good: #6fcf7f;
+    --display: 'Cinzel Decorative', 'Cinzel', Georgia, serif; --head: 'Cinzel', Georgia, serif; --prose: 'IM Fell English', 'EB Garamond', Georgia, serif; --data: 'EB Garamond', Georgia, serif; }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; min-height: 100%; background: var(--bg); color: var(--ink); font: 17px/1.45 var(--data); }
+  body { background: radial-gradient(ellipse 90% 60% at 50% -10%, #3a2412 0%, #1a110a 45%, var(--bg) 100%) fixed; }
+  main { max-width: 1100px; margin: 0 auto; padding: 28px 16px 40px; }
+  h1 { margin: 0; text-align: center; font: 900 clamp(26px, 6vw, 44px)/1.1 var(--display); letter-spacing: .14em; text-transform: uppercase;
+    background: linear-gradient(180deg, #ffe9a6 10%, #e7b04a 55%, #9a6420 100%); -webkit-background-clip: text; background-clip: text; color: transparent; filter: drop-shadow(0 2px 0 #000) drop-shadow(0 0 14px #e8742c55); }
+  .sub { margin: 6px 0 22px; text-align: center; font: italic 400 17px var(--prose); color: var(--dim); }
+  .total { text-align: center; margin: -10px 0 18px; font: 700 13px var(--head); letter-spacing: .16em; text-transform: uppercase; color: var(--bronze-hi); }
+  .total b { color: var(--gold); font-size: 17px; }
+
+  .layout { display: grid; grid-template-columns: minmax(280px, 1fr) minmax(300px, 1.2fr); gap: 18px; align-items: start; }
+  @media (max-width: 760px) { .layout { grid-template-columns: 1fr; } }
+  .plate { position: relative; border: 1px solid #54401f; border-radius: 3px; background: linear-gradient(180deg, #281f16, #17120e); box-shadow: inset 0 0 0 1px #0a0704, inset 0 0 0 2px #3a2b15, 0 4px 14px #000a; }
+
+  #list { list-style: none; margin: 0; padding: 8px; display: grid; gap: 6px; }
+  .chap { display: grid; grid-template-columns: 38px 1fr auto; gap: 4px 12px; align-items: center; width: 100%; padding: 9px 12px; text-align: left; cursor: pointer; font: inherit; color: var(--ink);
+    background: linear-gradient(180deg, #3b2e20, #221911); border: 1px solid var(--bronze); border-radius: 3px; box-shadow: inset 0 1px 0 #ffffff1c, 0 1px 3px #000b; }
+  .chap:hover:not(.locked) { border-color: var(--gold); box-shadow: inset 0 1px 0 #ffffff26, 0 0 10px #f2c14e55; }
+  .chap:focus-visible, .go:focus-visible, .link:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
+  .chap.sel { border-color: #ffd36b; background: linear-gradient(180deg, #8a5d17, #4d330d); box-shadow: inset 0 0 12px #ffd36b66, 0 0 12px #f0a53a88; }
+  .chap .no { grid-row: 1 / 3; font: 700 20px var(--head); color: var(--bronze-hi); text-align: center; }
+  .chap .nm { font: 700 15px var(--head); letter-spacing: .05em; }
+  .chap .tg { grid-column: 2; font: italic 400 15px var(--prose); color: var(--dim); }
+  .chap.sel .tg { color: #e3cfa0; }
+  .chap .st { grid-row: 1 / 3; grid-column: 3; font-size: 20px; letter-spacing: 2px; color: #5a4a30; white-space: nowrap; } .chap .st .on { color: var(--gold); text-shadow: 0 0 8px #f2c14e88; }
+  .chap.locked { cursor: not-allowed; opacity: .5; filter: grayscale(.6); } .chap.locked .st { font-size: 16px; letter-spacing: 0; }
+
+  #detail { padding: 22px 26px 24px; color: #2b1b0b; border-color: #6a4c1d; min-height: 280px;
+    background: radial-gradient(ellipse at 20% 0%, #ecdcb2, transparent 60%), linear-gradient(180deg, #dcc99e, #c3aa74); box-shadow: inset 0 0 36px #7a5a2a99, 0 6px 18px #000b; }
+  #detail h2 { margin: 0 0 2px; font: 900 26px var(--display); letter-spacing: .08em; color: #5a2a08; }
+  #detail .kicker { margin: 0 0 12px; font: 700 12px var(--head); letter-spacing: .2em; text-transform: uppercase; color: #6b4a1c; }
+  #detail p { margin: 0 0 14px; font: 400 18px/1.45 var(--prose); }
+  #detail .best { margin: 0 0 16px; font: 600 14px var(--head); letter-spacing: .06em; color: #4a3010; } #detail .best .st { font-size: 22px; letter-spacing: 3px; color: #8a6a3a; } #detail .best .st .on { color: #b8780a; text-shadow: 0 0 8px #f2c14e; }
+  .go { padding: 10px 26px; cursor: pointer; font: 600 15px var(--head); letter-spacing: .08em; color: #f6e6b8; background: linear-gradient(180deg, #98661c, #55380e); border: 1px solid #2a1a05; border-radius: 3px; text-shadow: 0 1px 0 #000;
+    box-shadow: inset 0 1px 0 #ffffff33, inset 0 -2px 0 #0008, 0 1px 3px #000c; }
+  .go:hover { color: #fff; box-shadow: inset 0 1px 0 #ffffff33, inset 0 -2px 0 #0008, 0 0 12px #f2c14ecc; }
+  .go[disabled] { opacity: .5; cursor: not-allowed; }
+  .foot { margin-top: 22px; text-align: center; font: 400 14px var(--prose); color: var(--dim); }
+  .link { background: none; border: 0; padding: 0; font: inherit; color: var(--dim); text-decoration: underline; cursor: pointer; }
+  .link:hover { color: var(--gold); }
+  .sbx { display: inline-block; margin-top: 4px; padding: 9px 22px; font: 600 14px var(--head); letter-spacing: .08em; color: #e9d6a6; text-decoration: none; background: linear-gradient(180deg, #3b2e20, #221911); border: 1px solid var(--bronze); border-radius: 3px; box-shadow: inset 0 1px 0 #ffffff1c, 0 1px 3px #000b; }
+  .sbx:hover { border-color: var(--gold); color: #fff3cf; } .sbx:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
+  @media (prefers-reduced-motion: no-preference) { .chap { transition: border-color .12s, box-shadow .12s; } }
+  /* sound controls (audio.js fills them in), fixed in the corner */
+  #audioCtl { position: fixed; right: 12px; bottom: 10px; display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 4px 10px; max-width: 520px; padding: 6px 10px; font: 600 11px var(--head); letter-spacing: .06em; color: var(--dim);
+    background: #120d09cc; border: 1px solid #3a2b15; border-radius: 3px; }
+  #audioCtl button { padding: 0 8px; line-height: 1.7; font-size: 14px; cursor: pointer; color: #e9d6a6; background: linear-gradient(180deg, #3b2e20, #221911); border: 1px solid var(--bronze); border-radius: 3px; }
+  #audioCtl button.on { border-color: #ffd36b; } #audioCtl label { display: flex; align-items: center; gap: 6px; } #audioCtl input[type=range] { width: 76px; }
+  #audioHint { font: italic 400 13px var(--prose); letter-spacing: 0; color: var(--dim); }
+  #audioCtl input[type=range] { -webkit-appearance: none; appearance: none; height: 16px; margin: 0; background: transparent; cursor: pointer; }
+  #audioCtl input[type=range]::-webkit-slider-runnable-track { height: 5px; border-radius: 3px; border: 1px solid #5a4424; background: linear-gradient(#0b0805, #2a2016); }
+  #audioCtl input[type=range]::-moz-range-track { height: 5px; border-radius: 3px; border: 1px solid #5a4424; background: linear-gradient(#0b0805, #2a2016); }
+  #audioCtl input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; width: 12px; height: 12px; margin-top: -5px; border: 1px solid #2a1a05; border-radius: 2px; transform: rotate(45deg); background: radial-gradient(circle at 35% 30%, #ffeab0, #c98d22 60%, #6d4a0e); }
+  #audioCtl input[type=range]::-moz-range-thumb { width: 10px; height: 10px; border: 1px solid #2a1a05; border-radius: 2px; transform: rotate(45deg); background: radial-gradient(circle at 35% 30%, #ffeab0, #c98d22 60%, #6d4a0e); }
+</style>
+</head>
+<body>
+<div id="audioCtl"><button id="bMute" title="Mute / unmute (M)" aria-label="Mute">🔇</button><input id="vol" type="range" min="0" max="100" value="70" aria-label="Master volume" title="Master volume"><label>Music <input id="musVol" type="range" min="0" max="100" value="100" aria-label="Music volume" title="Music volume"></label><label>Effects <input id="sfxVol" type="range" min="0" max="100" value="100" aria-label="Effects volume" title="Effects volume"></label><small id="audioHint">click anywhere to start sound</small></div>
+<main>
+  <h1>Dungeon Master</h1>
+  <div class="sub">Choose your chapter, Keeper</div>
+  <div class="total" id="total"></div>
+  <div class="layout">
+    <div class="plate"><ul id="list" aria-label="Chapters"></ul></div>
+    <section class="plate" id="detail" aria-live="polite"></section>
+  </div>
+  <div class="foot"><a class="sbx" id="sandbox" href="sandbox.html">Sandbox &amp; Endless Mode ▸</a></div>
+  <div class="foot" style="margin-top:8px">Progress is saved in this browser. <button class="link" id="reset">Erase saved progress</button></div>
+</main>
+<script src="audio.js"></script>
+<script src="levels.js"></script>
+<script src="chapters.js"></script>
+<script src="progress.js"></script>
+<script>
+(function () {
+  const qs = new URLSearchParams(location.search), order = (window.CAMPAIGN || []).filter(id => window.LEVELS[id]), cheat = qs.get('unlock') === 'all';   // ?unlock=all opens every chapter (testing)
+  const $ = (id) => document.getElementById(id), roman = ['I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII', 'IX', 'X'];
+  const stars = (n, big) => '<span class="st" aria-label="' + n + ' of 3 stars">' + [0, 1, 2].map(i => '<span class="' + (i < n ? 'on' : '') + '">' + (i < n ? '★' : '☆') + '</span>').join('') + '</span>';
+  const open = (id) => { const keep = ['view', 'sound'].filter(k => qs.get(k) !== null).map(k => '&' + k + '=' + encodeURIComponent(qs.get(k))).join(''); location.href = 'index.html?level=' + encodeURIComponent(id) + '&brief=1' + keep; };
+  let sel = null;
+
+  function render() {
+    const first = order.find(id => !Progress.won(id)) || order[order.length - 1];            // the chapter you are up to
+    if (!sel || !order.includes(sel)) sel = first;
+    $('total').innerHTML = 'Stars <b>' + Progress.totalStars(order) + '</b> / ' + order.length * 3;
+    $('list').innerHTML = '';
+    order.forEach((id, i) => {
+      const lv = window.LEVELS[id], rec = Progress.level(id), ok = cheat || Progress.unlocked(order, id), li = document.createElement('li'), b = document.createElement('button');
+      b.className = 'chap' + (ok ? '' : ' locked') + (id === sel ? ' sel' : ''); b.dataset.id = id; b.setAttribute('aria-disabled', ok ? 'false' : 'true');
+      b.innerHTML = '<span class="no">' + (roman[i] || i + 1) + '</span><span class="nm"></span><span class="tg"></span>' + (ok ? stars(rec ? rec.stars : 0) : '<span class="st" title="Win the previous chapter">🔒</span>');
+      b.querySelector('.nm').textContent = lv.name; b.querySelector('.tg').textContent = ok ? (lv.tagline || '') : 'Locked: win the previous chapter';
+      b.onclick = () => { if (ok) { sel = id; render(); } else if (window.Sound) Sound.play('deny'); };
+      li.appendChild(b); $('list').appendChild(li);
+    });
+    const lv = window.LEVELS[sel], rec = Progress.level(sel), idx = order.indexOf(sel);
+    $('detail').innerHTML = '<div class="kicker">Chapter ' + (roman[idx] || idx + 1) + '</div><h2></h2><p></p><div class="best"></div><button class="go" id="play"></button>';
+    $('detail').querySelector('h2').textContent = lv.name; $('detail').querySelector('p').textContent = lv.briefing || lv.tagline || '';
+    $('detail').querySelector('.best').innerHTML = rec && rec.wins ? 'Best ' + stars(rec.stars) + ' &nbsp;' + Progress.fmtTime(rec.bestTime) + ' &nbsp;·&nbsp; ' + rec.wins + (rec.wins === 1 ? ' victory' : ' victories') + (rec.defeats ? ', ' + rec.defeats + ' lost' : '') : (rec && rec.defeats ? rec.defeats + ' defeat' + (rec.defeats > 1 ? 's' : '') + ' so far' : 'Not yet attempted');
+    $('play').textContent = rec && rec.wins ? 'Play again' : rec ? 'Try again' : 'Begin chapter'; $('play').onclick = () => open(sel);
+  }
+  $('reset').onclick = () => { if (confirm('Erase all saved chapters and stars in this browser?')) { Progress.reset(); sel = null; render(); } };
+  render();
+})();
+</script>
+</body>
+</html>

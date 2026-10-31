@@ -1,0 +1,57 @@
+/* Latin subsets of Cinzel, Cinzel Decorative, IM Fell English and EB Garamond (all SIL OFL 1.1, see LICENSE-*.txt). */
+@font-face {
+  font-family: 'Cinzel';
+  font-style: normal;
+  font-weight: 400 900;
+  font-display: swap;
+  src: url(Cinzel-normal-400-900.woff2) format('woff2');
+  
+}
+@font-face {
+  font-family: 'Cinzel Decorative';
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url(CinzelDecorative-normal-700.woff2) format('woff2');
+  
+}
+@font-face {
+  font-family: 'Cinzel Decorative';
+  font-style: normal;
+  font-weight: 900;
+  font-display: swap;
+  src: url(CinzelDecorative-normal-900.woff2) format('woff2');
+  
+}
+@font-face {
+  font-family: 'IM Fell English';
+  font-style: italic;
+  font-weight: 400;
+  font-display: swap;
+  src: url(IMFellEnglish-italic-400.woff2) format('woff2');
+  
+}
+@font-face {
+  font-family: 'IM Fell English';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url(IMFellEnglish-normal-400.woff2) format('woff2');
+  
+}
+@font-face {
+  font-family: 'EB Garamond';
+  font-style: italic;
+  font-weight: 400 700;
+  font-display: swap;
+  src: url(EBGaramond-italic-400-700.woff2) format('woff2');
+  
+}
+@font-face {
+  font-family: 'EB Garamond';
+  font-style: normal;
+  font-weight: 400 700;
+  font-display: swap;
+  src: url(EBGaramond-normal-400-700.woff2) format('woff2');
+  
+}

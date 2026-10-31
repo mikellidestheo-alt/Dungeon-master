@@ -1,0 +1,9 @@
+__pycache__/
+*.pyc
+
+# Dungeon Keeper II's audio belongs to EA: never commit it. Local recordings for web/assets/audio/ stay out of git
+# (use `git add -f` only for files you made or are licensed to publish).
+*.sdt
+web/assets/audio/*
+!web/assets/audio/sounds.json
+!web/assets/audio/README.md
