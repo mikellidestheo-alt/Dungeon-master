@@ -98,7 +98,7 @@ const sleep = (ms) => new Promise(r => setTimeout(r, ms));
     check('the Hand picks a creature up', await pick());
     const s1 = await state();
     check('carrying: the fist holding an imp, on the canvas and on the buttons', s1.holding && /grab\.png/.test(s1.canvas) && /grab\.png/.test(s1.button) && s1.held, JSON.stringify([s1.canvas.slice(0, 60)]));
-    await page.evaluate(() => { const G = __game.G, x = G.heart.x + 3.5, y = G.heart.y + 0.5; const p = { x: Math.floor(x), y: Math.floor(y) }, f = { fx: x, fy: y }; __ui.inputDown(p, f, 0); __ui.inputUp(p, f); });
+    await page.evaluate(() => { const G = __game.G, x = G.heart.x + 3.5, y = G.heart.y - 2.5; const p = { x: Math.floor(x), y: Math.floor(y) }, f = { fx: x, fy: y }; __ui.inputDown(p, f, 0); __ui.inputUp(p, f); });       // open floor away from the imps: a click right on another creature would pick it up too
     const s2 = await state();
     check('dropping it: back to the pointing hand', !s2.holding && /hand\.png/.test(s2.canvas) && !s2.held);
     await pick(); await page.evaluate(() => { __game.G.held.dead = true; }); await sleep(300);

@@ -302,10 +302,24 @@ function start() {
 
   /* doors & traps: sprites keyed by sim object */
   const doorObjs = new Map(), trapObjs = new Map();
+  /* A door is an upright panel standing ACROSS its passage, in line with the walls on either side (not a camera-facing sprite, which looked crooked
+   * from the isometric camera). Walls to the west and east mean the passage runs north-south and the panel spans west-east; walls north and south
+   * mean the opposite. In the open (no walls either side) it faces the way most of its neighbours are blocked. */
+  const doorGeo = new THREE.PlaneGeometry(1, 1); doorGeo.translate(0, 0.5, 0);
+  function doorTurn(d) {
+    const wall = (x, y) => { const t = G.map[y * W + x]; return !t || TERRAIN[t.t].solid; }, we = wall(d.tx - 1, d.ty) + wall(d.tx + 1, d.ty), ns = wall(d.tx, d.ty - 1) + wall(d.tx, d.ty + 1);
+    return ns > we ? Math.PI / 2 : 0;                              // 0: the panel lies along x (walls west and east); PI/2: along z (walls north and south)
+  }
   function makeDoor(d) {
     const g = new THREE.Group(); g.position.set(d.x, 0, d.y);
-    const spr = makeSprite('door', g), bar = makeBar({ team: 'k' }); bar.position.y = 1.35; g.add(bar);
+    const mat = new THREE.MeshBasicMaterial({ map: TEXS.door, transparent: true, alphaTest: 0.3, side: THREE.DoubleSide, depthWrite: true }), spr = new THREE.Mesh(doorGeo, mat);
+    spr.rotation.y = doorTurn(d); g.add(spr);
+    const bar = makeBar({ team: 'k' }); bar.position.y = 1.35; g.add(bar);
     g.userData = { spr, bar, open: 0 }; scene.add(g); return g;
+  }
+  function placeDoor(spr, lift) {                                  // the panel is a tile wide and as tall as the art's proportions make it
+    const im = TEXS.door.image; if (!im) { spr.visible = false; return; }
+    const h = 0.98 * im.height / im.width; spr.scale.set(0.98, Math.min(h, WALL_H), 1); spr.position.y = lift; spr.visible = true;
   }
   function makeTrap(tr) {
     const g = new THREE.Group(); g.position.set(tr.x, 0, tr.y);
@@ -319,7 +333,7 @@ function start() {
       keep.add(d); let g = doorObjs.get(d); if (!g) { g = makeDoor(d); doorObjs.set(d, g); }
       const near = G.creatures.concat(G.imps).some(u => !u.dead && Math.hypot(u.x - d.x, u.y - d.y) < 1.4), u = g.userData;
       u.open += ((near ? 1 : 0) - u.open) * .25;
-      placeSprite(u.spr, 0, u.open * 0.5, 0); u.spr.material.opacity = 1 - u.open * 0.65;                  // slides up and fades while a friend passes
+      placeDoor(u.spr, u.open * 0.5); u.spr.material.opacity = 1 - u.open * 0.65;                         // slides up and fades while a friend passes
       u.spr.material.color.setScalar(d.flash > 0 ? 2.2 : 1);
       u.bar.visible = d.hp < d.maxHp; u.bar.userData.fg.scale.x = .5 * Math.max(.001, d.hp / d.maxHp);
     }
@@ -329,7 +343,7 @@ function start() {
       u.pips.forEach((p, i) => p.visible = i < tr.charges);
     }
     for (const m of [doorObjs, trapObjs]) for (const [k, g] of m) if (!keep.has(k)) {
-      scene.remove(g); g.traverse(o => { if (o.isSprite || o.isMesh) { if (o.geometry && o.isMesh) o.geometry.dispose(); o.material.dispose(); } }); m.delete(k); }
+      scene.remove(g); g.traverse(o => { if (o.isSprite || o.isMesh) { if (o.geometry && o.isMesh && o.geometry !== doorGeo) o.geometry.dispose(); o.material.dispose(); } }); m.delete(k); }
   }
 
   /* shots, damage numbers, blood splats (small pools) */
@@ -387,7 +401,7 @@ function start() {
     let x0 = m.x, x1 = m.x, y0 = m.y, y1 = m.y;
     if (m.down && tool !== 'hand') { x0 = Math.min(m.sx, m.x); x1 = Math.max(m.sx, m.x); y0 = Math.min(m.sy, m.y); y1 = Math.max(m.sy, m.y); }
     sel.scale.set(x1 - x0 + 1, y1 - y0 + 1, 1); sel.position.set((x0 + x1 + 1) / 2, tool === 'dig' ? WALL_H + .05 : .05, (y0 + y1 + 1) / 2);
-    sel.material.color.set(m.down === 3 ? 0xff5050 : m.down ? 0xffe678 : 0xffffff); sel.material.opacity = m.down ? .35 : .22;
+    sel.material.color.set(m.down === 3 || tool === 'sell' ? 0xff5050 : m.down ? 0xffe678 : 0xffffff); sel.material.opacity = m.down ? .35 : .22;
   }
 
   /* ------------------------------------------------------------------ input: ray-march the camera ray into the tile columns */
@@ -467,5 +481,5 @@ function start() {
     heartLight.intensity = 2.0 + Math.sin(G.time * 4) * .5; portalLight.intensity = G.portalOwned ? 1.6 : 0;
     renderer.render(scene, camera);
   };
-  window.__three = { scene, camera, renderer, cam, SPR, TEXS };
+  window.__three = { scene, camera, renderer, cam, SPR, TEXS, doorObjs };
 }

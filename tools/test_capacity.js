@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /* Headless checks for "Lair and Hatchery size cap the army" (web/game.js armyLimit, the Portal's spawn rule, the Heart's larder, the HUD).
  *   node tools/test_capacity.js     (needs playwright with chromium)
- *   1. capacity = min(Portal 15, beds, food): the numbers, with and without the level's rules.food switch
+ *   1. capacity = min(Portal 20, beds, food): the numbers, with and without the level's rules.food switch
  *   2. the Portal stops at the limit, says so once, and more Lair / Hatchery tiles raise it again
  *   3. nobody is thrown out when the limit later drops
  *   4. the top bar and the Monsters tab show x/limit and which limit bites, with a tooltip naming all three
@@ -42,8 +42,8 @@ const sleep = (ms) => new Promise(r => setTimeout(r, ms));
     const lim = async () => page.evaluate(() => { const G = __game.G; return { n: G.creatures.length, log: G.log.filter(m => /dungeon is full|draws no more/.test(m)).length }; });
     await page.evaluate(() => { __t.build('lair', 4); const G = __game.G; G.portalOwned = true; G.nextSpawn = 0; __t.run(1, true); });
     let h = await hud();
-    check('4 Lair tiles and no Hatchery: min(15, 4 beds, 3 food) = 3, limited by food', h.max === '3' && h.by === 'food', JSON.stringify(h));
-    check('the tooltip names all three limits', /beds 4/.test(h.title) && /food 3/.test(h.title) && /Portal 15/.test(h.title), h.title);
+    check('4 Lair tiles and no Hatchery: min(20, 4 beds, 3 food) = 3, limited by food', h.max === '3' && h.by === 'food', JSON.stringify(h));
+    check('the tooltip names all three limits', /beds 4/.test(h.title) && /food 3/.test(h.title) && /Portal 20/.test(h.title), h.title);
     await page.close();
 
     console.log('2. the Portal stops at the limit');
@@ -62,10 +62,10 @@ const sleep = (ms) => new Promise(r => setTimeout(r, ms));
     await page.evaluate(() => { __t.build('lair', 3); __t.run(120, true); });
     l = await lim(); h = await hud();
     check('3 more Lair tiles: 7 beds, 7 food: the 7th creature arrives and the limit is 7', l.n === 7 && h.max === '7', JSON.stringify([l, h]));
-    await page.evaluate(() => { __t.build('lair', 12); __t.build('hatchery', 5); __t.run(600, true); });
+    await page.evaluate(() => { __t.build('lair', 16); __t.build('hatchery', 5); __t.run(900, true); });
     l = await lim(); h = await hud();
-    check('with plenty of both, the Portal itself stops the army at 15', l.n === 15 && h.max === '15' && h.by === 'Portal', JSON.stringify([l, h]));
-    check('and says so', await page.evaluate(() => __game.G.log.some(m => /Portal draws no more than 15/.test(m))));
+    check('with plenty of both, the Portal itself stops the army at 20', l.n === 20 && h.max === '20' && h.by === 'Portal', JSON.stringify([l, h]));
+    check('and says so', await page.evaluate(() => __game.G.log.some(m => /Portal draws no more than 20/.test(m))));
     await page.close();
 
     console.log('3. nobody is thrown out when the limit drops');
@@ -84,7 +84,7 @@ const sleep = (ms) => new Promise(r => setTimeout(r, ms));
     const ui = await page.evaluate(() => { __game.renderRoster(true); const s = document.getElementById('rosterSum'); return { sum: s.textContent, title: s.querySelector('small').title }; });
     h = await hud();
     check('top bar: 6 beds, food 3 + 4: 6/6 beds', h.n === '6' && h.max === '6' && h.by === 'beds', JSON.stringify(h));
-    check('the Monsters tab shows the same: "Creatures 6/6 beds" with the explanation as a tooltip', /Creatures 6\/6 beds/.test(ui.sum) && /beds 6, food 7, Portal 15/.test(ui.title), JSON.stringify(ui));
+    check('the Monsters tab shows the same: "Creatures 6/6 beds" with the explanation as a tooltip', /Creatures 6\/6 beds/.test(ui.sum) && /beds 6, food 7, Portal 20/.test(ui.title), JSON.stringify(ui));
     await page.close();
 
     console.log('5. nobody starves at capacity (10 minutes)');
@@ -93,7 +93,7 @@ const sleep = (ms) => new Promise(r => setTimeout(r, ms));
       const r = await p.evaluate(([lair, hatch]) => {
         const g = __game, G = g.G; __t.build('lair', lair); __t.build('hatchery', hatch); G.portalOwned = true; G.nextSpawn = 0;
         for (let x = 11; x <= 28; x++) { const t = G.map[14 * g.W + x]; t.t = g.T.PATH; t.owner = 1; t.hp = 1000; t.gold = 0; t.tag = 0; }       // a tunnel from the cavern to the Portal, so arrivals can reach beds and food
-        let guard = 0; while (G.creatures.length < 15 && guard++ < 400) { G.nextSpawn = 0; __t.run(0.1, true); }       // fill the dungeon to its limit, quickly
+        let guard = 0; while (G.creatures.length < 20 && guard++ < 600) { G.nextSpawn = 0; __t.run(0.1, true); }       // fill the dungeon to its limit, quickly
         const n0 = G.creatures.length; G.creatures.forEach(c => { c.hunger = 20; c.anger = 0; });
         let furious = 0, maxAnger = 0, hungryEnd = 0; const unsub = G.log.unshift.bind(G.log); G.log.unshift = (m) => { if (/furious/.test(m)) furious++; return unsub(m); };
         __t.run(600, false);
@@ -105,7 +105,7 @@ const sleep = (ms) => new Promise(r => setTimeout(r, ms));
     await starve([30, 2], '2 Hatchery tiles: 11 creatures, ten minutes, nobody leaves, nobody ends angry');
     await starve([30, 1], '1 Hatchery tile: 7 creatures, ten minutes, nobody leaves, nobody ends angry');
     await starve([30, 0], 'no Hatchery: the Heart\'s larder keeps its 3 creatures fed for ten minutes');
-    await starve([30, 4], '4 Hatchery tiles: 15 creatures (the Portal limit), ten minutes, nobody leaves, nobody ends angry');
+    await starve([30, 5], '5 Hatchery tiles: 20 creatures (the Portal limit), ten minutes, nobody leaves, nobody ends angry');
 
     console.log('6. rules.food and validation');
     page = await open('level=classic&seed=7'); await page.evaluate(SETUP);

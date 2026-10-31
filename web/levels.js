@@ -162,9 +162,9 @@ window.DIFFICULTY = {
   brutal: { name: 'Dungeon Master', blurb: 'Heroes hit hard and hardly wait.',         heroMult: 1.5,  scale: 0.16, prep: 60,  interval: 80,  minInterval: 50, heartHp: 2000, dig: 3 },
 };
 window.SANDBOX_LIMITS = { waves: [3, 15, 8], gold: [200, 5000, 1500], mana: [0, 1000, 300], gates: [1, 6, 1] };      // [min, max, default]
-/* The sandbox map: 88 x 60 tiles (the classic dungeon was 40 x 28), your Heart in the west, the Portal in the east and up to six Hero Gates spread round
+/* The sandbox map: 88 x 60 tiles (the classic dungeon was 40 x 28), your Heart in the west, the Portal a short dig east of it and up to six Hero Gates spread round
  * the edge so the heroes can come from different directions: south, north, south-east, north-east, south-west, north-west. Each Gate gets its own hero cavern. */
-window.SANDBOX_MAP = { size: [88, 60], heart: [6, 29], portal: [80, 29], gates: [[44, 54], [44, 5], [68, 54], [68, 5], [20, 54], [20, 5]], names: ['south', 'north', 'south-east', 'north-east', 'south-west', 'north-west'] };
+window.SANDBOX_MAP = { size: [88, 60], heart: [6, 29], portal: [18, 29], gates: [[44, 54], [44, 5], [68, 54], [68, 5], [20, 54], [20, 5]], names: ['south', 'north', 'south-east', 'north-east', 'south-west', 'north-west'] };
 
 /* The party for wave n (1, 2, 3, ...). Pure: the same n always gives the same party, so a seeded run stays reproducible and endless mode
  * needs no stored plan. Early waves are Knights and Archers; a new hero type joins every wave or two; the party grows to 9 (the
@@ -186,12 +186,12 @@ window.makeSandbox = function (params) {
   const M = window.SANDBOX_MAP, seed = parseInt(get('seed'), 10), ng = num('gates'), gates = M.gates.slice(0, ng), [gw, gh] = M.size;
   const lanes = [[11, M.heart[1] - 2, M.portal[0] - 4, M.heart[1] + 2]];                      // no rock is dropped on the way between the Heart and the Portal, nor on the way down from each Gate: every seed can be dug through
   for (const [x, y] of gates) lanes.push([x - 2, Math.min(y, M.heart[1]), x + 2, Math.max(y, M.heart[1])]);
-  const caverns = [{ rect: [M.heart[0] - 4, M.heart[1] - 3, M.heart[0] + 4, M.heart[1] + 3], owner: 'keeper' }, { rect: [M.portal[0] - 3, M.portal[1] - 3, M.portal[0] + 3, M.portal[1] + 3], owner: 'none' }];
+  const caverns = [{ rect: [M.heart[0] - 3, M.heart[1] - 2, M.heart[0] + 3, M.heart[1] + 2], owner: 'keeper' }, { rect: [M.portal[0] - 3, M.portal[1] - 3, M.portal[0] + 3, M.portal[1] + 3], owner: 'none' }];
   for (const [x, y] of gates) caverns.push({ rect: [x - 3, y - 3, x + 3, y + 3], owner: 'hero' });
   const base = { terrain: { size: M.size, caverns, generate: {
       rock: { count: 44, x: 4, xSpan: gw - 8, y: 2, ySpan: gh - 4, rMin: 1, rSpan: 2 }, gold: { count: 46, x: 12, xSpan: gw - 24, y: 2, ySpan: gh - 4, rMin: 1, rSpan: 0 },
       gems: [{ x: 30, y: 12, r: 1 }, { x: 58, y: 46, r: 1 }, { x: 44, y: 30, r: 1 }, { x: 20, y: 44, r: 1 }, { x: 66, y: 12, r: 1 }], lanes } },
-    heart: M.heart, portal: M.portal, gates, start: { pretag: [[M.heart[0] + 5, M.heart[1]], [M.heart[0] + 6, M.heart[1]], [M.heart[0] + 7, M.heart[1]], [M.heart[0] + 8, M.heart[1]]] } };
+    heart: M.heart, portal: M.portal, gates, start: { pretag: [[M.heart[0] + 4, M.heart[1]], [M.heart[0] + 5, M.heart[1]], [M.heart[0] + 6, M.heart[1]], [M.heart[0] + 7, M.heart[1]]] } };
   const lv = {
     id: 'sandbox', name: endless ? 'Endless Siege' : 'Sandbox', seed: Number.isFinite(seed) ? seed : 7, sandbox: { diff, endless, gates: ng },
     tagline: 'Your own rules.', terrain: base.terrain, heart: base.heart, portal: base.portal, gates: base.gates,

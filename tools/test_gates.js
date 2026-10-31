@@ -31,7 +31,7 @@ const sleep = (ms) => new Promise(r => setTimeout(r, ms));
     };
     // a corridor of claimed floor from the Heart's cavern to a Gate's cavern (the 88 x 60 sandbox map): trunk along y=29, then up or down x=44
     const carve = (page, which) => page.evaluate((which) => { const g = window.__game, G = g.G, W = g.W; const cut = (x, y) => { const t = G.map[y * W + x]; t.t = g.T.PATH; t.hp = 1000; t.owner = 1; t.gold = 0; t.tag = 0; };
-      if (which === 'trunk') for (let x = 11; x <= 44; x++) cut(x, 29); if (which === 'south') for (let y = 30; y <= 50; y++) cut(44, y); if (which === 'north') for (let y = 9; y <= 28; y++) cut(44, y); G.dirty = true; }, which);
+      if (which === 'trunk') for (let x = 10; x <= 44; x++) cut(x, 29); if (which === 'south') for (let y = 30; y <= 50; y++) cut(44, y); if (which === 'north') for (let y = 9; y <= 28; y++) cut(44, y); G.dirty = true; }, which);
     const run = (page, secs) => page.evaluate((secs) => { const g = window.__game; for (let s = 0; s < secs && !g.G.over; s += 0.05) g.step(0.05); }, secs);
     const wave = (page) => page.evaluate(() => { const g = window.__game, G = g.G; G.nextWave = G.time; g.step(0.05); const gt = G.gates;
       return { n: G.wave, heroes: G.heroes.map(h => ({ name: h.name, gate: gt.indexOf(h.homeGate), near: gt.findIndex(q => Math.abs(h.x - q.x - .5) <= 1.6 && Math.abs(h.y - q.y - .5) <= 1.6), group: G.heroes.filter(o => o.party === h.party).length, leader: h.leader && h.leader.id === h.id })) }; });

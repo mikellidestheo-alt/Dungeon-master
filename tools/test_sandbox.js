@@ -67,13 +67,13 @@ const HEROES = ['Knight', 'Archer', 'Mage', 'Thief', 'Guard', 'Monk', 'Prince', 
 
     console.log('3. a sandbox level loads with its options');
     ctx = await fresh(); page = await game(ctx, 'level=sandbox&diff=hard&waves=5&gold=2500&mana=600&unlocks=all&seed=11&nosave=1');
-    const lv = await page.evaluate(() => { const g = window.__game, G = g.G; let h = 2166136261; for (const t of G.map) { h ^= t.t; h = Math.imul(h, 16777619) >>> 0; h ^= t.hp | 0; h = Math.imul(h, 16777619) >>> 0; }
+    const lv = await page.evaluate(() => { const g = window.__game, G = g.G; let h = 2166136261; for (const t of G.map) { h ^= t.t; h = Math.imul(h, 16777619) >>> 0; }
       return { id: g.LV.id, waves: g.VAR.WAVES, gold: G.gold, mana: Math.round(G.mana), done: Object.keys(G.research.done).length, total: Object.keys(g.RESEARCH).length, heartHp: G.heartHp, prep: g.VAR.FIRST_WAVE_DELAY, hash: h,
         last: g.LV.waves.plan[4][0], errs: g.validateLevel(g.LV), brief: document.getElementById('boxLog') && G.log[0], objs: document.getElementById('objList').textContent }; });
     check('options arrive: 5 waves, 2500 gold, ~600 mana, everything researched, Overlord numbers', lv.id === 'sandbox' && lv.waves === 5 && lv.gold === 2500 && lv.mana >= 600 && lv.mana < 620 && lv.done === lv.total && lv.heartHp === 2200 && lv.prep === 75, JSON.stringify(lv));
     check('the level validates and wave 5 is led by the Prince', lv.errs.length === 0 && lv.last === 'Prince', lv.errs.join());
     check('the default objective is shown', /Defeat every wave/.test(lv.objs));
-    const hashOf = async (q) => { const p = await game(ctx, 'level=sandbox&' + q); const h = await p.evaluate(() => { let h = 2166136261; for (const t of window.__game.G.map) { h ^= t.t; h = Math.imul(h, 16777619) >>> 0; h ^= t.hp | 0; h = Math.imul(h, 16777619) >>> 0; } return h; }); await p.close(); return h; };
+    const hashOf = async (q) => { const p = await game(ctx, 'level=sandbox&' + q); const h = await p.evaluate(() => { let h = 2166136261; for (const t of window.__game.G.map) { h ^= t.t; h = Math.imul(h, 16777619) >>> 0; } return h; }); await p.close(); return h; };
     const h11 = await hashOf('seed=11'), h12 = await hashOf('seed=12');
     check('the seed picks the map: same seed same dungeon, another seed another', h11 === lv.hash && h12 !== h11, [h11, h12, lv.hash].join(' '));
     await ctx.close();

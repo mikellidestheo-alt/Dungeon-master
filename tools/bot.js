@@ -119,7 +119,7 @@
     }
     function defences() {
       if (!S.routes) return; const wantDoors = need('doors'), anyTrap = g.isAvail('gas') || g.isAvail('bolt');
-      const wantTraps = Math.max(need('traps'), anyTrap ? 6 : 0), wantD = Math.max(wantDoors, anyTrap ? 2 : 0), h = heart();
+      const wantTraps = Math.max(need('traps'), anyTrap ? 4 : 0), wantD = Math.max(wantDoors, anyTrap ? 2 : 0), h = heart();
       S.routes.forEach((r, k) => {
         const path = heroPath(G.gates[r.gate], r).filter(([x, y]) => { const d = dist({ x: x + .5, y: y + .5 }, h); return d > 4.5 && d < 26; });       // the stretch leading into the home cavern
         const per = S.routes.length; let d = 0, tr = 0;
@@ -148,7 +148,7 @@
       if (!steady || !count(T.LIBRARY)) return;
       const want = obj('research').map(o => o.item).filter(id => !G.research.done[id]); if (want.length && G.research.current !== want[0]) G.research.current = want[0];
     }
-    function imps() {                                // imps dig, claim and (above all) re-arm traps and mend doors, so keep four alive before anything else and six when mana allows
+    function imps() {                                // imps dig, claim and mend doors, so keep four alive before anything else and six when mana allows
       if (!steady || G.time < 20 || !g.isAvail('imp')) return; const n = G.imps.length;
       if ((n < 4 && G.mana >= 100) || (n < 6 && G.mana >= 260)) g.castSpell('imp', { fx: heart().x, fy: heart().y + 2.5 });
     }

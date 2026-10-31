@@ -77,8 +77,8 @@ const sleep = (ms) => new Promise(r => setTimeout(r, ms));
     console.log('3. gold and wages');
     page = await open('level=classic&seed=7'); await page.evaluate(SETUP);
     const gold = await page.evaluate(() => {
-      const g = __game, G = g.G, V = g.VAR; __t.room(2); const c = __t.creature(); G.gold = 1000; let sessions = 0, was = c.state, spent = 0, prev = G.gold;
-      for (let s = 0; s < 200; s += 0.05) { g.step(0.05); c.anger = 0; c.hunger = 0; c.energy = 100; if (G.nextPay < 1) G.nextPay = 1e9; if (c.state === 'train' && was !== 'train') sessions++; was = c.state; }
+      const g = __game, G = g.G, V = g.VAR; __t.room(2); const c = __t.creature(); G.gold = 1000; let sessions = 0, was = c.state, spent = 0, prev = G.gold, prevS = 0;
+      for (let s = 0; s < 200; s += 0.05) { g.step(0.05); c.anger = 0; c.hunger = 0; c.energy = 100; if (G.nextPay < 1) G.nextPay = 1e9; if (c.state === 'train' && (was !== 'train' || c.studyT > prevS + 1)) sessions++; was = c.state; prevS = c.studyT; }       // a creature now stays at its dummy and pays for the next session, so a new session is a fresh 20 s on the clock
       const drop = 1000 - G.gold;
       const log0 = G.log.filter(m => /Not enough gold to train/.test(m)).length;
       G.gold = 110; c.level = 1; for (let s = 0; s < 120; s += 0.05) { g.step(0.05); c.anger = 0; c.hunger = 0; c.energy = 100; if (G.nextPay < 1) G.nextPay = 1e9; }
@@ -103,10 +103,12 @@ const sleep = (ms) => new Promise(r => setTimeout(r, ms));
     page = await open('level=classic&seed=7'); await page.evaluate(SETUP);
     const one = await page.evaluate(() => {
       const g = __game, G = g.G; __t.room(1); const a = __t.creature(1, 9, 12), b = __t.creature(1, 9, 13); let both = 0, any = 0;
-      for (let s = 0; s < 120; s += 0.05) { g.step(0.05); for (const c of [a, b]) { c.anger = 0; c.hunger = 0; c.energy = 100; } G.gold = Math.max(G.gold, 1e5); if (a.state === 'train' && b.state === 'train') both++; if (a.state === 'train' || b.state === 'train') any++; }
-      return { both, any, xpA: Math.round(a.xp), xpB: Math.round(b.xp) };
+      let xpB60 = 0;
+      for (let s = 0; s < 180; s += 0.05) { g.step(0.05); for (const c of [a, b]) { c.anger = 0; c.hunger = 0; c.energy = 100; } if (s >= 90) a.energy = 20;      // for 90 s the first stays at the dummy session after session; then it is tired and goes
+        G.gold = Math.max(G.gold, 1e5); if (a.state === 'train' && b.state === 'train') both++; if (a.state === 'train' || b.state === 'train') any++; if (s < 90) xpB60 = Math.round(b.xp); }
+      return { both, any, xpA: Math.round(a.xp), xpB: Math.round(b.xp), xpB60 };
     });
-    check('one creature per tile: with one dummy two creatures never train together, but both get turns', one.both === 0 && one.any > 800 && one.xpA > 5 && one.xpB > 5, JSON.stringify(one));
+    check('one creature per tile: with one dummy two creatures never train together; the first stays until it is tired, then the second gets its turn', one.both === 0 && one.any > 800 && one.xpA > 5 && one.xpB60 === 0 && one.xpB > 5, JSON.stringify(one));
     const fed = await page.evaluate(() => {
       const g = __game, G = g.G; G.creatures.length = 0; __t.room(2); const c = __t.creature(); c.noFood = false; c.hunger = 100; c.chickenless = true; G.chickens.length = 0; let trained = 0;
       for (let s = 0; s < 40; s += 0.05) { g.step(0.05); c.hunger = 100; c.anger = 0; c.energy = 100; if (c.state === 'train' || c.state === 'toTrain') trained++; }

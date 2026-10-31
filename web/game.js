@@ -25,8 +25,8 @@ const VAR = {                                         // Variable.MiscVariable.M
   GOLD_MINED_FROM_GEMS: 25, MAX_GOLD_PER_TREASURY_TILE: 3000,
   MODIFY_ANGER_OF_CREATURE_IN_LAIR_PER_SECOND: -550,
   MINIMUM_IMP_THRESHOLD: 4, TIME_BEFORE_FREE_IMP_GENERATED_SECONDS: 5,
-  CREATURES_SUPPORTED_BY_FIRST_PORTAL: 15,
-  FREE_FEED: 3, FEED_PER_HATCHERY_TILE: 4,            // food limit on the army: 3 creatures live off the Heart's larder; each Hatchery tile feeds 4 more (a tile lays a chicken every 24 s, a creature eats about every 120 s: 5 per tile in theory, 4 leaves room for the walk and the 12-chicken cap)
+  CREATURES_SUPPORTED_BY_FIRST_PORTAL: 20,                 // the level's rules.maxCreatures overrides it (20 by default, 25 in the last three chapters)
+  FREE_FEED: 3, FEED_PER_HATCHERY_TILE: 4,            // food limit on the army: 3 creatures live off the Heart's larder (a ration eaten at the Heart: it never lays a chicken, only a Hatchery does); each Hatchery tile feeds 4 more (a tile lays a chicken every 24 s, a creature eats about every 120 s: 5 per tile in theory, 4 leaves room for the walk and the 12-chicken cap)
   PAY_DAY_FREQUENCY_SECONDS: 90,                      // stock is 600; shortened so you see it
   IMP_EFFICIENCY: 80,                                 // TileWork.FULL_EFFICIENCY comment: "80% for a fresh imp"
   IMP_MAX_GOLD: 400,
@@ -43,6 +43,7 @@ const VAR = {                                         // Variable.MiscVariable.M
   XP_PER_KILL: 1, MAX_LEVEL: 10,                      // CreatureExperienceSystem, reduced: a kill is a trickle, training is the way up (see XP_FOR_LEVEL)
   XP_FOR_LEVEL: [50, 65, 80, 100, 125, 155, 190, 230, 280],     // XP to go from level n to n+1 (index n-1); 1275 in all: at about 30 XP a minute of steady training a creature gains a level every 1.7 minutes at first, 9 minutes at the end
   LEVEL_STAT_MULT: 1.11, PAY_PER_LEVEL: 0.08,         // hp and damage x1.11 per level (x2.5 at level 10); wages +8% of the base per level above 1
+  HATCHERY_HEAL_PER_SECOND: 4, HATCHERY_REST_BELOW: 0.75,       // a wounded creature rests among the chickens: half as fast as asleep in a Lair (8), nearly five times faster than walking about (0.8)
   TRAIN_SECONDS: 20, TRAIN_XP_PER_SECOND: 0.75, TRAIN_COST: 15, TRAIN_KEEP_GOLD: 100, TRAIN_PAYDAY_WINDOW: 30,      // a session is 20 s for 15 XP and 15 gold; a creature will not train if that leaves the purse under 100, or under the whole payday in the 30 s before it
 };
 
@@ -72,7 +73,7 @@ const TERRAIN = [
 function rng(seed) { return function () { seed |= 0; seed = seed + 0x6D2B79F5 | 0; let t = Math.imul(seed ^ seed >>> 15, 1 | seed);
   t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
 const WV = LV.waves || {};
-Object.assign(VAR, { HEART_HEALTH: LV.rules.heartHp, WAVES: WV.endless ? Infinity : (WV.plan || []).length, FIRST_WAVE_DELAY: WV.prep === undefined ? 75 : WV.prep, WAVE_INTERVAL: WV.interval || 110 });   // the level sets the invasion's pace
+Object.assign(VAR, { HEART_HEALTH: LV.rules.heartHp, WAVES: WV.endless ? Infinity : (WV.plan || []).length, FIRST_WAVE_DELAY: WV.prep === undefined ? 75 : WV.prep, WAVE_INTERVAL: WV.interval || 110, CREATURES_SUPPORTED_BY_FIRST_PORTAL: LV.rules.maxCreatures || VAR.CREATURES_SUPPORTED_BY_FIRST_PORTAL });   // the level sets the invasion's pace
 const qs = new URLSearchParams(location.search);
 const DIG = WV.dig || 0;                              // how many heroes tunnel (waves.dig, 0-4), see "Heroes that dig" below
 const rand = rng(parseInt(qs.get('seed') || LV.seed || '7', 10));
@@ -83,10 +84,12 @@ const G = {
   nextImp: 0, nextSpawn: 20, nextPay: VAR.PAY_DAY_FREQUENCY_SECONDS, scanT: 0, log: [],
   portalOwned: false, heart: { x: POS.heart[0], y: POS.heart[1] }, portal: POS.portal && { x: POS.portal[0], y: POS.portal[1] },
   gates: POS.gates.map(g => ({ x: g[0], y: g[1], open: false })), gate: null,
-  heroes: [], prisoners: [], shots: [], fx: [], doors: [], traps: [], clouds: [], mana: LV.start.mana, maxMana: 1000, manaRate: 3, spellCd: {}, rally: null, ownedTiles: 0, manaT: 0, research: { current: LV.start.research || null, points: {}, done: {} }, chickens: [], hatchT: 0, hatchTiles: [], hatchScan: 0, heartHp: VAR.HEART_HEALTH, heartFlash: 0, gateOpen: false, gateT: 0,
-  wave: 0, nextWave: Infinity, over: null, kills: 0, held: null, nextId: 0,
-  heardOf: {}, stats: { dug: 0, mined: 0, claimed: 0, spells: 0 }, objDone: {}, objProg: {}, guideStep: 0, guideHidden: false,   // counters the objectives read; which objectives are done; where the tutorial guide is
+  heroes: [], prisoners: [], shots: [], fx: [], doors: [], traps: [], clouds: [], mana: LV.start.mana, maxMana: 1000, manaRate: 3, spellCd: {}, rally: null, ownedTiles: 0, manaT: 0, research: { current: LV.start.research || null, points: {}, done: {} }, chickens: [], hatchT: 0, hatchTiles: [], trainTiles: [], trainFullAt: -1e9, needs: {}, warnedAt: {}, hatchScan: 0, heartHp: VAR.HEART_HEALTH, heartFlash: 0, gateOpen: false, gateT: 0,
+  wave: 0, nextWave: Infinity, over: null, kills: 0, hand: [], needSince: {}, nextId: 0,
+  heardOf: {}, stats: { dug: 0, mined: 0, claimed: 0, spells: 0, trapsPlaced: 0 }, objDone: {}, objProg: {}, guideStep: 0, guideHidden: false,   // counters the objectives read; which objectives are done; where the tutorial guide is
 };
+Object.defineProperty(G, 'held', { get() { return this.hand[this.hand.length - 1] || null; }, set(v) { if (!v) this.hand = []; else if (!this.hand.includes(v)) this.hand.push(v); } });      // G.held: the creature on top of the hand (the one a click drops next)
+const HAND_MAX = 8;                                   // how many creatures and imps the Hand carries at once
 G.gate = G.gates[0] || null;                          // the first Hero Gate (the one a single-Gate level has); G.gates holds them all, each with its own `open` flag
 const idx = (x, y) => y * W + x;
 const inb = (x, y) => x >= 0 && y >= 0 && x < W && y < H;
@@ -142,7 +145,7 @@ function validateLevel(lv) {
   plan.forEach((wv, i) => wv.forEach(nm => need(HEROES.some(k => k.name === nm), 'wave ' + (i + 1) + ': no hero called ' + nm)));
   need(!lv.waves || (lv.waves.prep >= 0 && lv.waves.interval > 0), 'waves.prep and waves.interval');
   if (lv.waves && lv.waves.dig !== undefined) need(Number.isInteger(lv.waves.dig) && lv.waves.dig >= 0 && lv.waves.dig <= 4, 'waves.dig must be a whole number from 0 (nobody digs) to 4 (every hero digs)');
-  if (lv.waves && lv.waves.waiting !== undefined) { need(typeof lv.waves.waiting === 'boolean', 'waves.waiting must be true or false'); need(!lv.waves.waiting || (plan.length && !endless), 'waves.waiting needs a waves.plan (and cannot be endless): wave 1 is the party that waits'); } need(lv.start && typeof lv.start.gold === 'number', 'start.gold'); need(lv.rules && lv.rules.heartHp > 0, 'rules.heartHp'); need(!lv.rules || lv.rules.food === undefined || typeof lv.rules.food === 'boolean', 'rules.food must be true or false'); need(!lv.rules || lv.rules.arrivals === undefined || ['any', 'rooms'].includes(lv.rules.arrivals), 'rules.arrivals must be "rooms" (the default) or "any"');
+  if (lv.waves && lv.waves.waiting !== undefined) { need(typeof lv.waves.waiting === 'boolean', 'waves.waiting must be true or false'); need(!lv.waves.waiting || (plan.length && !endless), 'waves.waiting needs a waves.plan (and cannot be endless): wave 1 is the party that waits'); } need(lv.start && typeof lv.start.gold === 'number', 'start.gold'); need(lv.rules && lv.rules.heartHp > 0, 'rules.heartHp'); need(!lv.rules || lv.rules.food === undefined || typeof lv.rules.food === 'boolean', 'rules.food must be true or false'); need(!lv.rules || lv.rules.maxCreatures === undefined || (Number.isInteger(lv.rules.maxCreatures) && lv.rules.maxCreatures > 0 && lv.rules.maxCreatures <= 60), 'rules.maxCreatures must be a whole number from 1 to 60'); need(!lv.rules || lv.rules.arrivals === undefined || ['any', 'rooms'].includes(lv.rules.arrivals), 'rules.arrivals must be "rooms" (the default) or "any"');
   if (lv.stars) { need(lv.stars.heart === undefined || (lv.stars.heart > 0 && lv.stars.heart <= 1), 'stars.heart must be between 0 and 1'); need(lv.stars.par === undefined || lv.stars.par > 0, 'stars.par must be positive seconds'); }
   const cond = (c, where) => {                                   // an objective or a guide condition
     const d = c && COND[c.type]; if (!d) { errs.push(where + ': unknown condition type "' + (c && c.type) + '"'); return; }
@@ -222,8 +225,8 @@ function healClaim(x, y, dt, eff) {
 
 /* ===================================================================================== task board
  * TaskManager.scanTerrainTasks: one tile-task per tile per player, created/removed as the map changes. */
-const TASK = { DIG: { prio: 10, max: 3 }, CLAIM: { prio: 6, max: 1 }, REPAIR: { prio: 7, max: 2 }, REARM: { prio: 5, max: 1 },
-  RESCUE: { prio: 11, max: 1 }, CAPTURE: { prio: 11, max: 1 }, HAUL: { prio: 5, max: 1 } };   // RescueCreatureTask / CaptureEnemyCreatureTask / CarryEnemyCreatureToPrison   // RepairWallTileTask / workshop crates analogues
+const TASK = { DIG: { prio: 10, max: 3 }, CLAIM: { prio: 6, max: 1 }, REPAIR: { prio: 7, max: 2 },       // RepairWallTileTask analogue. Everyday work: imps spread over these by who is short of hands (see Imp.findWork)
+  RESCUE: { prio: 11, max: 1, urgent: 1 }, CAPTURE: { prio: 11, max: 1, urgent: 1 }, HAUL: { prio: 11, max: 1, urgent: 1 } };   // RescueCreatureTask / CaptureEnemyCreatureTask / CarryEnemyCreatureToPrison: one imp each, always first
 function scanTasks() {
   const live = new Set();
   for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
@@ -239,7 +242,6 @@ function scanTasks() {
   for (const h of G.heroes) if (h.unconscious && !h.carriedBy && !h.dead && freeSlot(T.PRISON, h)) add('CAPTURE', h.tx, h.ty, h);
   for (const b of G.prisoners) if (b.status === 'prisoner' && !b.carriedBy && freeSlot(T.TORTURE, b)) add('HAUL', b.tx, b.ty, b);
   for (const d of G.doors) if (!d.dead && d.hp < d.maxHp && !G.heroes.some(h => Math.hypot(h.x - d.x, h.y - d.y) < 4)) add('REPAIR', d.tx, d.ty);   // imps wait until the fight is over
-  for (const tr of G.traps) if (tr.charges < tr.max && G.gold >= TRAPS[tr.kind].rearmCost) add('REARM', tr.tx, tr.ty);
   for (const [k, task] of G.tasks) if (!live.has(k)) { for (const w of task.who) if (w.task === task) w.drop(); G.tasks.delete(k); }
 }
 function taskTargets(task) {                     // DigTileTask.getTarget = an accessible neighbour; Claim = the tile
@@ -318,9 +320,6 @@ class Imp extends Mover {                        // CreatureState.IDLE -> findSt
       } else if (k.type === 'REPAIR') {
         const d = doorAt(k.x, k.y); if (!d || d.dead || d.hp >= d.maxHp) return this.drop();
         d.hp = Math.min(d.maxHp, d.hp + 40 * VAR.IMP_EFFICIENCY / 100 * dt);
-      } else if (k.type === 'REARM') {
-        const tr = trapAt(k.x, k.y), def = tr && TRAPS[tr.kind]; if (!tr || tr.charges >= tr.max || G.gold < def.rearmCost) return this.drop();
-        tr.prog = (tr.prog || 0) + dt; if (tr.prog >= def.rearm) { tr.prog = 0; tr.charges++; G.gold -= def.rearmCost; }
       } else if (k.body) {                                                // pick the body up and haul it to its destination
         const b = k.body; if (k.type !== 'HAUL' && !b.unconscious) return this.drop();
         const d = k.type === 'RESCUE' ? lairSpot(b) : freeSlot(k.type === 'CAPTURE' ? T.PRISON : T.TORTURE, b);
@@ -351,12 +350,16 @@ class Imp extends Mover {                        // CreatureState.IDLE -> findSt
     this.state = 'deliver'; this.go(p); if (!p.length) this.state = 'deliver'; return true;
   }
   findWork() {                                                            // TaskManager: workers pull tasks
-    const cands = [];
+    const cands = [], load = {};                                           // load: how many other imps are already on each kind of job
+    for (const i of G.imps) if (i !== this && i.task) load[i.task.type] = (load[i.task.type] || 0) + 1;
     for (const task of G.tasks.values()) {
       const def = TASK[task.type]; if (task.who.size >= def.max) continue;
       if (task.body && (task.body.carriedBy || (task.type === 'CAPTURE' && !freeSlot(T.PRISON, task.body)) || (task.type === 'HAUL' && !freeSlot(T.TORTURE, task.body)))) continue;
       if (task.type === 'DIG' && this.gold >= VAR.IMP_MAX_GOLD && !this.hasRoomFor()) continue;
-      cands.push({ task, score: def.prio * 100 - (Math.abs(task.x - this.tx) + Math.abs(task.y - this.ty)) });
+      // Rescue / capture / haul come first. Of the everyday jobs, the one with the fewest imps on it wins (so with one imp digging, the next claims floor
+      // and the next repairs a door), priority only breaks ties; within a job, a tile nobody is at yet beats one that already has company.
+      const score = (def.urgent ? 10000 : -1000 * (load[task.type] || 0)) + def.prio * 100 - task.who.size * 30 - (Math.abs(task.x - this.tx) + Math.abs(task.y - this.ty));
+      cands.push({ task, score });
     }
     cands.sort((a, b) => b.score - a.score);
     for (const { task } of cands.slice(0, 8)) {
@@ -425,6 +428,7 @@ class Creature extends Mover {                    // CreatureMoodSystem / Creatu
     this.trainThink = 2;
     if (G.gold < VAR.TRAIN_COST + trainReserve()) { if (!G.warnTrain && G.map.some(t => t.t === T.TRAINING && t.owner === 1)) { G.warnTrain = 1; say('Not enough gold to train: creatures keep gold back for wages.'); } return false; }
     const dummy = freeSlot(T.TRAINING, this), p = dummy && findPath(this.tx, this.ty, dummy.x, dummy.y);
+    if (!dummy && G.trainTiles.length) G.trainFullAt = G.time;                          // every dummy is taken: the dungeon wants a bigger Training Room
     if (!p) return false; dummy.t.occ = this; this.desk = dummy.t; this.state = 'toTrain'; this.go(p); return true;
   }
   releaseDesk() { if (this.desk) { this.desk.occ = null; this.desk = null; } }
@@ -449,8 +453,9 @@ class Creature extends Mover {                    // CreatureMoodSystem / Creatu
     }
     if (this.anger >= 3000) { say(this.name + ' #' + this.id + ' is furious and leaves your dungeon!'); if (this.lair) this.lair.occupant = null; this.releaseDesk(); this.releaseChicken(); this.releaseVictim(); return 'leave'; }
     if (fightBrain(this, dt)) return;                                     // CreatureState: shouldFleeOrAttack comes first
-    if (this.hp < this.maxHp)                                             // own-land regen, much faster asleep in the lair
-      this.hp = Math.min(this.maxHp, this.hp + (this.state === 'sleep' ? 8 : VAR.OWN_LAND_HEALTH_INCREASE_PER_SECOND) * dt);
+    if (this.hp < this.maxHp) {                                           // own-land regen, much faster asleep in the lair, and faster on a Hatchery tile too
+      const ht = this.state !== 'sleep' && tile(this.tx, this.ty), onHatch = !!ht && ht.t === T.HATCHERY && ht.owner === 1;
+      this.hp = Math.min(this.maxHp, this.hp + (this.state === 'sleep' ? 8 : onHatch ? VAR.HATCHERY_HEAL_PER_SECOND : VAR.OWN_LAND_HEALTH_INCREASE_PER_SECOND) * dt); }
     if (G.rally && G.time < G.rally.until) {                             // Call to Arms: drop everything and gather at the flag
       this.rep -= dt;
       if (dist(this, G.rally) > 1.6) {
@@ -465,15 +470,19 @@ class Creature extends Mover {                    // CreatureMoodSystem / Creatu
       if (this.energy >= 100 && this.hp >= this.maxHp * 0.8) { this.state = 'idle'; this.wait = 1; }
     } else if (this.state === 'toBed') {
       if (this.stepMove(dt)) this.state = 'sleep';
+    } else if (this.state === 'toHeal') {                                 // a wounded creature walks to the Hatchery to recover among the chickens
+      if (this.stepMove(dt)) this.state = 'heal';
+    } else if (this.state === 'heal') {
+      if (this.hp >= this.maxHp * 0.95 || this.energy < 35 || this.hunger >= VAR.HUNGRY_AT) { this.state = 'idle'; this.wait = 1; }
     } else if (this.state === 'toFood') {                                // task/creature/GoToEat: walk to a free-range chicken and eat it
       const ch = this.chicken; if (!ch || ch.dead) { this.releaseChicken(); this.state = 'idle'; this.path = null; return; }
       this.rep -= dt; if (this.rep <= 0 || !this.path) { this.rep = 0.5; this.go(findPath(this.tx, this.ty, ch.tx, ch.ty)); }
       this.stepMove(dt); this.face = Math.atan2(ch.y - this.y, ch.x - this.x);
-      if (dist(this, ch) < 0.9) { this.state = 'eat'; this.eatT = VAR.EAT_SECONDS; this.path = null; ch.frozen = true; sfx('squawk', ch.x, ch.y); }
+      if (dist(this, ch) < 0.9) { this.state = 'eat'; this.eatT = VAR.EAT_SECONDS; this.path = null; if (!ch.ration) { ch.frozen = true; sfx('squawk', ch.x, ch.y); } }
     } else if (this.state === 'eat') {
       this.eatT -= dt; const ch = this.chicken;
       if (this.eatT <= 0 || !ch || ch.dead) {
-        if (ch) ch.dead = true; this.chicken = null; this.hunger = 0; this.hp = Math.min(this.maxHp, this.hp + this.maxHp * 0.15); this.anger = Math.max(0, this.anger - 300);
+        if (ch && !ch.ration) ch.dead = true; this.chicken = null; this.hunger = 0; this.hp = Math.min(this.maxHp, this.hp + this.maxHp * 0.15); this.anger = Math.max(0, this.anger - 300);
         G.fx.push({ x: this.x, y: this.y - 0.5, txt: 'Yum', life: 0.8, color: '#ffd080' }); sfx('munch', this.x, this.y); this.state = 'idle'; this.wait = 1;
       }
     } else if (this.state === 'toRack') {                                 // a Mistress goes to whoever is strapped to a rack
@@ -502,13 +511,22 @@ class Creature extends Mover {                    // CreatureMoodSystem / Creatu
     } else if (this.state === 'train') {                                   // each strike on the dummy is XP; a session ends on time, hunger, tiredness or the top level
       this.sndT -= dt; if (this.sndT <= 0) { this.sndT = 1.1; sfx('train', this.x, this.y); }
       this.studyT -= dt; this.face = Math.atan2(0.4, 1); gainXp(this, VAR.TRAIN_XP_PER_SECOND * dt);
-      if (this.studyT <= 0 || this.energy < 35 || this.hunger >= VAR.HUNGRY_AT || this.level >= VAR.MAX_LEVEL) { this.releaseDesk(); this.state = 'idle'; this.wait = 1; this.nextTrain = false; }
+      if (this.energy < 35 || this.hunger >= VAR.HUNGRY_AT || this.level >= VAR.MAX_LEVEL) { this.releaseDesk(); this.state = 'idle'; this.wait = 1; this.nextTrain = false; }          // only hunger, tiredness or the top level end the training (and enemies: fightBrain)
+      else if (this.studyT <= 0) {                                         // session over: it stays at its dummy and pays for the next, until it is hungry, tired, broke, or heroes call it away
+        if (G.gold >= VAR.TRAIN_COST + trainReserve()) { G.gold -= VAR.TRAIN_COST; this.studyT = VAR.TRAIN_SECONDS; }
+        else { this.releaseDesk(); this.state = 'idle'; this.wait = 1; this.nextTrain = false; this.trainThink = 20; if (!G.warnTrain) { G.warnTrain = 1; say('Not enough gold to train: creatures keep gold back for wages.'); } }
+      }
     } else {
       if ((this.energy < 35 || this.hp < this.maxHp * VAR.CREATURE_SLEEPS_WHEN_BELOW_PERCENT_HEALTH / 100) && this.lair) { const p = findPath(this.tx, this.ty, this.lair.x, this.lair.y); if (p) { this.go(p); this.state = 'toBed'; return; } }
+      if (this.hp < this.maxHp * VAR.HATCHERY_REST_BELOW && G.hatchTiles.length && !this.path && this.hunger < VAR.HUNGRY_AT) {      // hurt, not in need of a bed: the Hatchery heals too
+        let best = null, bd = Infinity; for (const h of G.hatchTiles) { const d = Math.abs(h.x - this.tx) + Math.abs(h.y - this.ty); if (d < bd) { bd = d; best = h; } }
+        const p = best && findPath(this.tx, this.ty, best.x, best.y); if (p) { this.go(p); this.state = p.length ? 'toHeal' : 'heal'; return; }
+      }
       this.foodThink -= dt;
       if (!this.noFood && this.hunger >= VAR.HUNGRY_AT && !this.path && this.foodThink <= 0) {              // hunger comes before study and prayer
         this.foodThink = VAR.TIME_BETWEEN_REATTEMPTING_HUNGER_SECONDS || 4;
         let best = null, bd = Infinity; for (const ch of G.chickens) if (!ch.dead && !ch.claimedBy) { const d = dist(this, ch); if (d < bd) { bd = d; best = ch; } }
+        if (!best && eatsRation(this)) best = RATION;                                                          // no free chicken: the Heart's larder feeds the first few
         const p = best && findPath(this.tx, this.ty, best.tx, best.ty);
         if (p) { best.claimedBy = this; this.chicken = best; this.state = 'toFood'; this.go(p); this.rep = 0.5; return; }
       }
@@ -528,11 +546,15 @@ class Creature extends Mover {                    // CreatureMoodSystem / Creatu
         if (p) { alt.t.occ = this; this.desk = alt.t; this.state = 'toAltar'; this.go(p); return; }
       }
       if (this.startTraining()) return;                                                                         // nothing else to do: train
-      if (this.path) this.stepMove(dt); else { this.wait -= dt; if (this.wait <= 0) { this.wait = 1 + rand() * 3; const c = ownedFloor(); if (c) this.go(findPath(this.tx, this.ty, c.x, c.y)); } }
+      if (this.path) this.stepMove(dt); else { this.wait -= dt; if (this.wait <= 0) { this.wait = 1 + rand() * 3; const c = trainSpot(this) || ownedFloor(); if (c) this.go(findPath(this.tx, this.ty, c.x, c.y)); } }
     }
   }
 }
 Creature.n = 0;
+function trainSpot(c) {                          // idle with nothing to do and a Training Room built: hang about in it (waiting for a dummy), not in a corner
+  if (!G.trainTiles.length || c.level >= VAR.MAX_LEVEL || c.hunger >= VAR.HUNGRY_AT || c.energy < 35) return null;
+  return G.trainTiles[(rand() * G.trainTiles.length) | 0];
+}
 function freeBed() {
   for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) { const t = G.map[idx(x, y)];
     if (t.t === T.LAIR && t.owner === 1) { t.bed = t.bed || { x, y, occupant: null }; if (!t.bed.occupant) return t.bed; } }
@@ -545,6 +567,29 @@ function freeBed() {
 function armyLimit() {
   const have = ownedRooms(), beds = have[T.LAIR] || 0, food = LV.rules.food === false ? Infinity : VAR.FREE_FEED + VAR.FEED_PER_HATCHERY_TILE * (have[T.HATCHERY] || 0), portal = VAR.CREATURES_SUPPORTED_BY_FIRST_PORTAL;
   const cap = Math.min(portal, beds, food); return { beds, food, portal, cap, by: cap === beds ? 'beds' : cap === food ? 'food' : 'Portal' };      // `by`: which limit bites (beds first when tied)
+}
+
+/* Tells the player when a kind of room is too small for the dungeon: not enough beds, not enough food, every training dummy busy, the Treasury nearly full.
+ * A need must last a few seconds before it is reported (so a creature that has just turned hungry does not nag), is said in the Log at most once
+ * a minute while it lasts, and meanwhile marks its button in the Buildings tab (G.needs, see renderHud). */
+const NEED_AFTER = 8, NEED_REPEAT = 75;
+function checkExpansion() {
+  const lim = armyLimit(), homeless = G.creatures.filter(c => !c.lair && !c.noLair).length, plural = (n, w) => n + ' ' + w + (n === 1 ? '' : 's');
+  const hungry = G.creatures.filter(c => !c.noFood && c.hunger >= VAR.HUNGRY_AT && c.state !== 'eat' && c.state !== 'toFood').length;
+  const freeChickens = G.chickens.filter(c => !c.dead && !c.claimedBy).length, foodFull = LV.rules.food !== false && lim.by === 'food' && G.creatures.length >= lim.cap;
+  const cap = capacity(), msg = {
+    lair: homeless ? plural(homeless, 'creature') + ' without a bed: build more Lair tiles.' : '',
+    hatchery: foodFull ? 'The dungeon cannot feed any more creatures: build more Hatchery tiles.' : hungry && !freeChickens && !G.creatures.some(c => !c.noFood && c.hunger >= VAR.HUNGRY_AT && eatsRation(c)) ? plural(hungry, 'hungry creature') + ' and no chickens: build or enlarge the Hatchery.' : '',
+    training: G.trainTiles.length && G.time - G.trainFullAt < 6 ? 'Every training dummy is busy and creatures are waiting: build more Training Room tiles.' : '',
+    treasury: G.gold >= cap * 0.9 ? 'The Treasury is almost full (' + Math.floor(G.gold) + '/' + cap + '): build more Treasury tiles or imps will dump the surplus gold.' : '',
+  };
+  for (const k in msg) {
+    if (!msg[k]) { delete G.needSince[k]; G.needs[k] = ''; continue; }
+    if (G.needSince[k] === undefined) G.needSince[k] = G.time;
+    if (G.time - G.needSince[k] < NEED_AFTER) continue;
+    G.needs[k] = msg[k];
+    if (G.time - (G.warnedAt[k] === undefined ? -1e9 : G.warnedAt[k]) >= NEED_REPEAT) { G.warnedAt[k] = G.time; say('⚠ ' + msg[k]); sfx('deny'); }
+  }
 }
 
 /* ===================================================================================== combat
@@ -570,6 +615,11 @@ function nearestFoe(u, maxD, needLos) {
   for (const f of foesOf(u)) { if (!alive(f)) continue; const d = dist(u, f);
     if (d < bd && d <= (maxD || 99) && (needLos ? los(u.x, u.y, f.x, f.y) : sees(u, f))) { best = f; bd = d; } }
   return best;
+}
+function shotClear(ax, ay, bx, by) {              // a shot or a spell cannot pass a door: only the tiles between the two ends count (somebody standing IN the doorway can still fire out of it)
+  const n = Math.ceil(Math.hypot(bx - ax, by - ay) * 3), sx = Math.floor(ax), sy = Math.floor(ay), ex = Math.floor(bx), ey = Math.floor(by);
+  for (let i = 1; i < n; i++) { const x = Math.floor(ax + (bx - ax) * i / n), y = Math.floor(ay + (by - ay) * i / n); if ((x === sx && y === sy) || (x === ex && y === ey)) continue; const d = doorAt(x, y); if (d && !d.dead) return false; }
+  return true;
 }
 const heartTarget = { get x() { return G.heart.x + 0.5; }, get y() { return G.heart.y + 0.5; }, heart: true, dead: false };
 const roll = (d) => d * (0.85 + rand() * 0.3);
@@ -637,7 +687,7 @@ function fightBrain(u, dt) {                      // true = this unit's turn was
   if (!t) { if (u.state === 'fight') { u.state = 'idle'; u.path = null; } return false; }
   if (u.hp < u.maxHp * 0.25 && !u.fearless && startFlee(u)) return true;
   u.state = 'fight';
-  if (dist(u, t) <= u.range && los(u.x, u.y, t.x, t.y)) { u.path = null; u.face = Math.atan2(t.y - u.y, t.x - u.x); if (u.cd <= 0) strike(u, t); return true; }
+  if (dist(u, t) <= u.range && los(u.x, u.y, t.x, t.y) && (!u.ranged || shotClear(u.x, u.y, t.x, t.y))) { u.path = null; u.face = Math.atan2(t.y - u.y, t.x - u.x); if (u.cd <= 0) strike(u, t); return true; }
   u.rep -= dt; if (u.rep <= 0 || !u.path) { u.rep = 0.4; u.go(findPath(u.tx, u.ty, t.tx, t.ty)); }
   u.stepMove(dt);
   if (u.blocker && !u.blocker.dead && u.cd <= 0) { u.face = Math.atan2(u.blocker.y - u.y, u.blocker.x - u.x); strike(u, u.blocker); }
@@ -712,7 +762,7 @@ class Hero extends Mover {
     }
     if (fightBrain(this, dt)) return;
     if (this.waiting) return;                                                                         // waves.waiting: stands on the pad until the Gate is linked
-    if (dist(this, heartTarget) <= this.range + 1.5 && los(this.x, this.y, heartTarget.x, heartTarget.y)) {   // the objective: KILL_PLAYER
+    if (dist(this, heartTarget) <= this.range + 1.5 && los(this.x, this.y, heartTarget.x, heartTarget.y) && (!this.ranged || shotClear(this.x, this.y, heartTarget.x, heartTarget.y))) {   // the objective: KILL_PLAYER
       this.path = null; this.face = Math.atan2(heartTarget.y - this.y, heartTarget.x - this.x); if (this.cd <= 0) strike(this, heartTarget); return;
     }
     const lead = this.leader; this.think -= dt;
@@ -774,7 +824,7 @@ function heroLogic(dt) {
  * list of steps shown one at a time; a step moves on when its `when` condition is met (or when the player presses "Got it"). */
 const roomCount = (room) => ownedRooms()[ROOM_TOOLS[room]] || 0;
 const COND = {
-  survive:   { needs: 'waves',  f: () => [G.wave >= VAR.WAVES && !G.heroes.length ? 1 : 0, 1], label: () => 'Defeat every wave of invaders' },
+  survive:   { needs: 'waves',  f: () => [G.wave >= VAR.WAVES && !activeHeroes().length ? 1 : 0, 1], label: () => 'Defeat every wave of invaders' },
   portal:    { needs: 'portal', f: () => [G.portalOwned ? 1 : 0, 1], label: () => 'Claim the Portal' },
   gate:      { needs: 'gate',   f: (c) => [G.gates.filter(g => g.open).length, c.n || 1], label: (c) => (c.n || 1) > 1 ? 'Link tunnels to ' + c.n + ' Hero Gates' : 'Link a tunnel to the Hero Gate' },
   wave:      { needs: 'waves',  params: ['n'], f: (c) => [G.wave, c.n], label: (c) => 'Withstand ' + c.n + ' wave' + (c.n > 1 ? 's' : '') },
@@ -788,10 +838,11 @@ const COND = {
   kills:     { params: ['n'], f: (c) => [G.kills, c.n], label: (c) => 'Slay ' + c.n + ' heroes' },
   research:  { params: ['item'], f: (c) => [G.research.done[c.item] ? 1 : 0, 1], label: (c) => 'Research ' + RESEARCH[c.item].name },
   doors:     { params: ['n'], f: (c) => [G.doors.length, c.n], label: (c) => 'Place ' + c.n + ' door' + (c.n > 1 ? 's' : '') },
-  traps:     { params: ['n'], f: (c) => [G.traps.length, c.n], label: (c) => 'Place ' + c.n + ' trap' + (c.n > 1 ? 's' : '') },
+  traps:     { params: ['n'], f: (c) => [G.stats.trapsPlaced, c.n], label: (c) => 'Place ' + c.n + ' trap' + (c.n > 1 ? 's' : '') },
   prisoners: { params: ['n'], f: (c) => [G.prisoners.length, c.n], label: (c) => 'Hold ' + c.n + ' prisoner' + (c.n > 1 ? 's' : '') },
   spells:    { params: ['n'], f: (c) => [G.stats.spells, c.n], label: (c) => 'Cast ' + c.n + ' spell' + (c.n > 1 ? 's' : '') },
 };
+const activeHeroes = () => G.heroes.filter(h => !h.dead && !h.unconscious);          // heroes still fighting: the knocked-out ones (waiting for the imps) are beaten
 const OBJECTIVES = LV.objectives || [{ type: 'survive' }];      // endless levels set [] and are never won: they end in defeat or when you retire
 const GUIDE = qs.get('guide') === '0' ? [] : (LV.guide || []);
 const condState = (c) => { const [v, goal] = COND[c.type].f(c); return { v: Math.min(v, goal), goal, done: v >= goal }; };
@@ -810,7 +861,7 @@ function updateObjectives() {
 }
 /* The end of a run: freezes the result, judges the stars, and saves it (progress.js). `?nosave=1` skips saving (bots, experiments). */
 const SB = LV.sandbox || null;                       // the sandbox's options ({ diff, endless }) when this is the generated sandbox level
-const wavesSurvived = () => Math.max(0, G.wave - (G.heroes.length ? 1 : 0));       // waves whose heroes are all beaten: the wave you are fighting does not count yet
+const wavesSurvived = () => Math.max(0, G.wave - (activeHeroes().length ? 1 : 0));       // waves whose heroes are all beaten: the wave you are fighting does not count yet
 function finishGame(outcome) {                         // 'victory', 'defeat', or 'retired' (endless: you stopped and banked the score; G.over is then 'defeat')
   G.over = outcome === 'victory' ? 'victory' : 'defeat'; G.overAt = G.time;
   const bonus = OBJECTIVES.map((o, i) => o.optional ? i : -1).filter(i => i >= 0), r = { outcome, time: Math.round(G.time), kills: G.kills, heart: Math.max(0, G.heartHp) / VAR.HEART_HEALTH,
@@ -828,39 +879,51 @@ function guideTarget() {                                  // the map area the cu
 
 /* ===================================================================================== doors & traps
  * DoorsController / TrapsController, reduced. Doors are walls to heroes (they must smash them) and open for your units;
- * imps repair them. Traps are hidden from heroes, fire when one steps on the tile, hold a few charges and are re-armed
- * by imps for gold (stand-in for the Workshop's manufactured crates). */
+ * imps repair them. Traps are hidden from heroes, fire when one steps on the tile, hold two charges and then crumble away
+ * (no re-arming; you may keep two of each kind at a time). */
+const TRAP_USES = 2, TRAP_LIMIT = 2;                     // a trap fires twice and is gone (no re-arming, so no spamming); you may have two of each kind standing at once
 const TRAPS = {
-  gas:  { name: 'Gas Trap',       cost: 150, max: 3, cd: 7, rearm: 3, rearmCost: 30, color: '#7fe04a' },
-  bolt: { name: 'Lightning Trap', cost: 200, max: 2, cd: 5, rearm: 4, rearmCost: 40, color: '#ffe040' },
+  gas:  { name: 'Gas Trap',       cost: 150, max: TRAP_USES, limit: TRAP_LIMIT, cd: 7, color: '#7fe04a' },
+  bolt: { name: 'Lightning Trap', cost: 200, max: TRAP_USES, limit: TRAP_LIMIT, cd: 5, color: '#ffe040' },
 };
+const trapCount = (kind) => G.traps.filter(t => t.kind === kind).length;
+function removeTrap(tr) { G.traps = G.traps.filter(d => d !== tr); const t = tile(tr.tx, tr.ty); if (t && t.trap === tr) t.trap = null; G.dirty = true; }
 const DOOR = { cost: 100, hp: 400 };
 const doorAt = (x, y) => { const t = tile(x, y); return t && t.door || null; };
 const trapAt = (x, y) => { const t = tile(x, y); return t && t.trap || null; };
 function placeThings(kind, x0, y0, x1, y1) {
   if (RESEARCH[kind] && !needs(kind)) return;
-  const def = kind === 'door' ? DOOR : TRAPS[kind], name = kind === 'door' ? 'Door' : def.name; let n = 0, spent = 0;
+  const def = kind === 'door' ? DOOR : TRAPS[kind], name = kind === 'door' ? 'Door' : def.name; let n = 0, spent = 0, said = false;
   for (let y = Math.min(y0, y1); y <= Math.max(y0, y1); y++) for (let x = Math.min(x0, x1); x <= Math.max(x0, x1); x++) {
     const t = tile(x, y); if (!t || t.t !== T.PATH || t.owner !== 1 || t.door || t.trap) continue;
-    if (G.gold - spent < def.cost) { say('Not enough gold for more ' + name + 's.'); x = 1e9; y = 1e9; break; }
+    if (kind !== 'door' && trapCount(kind) >= def.limit) { say('You can only keep ' + def.limit + ' ' + name + 's at a time: each fires ' + def.max + ' times and then crumbles away.'); said = true; x = 1e9; y = 1e9; break; }
+    if (G.gold - spent < def.cost) { say('Not enough gold for more ' + name + 's.'); said = true; x = 1e9; y = 1e9; break; }
     if (kind === 'door') { const d = { door: true, tx: x, ty: y, x: x + .5, y: y + .5, hp: DOOR.hp, maxHp: DOOR.hp, dead: false, flash: 0 }; t.door = d; G.doors.push(d); }
-    else { const tr = { kind, tx: x, ty: y, x: x + .5, y: y + .5, charges: def.max, max: def.max, cd: 0, prog: 0 }; t.trap = tr; G.traps.push(tr); }
+    else { const tr = { kind, tx: x, ty: y, x: x + .5, y: y + .5, charges: def.max, max: def.max, cd: 0 }; t.trap = tr; G.traps.push(tr); G.stats.trapsPlaced++; }
     spent += def.cost; n++;
   }
-  G.gold -= spent; if (n) sfx('build', (x0 + x1) / 2 + .5, (y0 + y1) / 2 + .5); if (n) say('Placed ' + n + ' ' + name + (n > 1 ? 's' : '') + ' for ' + spent + ' gold.'); else say('Doors and traps go on your claimed floor, not on rooms.');
+  G.gold -= spent; if (n) sfx('build', (x0 + x1) / 2 + .5, (y0 + y1) / 2 + .5); if (n) say('Placed ' + n + ' ' + name + (n > 1 ? 's' : '') + ' for ' + spent + ' gold.'); else if (!said) say('Doors and traps go on your claimed floor, not on rooms.');
   G.dirty = true;
 }
-function removeThings(x0, y0, x1, y1) {                  // right-click: sell for half the price
-  let n = 0, refund = 0;
+function removeThings(x0, y0, x1, y1, rooms) {            // right-click / the Sell tool: sell doors and traps for half the price; rooms too when `rooms` is set (the Sell tool, or a right-drag with a room chosen)
+  let n = 0, refund = 0, kept = 0, rn = 0, rrefund = 0;
   for (let y = Math.min(y0, y1); y <= Math.max(y0, y1); y++) for (let x = Math.min(x0, x1); x <= Math.max(x0, x1); x++) {
     const t = tile(x, y); if (!t) continue;
     if (t.door) { refund += DOOR.cost / 2; G.doors = G.doors.filter(d => d !== t.door); t.door = null; n++; }
     else if (t.trap) { refund += TRAPS[t.trap.kind].cost / 2; G.traps = G.traps.filter(d => d !== t.trap); t.trap = null; n++; }
+    else if (rooms && t.owner === 1 && TERRAIN[t.t].room && TERRAIN[t.t].cost) {          // the Heart, Portal and Gates have no price: they cannot be sold
+      if (t.occ || t.reserved) { kept++; continue; }                                         // somebody is using it (a desk, a dummy, a cell, a rack)
+      const was = t.t, price = Math.floor(TERRAIN[was].cost / 2); t.t = T.PATH; if (was === T.TREASURY && G.gold > capacity()) { t.t = was; kept++; continue; }       // a Treasury tile cannot go while the gold would no longer fit
+      if (t.bed && t.bed.occupant) { const c = t.bed.occupant; c.lair = null; if (c.state === 'sleep' || c.state === 'toBed') { c.state = 'idle'; c.path = null; } }
+      t.hp = TERRAIN[T.PATH].maxHealth; t.room = 0; t.bed = null; t.stored = 0; rrefund += price; rn++;
+    }
   }
-  if (n) { G.gold += refund; sfx('coins', (x0 + x1) / 2 + .5, (y0 + y1) / 2 + .5); say('Sold ' + n + ' item(s) for ' + refund + ' gold.'); G.dirty = true; }
+  if (n || rn) { G.gold += refund + rrefund; sfx('coins', (x0 + x1) / 2 + .5, (y0 + y1) / 2 + .5); say('Sold ' + (n ? n + ' door/trap(s)' : '') + (n && rn ? ' and ' : '') + (rn ? rn + ' room tile(s)' : '') + ' for ' + (refund + rrefund) + ' gold.'); G.dirty = true; }
+  if (kept) say(kept + ' tile(s) were not sold: they are in use' + (rooms ? ' (or a Treasury that still holds your gold)' : '') + '.');
+  return n + rn;
 }
 function fireTrap(tr) {
-  tr.charges--; tr.cd = TRAPS[tr.kind].cd;
+  tr.charges--; tr.cd = TRAPS[tr.kind].cd; if (tr.charges <= 0) { say('The ' + TRAPS[tr.kind].name + ' is spent and crumbles away.'); removeTrap(tr); }
   if (tr.kind === 'gas') { sfx('gas', tr.x, tr.y); G.clouds.push({ x: tr.x, y: tr.y, r: 2.2, life: 5, dps: 10, tick: 0 }); say('A Gas Trap hisses!'); }
   else {
     G.fx.push({ x: tr.x, y: tr.y, bolt: true, life: 0.35 }); sfx('lightning', tr.x, tr.y); say('A Lightning Trap discharges!');
@@ -869,11 +932,11 @@ function fireTrap(tr) {
 }
 function updateTraps(dt) {
   for (const d of G.doors) d.flash = Math.max(0, d.flash - dt);
-  for (const tr of G.traps) {
+  for (const tr of G.traps.slice()) {
     tr.cd = Math.max(0, tr.cd - dt);
     const stepper = tr.charges > 0 && tr.cd <= 0 && G.heroes.find(h => !h.dead && !h.unconscious && !h.flying && Math.hypot(h.x - tr.x, h.y - tr.y) <= 0.9);   // flyers glide over
     if (stepper) {
-      if (stepper.disarms) { tr.charges = 0; sfx('clank', tr.x, tr.y); say('A Dwarf disarms the ' + TRAPS[tr.kind].name + '!'); G.fx.push({ x: tr.x, y: tr.y - 0.5, txt: 'Disarmed', life: 0.9, color: '#ffd080' }); }
+      if (stepper.disarms) { tr.charges = 0; sfx('clank', tr.x, tr.y); say('A Dwarf disarms the ' + TRAPS[tr.kind].name + '!'); G.fx.push({ x: tr.x, y: tr.y - 0.5, txt: 'Disarmed', life: 0.9, color: '#ffd080' }); removeTrap(tr); }
       else fireTrap(tr);
     }
   }
@@ -915,6 +978,10 @@ function unlockAll() { for (const id in RESEARCH) G.research.done[id] = true; G.
  * OpenKeeper: Hatchery generates free-range chickens (CHICKEN_GENERATION_TIME_PER_HATCHERY, MAX_FREE_RANGE_CHICKENS_PER_PLAYER),
  * hungry creatures run GoToEat and the missing food feeds REASON_NO_FOOD. The Temple lets creatures pray for mana
  * (Attributes.manaGenPrayer, MOTIONLESS_WHILE_PRAYING_SECONDS). */
+/* The Heart's larder: the first FREE_FEED creatures (everybody on levels with rules.food: false) can eat a ration at the Heart when no chicken is free. It is
+ * not a chicken and nothing is ever drawn for it; a Hatchery's chickens are the only chickens in the dungeon. */
+const RATION = { ration: true, dead: false, claimedBy: null, frozen: false, get x() { return G.heart.x + 0.5; }, get y() { return G.heart.y + 2.5; }, get tx() { return G.heart.x; }, get ty() { return G.heart.y + 2; } };
+const eatsRation = (c) => LV.rules.food === false || G.creatures.indexOf(c) < VAR.FREE_FEED;
 class Chicken extends Mover {
   constructor(x, y) { super(x, y, 0.6); Object.assign(this, { team: 'k', isChicken: true, hp: 10, maxHp: 10, dead: false, flash: 0, claimedBy: null, frozen: false, t: 1, cluckT: 2 + Math.random() * 8, id: ++G.nextId, sprite: 'chicken' }); }
   update(dt) {
@@ -922,18 +989,17 @@ class Chicken extends Mover {
     if (this.frozen) { this.path = null; return; }                       // being eaten
     this.cluckT -= dt; if (this.cluckT <= 0) { this.cluckT = 7 + Math.random() * 12; sfx('cluck', this.x, this.y); }
     this.t -= dt;
-    if (!this.path && this.t <= 0) { this.t = 1.5 + rand() * 3; const t = G.hatchTiles.length ? G.hatchTiles[(rand() * G.hatchTiles.length) | 0] : ownedFloor(); if (t) this.go(findPath(this.tx, this.ty, t.x, t.y)); }       // free-range: round the Hatchery, or round your floor when only the larder lays
+    if (!this.path && this.t <= 0) { this.t = 1.5 + rand() * 3; const t = G.hatchTiles.length ? G.hatchTiles[(rand() * G.hatchTiles.length) | 0] : null; if (t) this.go(findPath(this.tx, this.ty, t.x, t.y)); }       // free-range: round the Hatchery (a chicken left after the Hatchery was sold just stands about until somebody eats it)
     this.stepMove(dt);
   }
 }
 function updateHatchery(dt) {
   G.hatchScan -= dt;
-  if (G.hatchScan <= 0) { G.hatchScan = 1; G.hatchTiles = []; for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) { const t = G.map[idx(x, y)]; if (t.t === T.HATCHERY && t.owner === 1) G.hatchTiles.push({ x, y }); } }
-  const larder = VAR.FREE_FEED / VAR.FEED_PER_HATCHERY_TILE;           // the Heart's own larder lays like a fraction of a tile, so the creatures its free food allowance covers really are fed
-  G.hatchT += dt * (G.hatchTiles.length + larder);                    // more tiles hatch faster
-  if (G.hatchT >= VAR.CHICKEN_SECONDS && G.chickens.length < (G.hatchTiles.length ? VAR.MAX_CHICKENS : VAR.FREE_FEED)) {       // with no Hatchery the larder keeps just a few chickens about
-    G.hatchT = 0; const t = G.hatchTiles.length ? G.hatchTiles[(rand() * G.hatchTiles.length) | 0] : { x: G.heart.x, y: G.heart.y + 2 };
-    G.chickens.push(new Chicken(t.x, t.y)); }
+  if (G.hatchScan <= 0) { G.hatchScan = 1; G.hatchTiles = []; G.trainTiles = []; for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) { const t = G.map[idx(x, y)]; if (t.owner !== 1) continue; if (t.t === T.HATCHERY) G.hatchTiles.push({ x, y }); else if (t.t === T.TRAINING) G.trainTiles.push({ x, y }); } }
+  if (G.hatchTiles.length) {                                           // ONLY a Hatchery lays chickens: no tiles, no chickens (the Heart's free larder is a ration, see RATION)
+    G.hatchT += dt * G.hatchTiles.length;                              // more tiles hatch faster
+    if (G.hatchT >= VAR.CHICKEN_SECONDS && G.chickens.length < VAR.MAX_CHICKENS) { G.hatchT = 0; const t = G.hatchTiles[(rand() * G.hatchTiles.length) | 0]; G.chickens.push(new Chicken(t.x, t.y)); }
+  } else G.hatchT = 0;
   for (const c of G.chickens) c.update(dt);
   G.chickens = G.chickens.filter(c => !c.dead);
 }
@@ -941,10 +1007,10 @@ const prayRate = () => G.creatures.reduce((s, c) => s + (c.state === 'pray' ? c.
 
 /* ===================================================================================== knock-out, prison & torture
  * In OpenKeeper a creature that loses its last hit points in a fight falls unconscious (CREATURE_DYING_STATE_DURATION_SECONDS,
- * 60): TaskManager spawns a RescueCreatureTask for your own and a CaptureEnemyCreatureTask for enemies, imps carry them
+ * 60, 30 here): TaskManager spawns a RescueCreatureTask for your own and a CaptureEnemyCreatureTask for enemies, imps carry them
  * to a Lair / Prison, prisoners lose health (PRISON_MODIFY_CREATURE_HEALTH_PER_SECOND) and the Torture Chamber converts
  * them after Attributes.tortureTimeToConvert. Traps and spells (no attacker) still kill outright. */
-const KO_SECONDS = 60, PRISON_DRAIN = 0.5, TORTURE_DRAIN = 0.25, TORTURE_SECONDS = 30, CONVERT_CHANCE = 0.7;
+const KO_SECONDS = 30, PRISON_DRAIN = 0.5, TORTURE_DRAIN = 0.25, TORTURE_SECONDS = 30, CONVERT_CHANCE = 0.7;
 const SKELETON = { name: 'Skeleton', sprite: 'skeleton', elite: 'skeleton_knight', color: '#d8d8c8', pay: 0, hp: 70, dmg: 8, range: 1.2, cdMax: 1.1, ranged: 0, noLair: true, noFood: true };   // rises from starved prisoners
 function canKnockOut(t, src) { return !t.isImp && !t.door && !t.heart && !!src && !!src.team && !!t.team && src.team !== t.team; }
 function knockOut(t, src) {
@@ -1097,6 +1163,7 @@ function step(dt) {
   updateTraps(dt); updateJail(dt); updateShots(dt); heroLogic(dt);
   G.heroes = G.heroes.filter(h => !h.dead); G.creatures = G.creatures.filter(c => !c.dead); G.imps = G.imps.filter(i => !i.dead);
   updateObjectives();
+  G.needT = (G.needT || 0) - dt; if (G.needT <= 0) { G.needT = 1; checkExpansion(); }
   // payday
   G.nextPay -= dt;
   if (G.nextPay <= 0) {
@@ -1205,15 +1272,15 @@ function draw() {
 const $ = (id) => document.getElementById(id);
 const TOOLS = [ ['dig', 'Dig / grab'], ['hand', '✋ Hand'], ['treasury', 'Treasury ' + TERRAIN[T.TREASURY].cost + 'g'], ['lair', 'Lair ' + TERRAIN[T.LAIR].cost + 'g'],
   ['library', 'Library ' + TERRAIN[T.LIBRARY].cost + 'g'], ['hatchery', 'Hatchery ' + TERRAIN[T.HATCHERY].cost + 'g'], ['temple', 'Temple ' + TERRAIN[T.TEMPLE].cost + 'g'], ['prison', 'Prison ' + TERRAIN[T.PRISON].cost + 'g'], ['torture', 'Torture ' + TERRAIN[T.TORTURE].cost + 'g'], ['training', 'Training ' + TERRAIN[T.TRAINING].cost + 'g'],
-  ['door', 'Door ' + DOOR.cost + 'g'], ['gas', 'Gas Trap ' + TRAPS.gas.cost + 'g'], ['bolt', 'Lightning Trap ' + TRAPS.bolt.cost + 'g'],
+  ['sell', '💰 Sell [X]'], ['door', 'Door ' + DOOR.cost + 'g'], ['gas', 'Gas Trap ' + TRAPS.gas.cost + 'g'], ['bolt', 'Lightning Trap ' + TRAPS.bolt.cost + 'g'],
   ...SPELL_ORDER.map((id, i) => [id, SPELLS[id].icon + ' ' + SPELLS[id].name + ' ' + SPELLS[id].cost + ' [' + (i + 1) + ']']),
   ['sp1', '⏸ Pause'], ['sp2', '1×'], ['sp3', '3×'], ['sp4', '8×'] ];
-const TOOL_GROUP = (id) => id.startsWith('sp') ? 'speed' : SPELLS[id] ? 'spell' : ['door', 'gas', 'bolt'].includes(id) ? 'trap' : ['dig', 'hand'].includes(id) ? 'act' : 'room';     // only styling: which accent a button gets
+const TOOL_GROUP = (id) => id.startsWith('sp') ? 'speed' : SPELLS[id] ? 'spell' : ['door', 'gas', 'bolt', 'sell'].includes(id) ? 'trap' : ['dig', 'hand'].includes(id) ? 'act' : 'room';     // only styling: which accent a button gets
 /* The toolbar. In view all the time: Dig, three tabs and the speed buttons. A tab opens its commands in a panel under the strip (above it in
  * full screen): Buildings = the rooms and the defences (doors and traps), Spells = the five spells, Monsters = the Hand and a roster of your
  * creatures. Click a tab again (or press Esc) to close it. Keys: B, C (cast) and H (Hand) open the tabs; 1-5 open Spells and pick a spell. */
 const TABS = [
-  { id: 'build', label: '🏰 Buildings', key: 'B', groups: [['Rooms', ['treasury', 'lair', 'library', 'hatchery', 'temple', 'prison', 'torture', 'training']], ['Defences', ['door', 'gas', 'bolt']]] },
+  { id: 'build', label: '🏰 Buildings', key: 'B', groups: [['Rooms', ['treasury', 'lair', 'library', 'hatchery', 'temple', 'prison', 'torture', 'training']], ['Defences', ['door', 'gas', 'bolt']], ['Sell a misplaced room, door or trap', ['sell']]] },
   { id: 'spells', label: '✨ Spells', key: 'C', groups: [['', SPELL_ORDER]] },
   { id: 'monsters', label: '👹 Monsters', key: 'H', groups: [['Carry', ['hand']]], roster: true },
 ];
@@ -1274,12 +1341,13 @@ function renderRoster(force) {
 }
 $('roster').addEventListener('click', e => {
   const grab = e.target.closest('[data-grab]'), chip = e.target.closest('.chip'); if (!chip) return; const u = G.creatures.find(c => c.id === +chip.dataset.id); if (!u) return;
-  if (grab) { if (G.held) { say('You are already carrying something: put it down first.'); return; } tool = 'hand'; pickUp(u); refreshButtons(); }
+  if (grab) { if (G.hand.length >= HAND_MAX) { say('Your hand is full: it carries ' + HAND_MAX + ' at most. Put some down first.'); return; } tool = 'hand'; pickUp(u); refreshButtons(); }
   else { selectedUnit = u.id; const cam = window.__three && __three.cam; if (cam) { cam.x = u.x; cam.z = u.y; } renderRoster(true); }
 });
 addEventListener('keydown', e => {                                // B, C, H open the tabs; Esc closes the open one
   if (e.target.tagName === 'INPUT' || e.ctrlKey || e.metaKey || e.altKey) return; const k = e.key.toLowerCase(), t = TABS.find(t => t.key.toLowerCase() === k);
-  if (t) { if (t.id === 'monsters') { tool = 'hand'; setTab('monsters', true); refreshButtons(); } else setTab(t.id); }
+  if (k === 'x') { tool = 'sell'; setTab('build', true); refreshButtons(); }
+  else if (t) { if (t.id === 'monsters') { tool = 'hand'; setTab('monsters', true); refreshButtons(); } else setTab(t.id); }
   else if (k === 'escape' && openTab) setTab(openTab);
   else if (k === 'escape') cancelTool();
 });
@@ -1291,23 +1359,25 @@ const ROOM_TOOLS = { treasury: T.TREASURY, lair: T.LAIR, library: T.LIBRARY, hat
  * picks it up (and the next left-click puts it down), right-drag untags and also sells any door or trap in the box. Every other tool (a room, door,
  * trap, spell, the Hand) is cancelled by a right-click, which returns to this mode; so does Esc. Right-click while carrying puts the creature down
  * at the nearest open floor under the cursor and returns to the default too. */
+let shiftDown = false; addEventListener('keydown', e => { if (e.key === 'Shift') shiftDown = true; }); addEventListener('keyup', e => { if (e.key === 'Shift') shiftDown = false; }); addEventListener('blur', () => { shiftDown = false; });      // Shift while carrying: drop here even if a creature is near the cursor
 const DEFAULT_TOOL = 'dig';
 function cancelTool() { if (tool === DEFAULT_TOOL) return false; tool = DEFAULT_TOOL; refreshButtons(); sfx('untag'); return true; }
 function inputDown(p, f, button) { mouse = { x: p.x, y: p.y, sx: p.x, sy: p.y, down: button === 2 ? 3 : 1, fx: f.fx, fy: f.fy }; }
 function inputMove(p, f) { mouse.x = p.x; mouse.y = p.y; mouse.fx = f.fx; mouse.fy = f.fy; }
 function inputUp(p, f) {
   if (!mouse.down) return; const right = mouse.down === 3, click = p.x === mouse.sx && p.y === mouse.sy, box = [mouse.sx, mouse.sy, p.x, p.y]; mouse.down = 0;
-  if (right && G.held) { dropHeld(f, true); cancelTool(); }                                  // right-click while carrying: set it down near the cursor, back to the default mode
+  if (right && G.held) { dropHeld(f, true, true); cancelTool(); }                            // right-click while carrying: set everything in the hand down near the cursor, back to the default mode
   else if (right && click && tool !== DEFAULT_TOOL) cancelTool();                           // right-click cancels the tool
-  else if (tool === 'hand') { if (!right) handClick(f); }
+  else if (tool === 'hand') { if (!right) handClick(f, shiftDown); }
   else if (tool === DEFAULT_TOOL) {
     if (right) { tagRect(...box, false); removeThings(...box); }                              // right-drag: untag, and sell doors and traps in the box
-    else if (G.held) handClick(f);                                                            // carrying: left-click puts it down
+    else if (G.held) handClick(f, shiftDown);                                                 // carrying: left-click puts one down (or picks up another creature under the cursor)
     else { const u = click && unitAt(f); if (u) pickUp(u); else tagRect(...box, true); }     // a click on a creature picks it up; anything else tags
   }
   else if (SPELLS[tool]) { if (!right) castSpell(tool, f); }
+  else if (tool === 'sell') { removeThings(...box, true); }                                  // the Sell tool: left- or right-drag sells rooms, doors and traps in the box
   else if (tool === 'door' || tool === 'gas' || tool === 'bolt') { if (right) removeThings(...box); else placeThings(tool, ...box); }
-  else if (!right && ROOM_TOOLS[tool]) build(ROOM_TOOLS[tool], ...box);
+  else if (ROOM_TOOLS[tool]) { if (right) removeThings(...box, true); else build(ROOM_TOOLS[tool], ...box); }          // a right-drag with a room chosen sells rooms (a plain right-click still drops the tool)
 }
 addEventListener('keydown', e => { const i = '12345'.indexOf(e.key); if (i >= 0 && e.target.tagName !== 'INPUT') { if (isAvail(SPELL_ORDER[i])) tool = SPELL_ORDER[i]; else needs(SPELL_ORDER[i]); setTab('spells', true); refreshButtons(); } });
 cv.addEventListener('contextmenu', e => e.preventDefault());
@@ -1318,10 +1388,11 @@ cv.addEventListener('pointerup', e => inputUp(pos(e), posF(e)));
 
 /* The Hand: pick up one of your imps/creatures and drop it elsewhere (GameWorldController pick-up / drop, `InHand`). */
 /* The cursor is the Keeper's hand (cursor.css); while you carry a creature or imp it closes into a fist holding an imp. */
-function syncHandCursor() { document.documentElement.classList.toggle('holding', !!(G.held && !G.held.dead && !G.over)); }
+function syncHandCursor() { G.hand = G.hand.filter(u => !u.dead); document.documentElement.classList.toggle('holding', !!(G.held && !G.over)); }
 const REACH = 1.3;                                                // how near the cursor must be to a creature or imp to pick it up (tiles)
-function unitAt(m) {                                              // the creature or imp under (near) a world position, or null
-  let best = null, bd = REACH;
+const REACH_MORE = 0.75;                                          // while carrying, only a click right on another creature picks it up too (a click near one still drops, so you can put a creature down in a crowd)
+function unitAt(m, reach = REACH) {                               // the creature or imp under (near) a world position, or null
+  let best = null, bd = reach;
   for (const u of G.creatures.concat(G.imps)) { const d = Math.hypot(u.x - m.fx, u.y - m.fy); if (!u.dead && !u.held && d < bd) { best = u; bd = d; } }
   return best;
 }
@@ -1331,21 +1402,69 @@ function nearestOpen(fx, fy) {                                    // the open fl
     if (solid(x, y)) continue; const d = Math.hypot(x + .5 - fx, y + .5 - fy); if (d < bd) { bd = d; best = { x: x + .5, y: y + .5 }; } }
   return best;
 }
-function dropHeld(m, near) {                                      // put the carried creature down; near: onto the nearest open floor (right-click), else refuse rock (left-click)
-  const held = G.held; if (!held) return false; let x = m.fx, y = m.fy;
-  if (solid(Math.floor(x), Math.floor(y))) {
-    if (!near) { say('Can\'t drop it into solid rock.'); return false; }
-    const q = nearestOpen(x, y) || held.lift || { x: held.x, y: held.y }; x = q.x; y = q.y;       // no floor close by: back where it was lifted
-  }
-  sfx('drop', x, y); held.x = x; held.y = y; held.held = false; held.state = 'idle'; held.path = null; held.think = 0; G.held = null; syncHandCursor(); return true;
+function dropHeld(m, near, all) {                                 // put the carried creature down (the last one picked up); near: onto the nearest open floor (right-click), else refuse rock (left-click); all: the whole hand, spread round the cursor
+  if (!G.hand.length) return false;
+  const list = all ? G.hand.slice().reverse() : [G.held];
+  if (!near && solid(Math.floor(m.fx), Math.floor(m.fy))) { say('Can\'t drop it into solid rock.'); return false; }
+  list.forEach((held, k) => {
+    const a = k * 2.4, r = list.length > 1 ? 0.35 + 0.12 * Math.floor(k / 6) : 0;                    // a little spiral so a handful of creatures do not stand on one spot
+    let x = m.fx + Math.cos(a) * r, y = m.fy + Math.sin(a) * r;
+    if (solid(Math.floor(x), Math.floor(y))) { const q = nearestOpen(m.fx, m.fy) || held.lift || { x: held.x, y: held.y }; x = q.x; y = q.y; }       // no floor close by: back where it was lifted
+    sfx('drop', x, y); held.x = x; held.y = y; held.held = false; held.state = 'idle'; held.path = null; held.think = 0; G.hand = G.hand.filter(u => u !== held);
+  });
+  syncHandCursor(); return true;
 }
-function handClick(m) {
-  if (G.held) { dropHeld(m, false); return; }
+function handClick(m, shift) {
+  if (G.hand.length) {                                            // carrying: a click on another creature picks it up too (up to 8); a click on open ground (or with Shift held) drops the last one
+    const more = !shift && unitAt(m, REACH_MORE);
+    if (more) { pickUp(more); return; }                           // (a full hand says so, instead of dropping what you carry onto the creature you clicked)
+    dropHeld(m, false); return; }
   const best = unitAt(m); if (best) pickUp(best);
 }
-function pickUp(u) {                                              // the Hand, or the Monsters tab, lifts a creature or imp
-  if (G.held || G.over || u.dead) return false;
-  sfx('pickup', u.x, u.y); if (u.isImp) u.drop(); u.lift = { x: u.x, y: u.y }; u.held = true; u.path = null; G.held = u; syncHandCursor(); return true;
+function pickUp(u) {                                              // the Hand, or the Monsters tab, lifts a creature or imp (up to HAND_MAX at once)
+  if (G.over || u.dead || u.held) return false;
+  if (G.hand.length >= HAND_MAX) { say('Your hand is full: it carries ' + HAND_MAX + ' at most. Put some down first.'); return false; }
+  sfx('pickup', u.x, u.y); if (u.isImp) u.drop(); u.lift = { x: u.x, y: u.y }; u.held = true; u.path = null; G.hand.push(u); syncHandCursor(); return true;
+}
+/* Hovering over a room, door or trap shows what it can hold right now (#tip follows the pointer; it also shows how many creatures the Hand carries). */
+function roomGroup(x, y, id) {                                    // tiles in the connected piece of room of this kind that (x, y) is part of
+  const seen = new Set([y * W + x]), st = [[x, y]]; let n = 0;
+  while (st.length) { const [cx, cy] = st.pop(); n++;
+    for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) { const nx = cx + dx, ny = cy + dy, q = tile(nx, ny); if (q && q.t === id && q.owner === 1 && !seen.has(ny * W + nx)) { seen.add(ny * W + nx); st.push([nx, ny]); } } }
+  return n;
+}
+function buildingInfo(x, y) {
+  const t = tile(x, y); if (!t) return '';
+  if (t.door) return '<b>Door</b><br>Strength ' + Math.ceil(t.door.hp) + '/' + t.door.maxHp + '<br><i>Ranged units cannot shoot through it.</i>';
+  if (t.trap) { const def = TRAPS[t.trap.kind]; return '<b>' + def.name + '</b><br>Uses left ' + t.trap.charges + '/' + def.max + ' · you have ' + trapCount(t.trap.kind) + '/' + def.limit + ' of these'; }
+  if (t.owner !== 1 && t.t !== T.PORTAL) return '';
+  const n = (id) => G.map.filter(q => q.t === id && q.owner === 1).length, here = roomGroup(x, y, t.t), lim = armyLimit(), count = (id, f) => G.map.filter(q => q.t === id && q.owner === 1 && f(q)).length;
+  switch (t.t) {
+    case T.LAIR: return '<b>Lair</b> · this room ' + here + ' tile' + (here > 1 ? 's' : '') + '<br>Beds ' + count(T.LAIR, q => q.bed && q.bed.occupant) + '/' + n(T.LAIR) + ' in use (all Lairs)' + (G.creatures.some(c => !c.lair && !c.noLair) ? '<br><span class="warn">creatures are waiting for a bed</span>' : '');
+    case T.HATCHERY: return '<b>Hatchery</b> · this room ' + here + ' tile' + (here > 1 ? 's' : '') + '<br>Feeds ' + (LV.rules.food === false ? 'everyone' : (n(T.HATCHERY) * VAR.FEED_PER_HATCHERY_TILE) + ' creatures (+' + VAR.FREE_FEED + ' from the Heart)') + ' · ' + G.creatures.length + ' creatures<br>Chickens ' + G.chickens.length + '/' + VAR.MAX_CHICKENS + ' · heals the wounded';
+    case T.TRAINING: return '<b>Training Room</b> · this room ' + here + ' tile' + (here > 1 ? 's' : '') + '<br>Dummies in use ' + count(T.TRAINING, q => q.occ) + '/' + n(T.TRAINING) + ' (all rooms)';
+    case T.TREASURY: return '<b>Treasury</b> · this room ' + here + ' tile' + (here > 1 ? 's' : '') + '<br>Gold ' + Math.floor(G.gold) + '/' + capacity() + ' (' + VAR.MAX_GOLD_PER_TREASURY_TILE + ' a tile + 2000 in the Heart)';
+    case T.LIBRARY: return '<b>Library</b> · this room ' + here + ' tile' + (here > 1 ? 's' : '') + '<br>Desks in use ' + count(T.LIBRARY, q => q.occ) + '/' + n(T.LIBRARY);
+    case T.TEMPLE: return '<b>Temple</b> · this room ' + here + ' tile' + (here > 1 ? 's' : '') + '<br>Altars in use ' + count(T.TEMPLE, q => q.occ) + '/' + n(T.TEMPLE);
+    case T.PRISON: return '<b>Prison</b> · this room ' + here + ' tile' + (here > 1 ? 's' : '') + '<br>Cells in use ' + count(T.PRISON, q => q.occ) + '/' + n(T.PRISON);
+    case T.TORTURE: return '<b>Torture Chamber</b> · this room ' + here + ' tile' + (here > 1 ? 's' : '') + '<br>Racks in use ' + count(T.TORTURE, q => q.occ) + '/' + n(T.TORTURE);
+    case T.PORTAL: return '<b>Portal</b><br>Creatures ' + G.creatures.length + '/' + lim.cap + ' (limited by ' + lim.by + ')';
+    case T.HEART: return '<b>Dungeon Heart</b><br>Heart ' + Math.ceil(G.heartHp) + '/' + VAR.HEART_HEALTH;
+  }
+  return '';
+}
+const tipEl = document.createElement('div'); tipEl.id = 'tip'; document.body.appendChild(tipEl);
+let ptrAt = null; document.addEventListener('pointermove', e => { ptrAt = { x: e.clientX, y: e.clientY, onMap: !!(e.target && e.target.tagName === 'CANVAS' && e.target.closest && e.target.closest('#stage')) }; });
+document.addEventListener('pointerleave', () => { ptrAt = null; });
+function renderTip() {
+  let html = '';
+  if (ptrAt && ptrAt.onMap && !G.over) {
+    if (G.hand.length) html = '✋ Carrying <b>' + G.hand.length + '</b>/' + HAND_MAX + (G.hand.length < HAND_MAX ? ' · click another to pick it up' : ' · hand full') + '<br><small>click drops one · Shift+click drops here · right-click drops all</small>';
+    else if (!mouse.down && mouse.x >= 0) html = buildingInfo(mouse.x, mouse.y);
+  }
+  if (html !== tipEl.dataset.html) { tipEl.dataset.html = html; tipEl.innerHTML = html; }
+  tipEl.style.display = html ? 'block' : 'none';
+  if (html) { const w = tipEl.offsetWidth, h = tipEl.offsetHeight; tipEl.style.left = Math.max(4, Math.min(innerWidth - w - 4, ptrAt.x + 16)) + 'px'; tipEl.style.top = Math.max(4, Math.min(innerHeight - h - 4, ptrAt.y + 20)) + 'px'; }
 }
 function renderLog(isNew) { const el = $('log'); el.innerHTML = G.log.slice(0, 12).map((m, i) => '<div' + (i === 0 && isNew ? ' class="new"' : '') + '>' + m + '</div>').join(''); }
 function renderHud() {
@@ -1356,12 +1475,14 @@ function renderHud() {
   $('hMana').textContent = Math.floor(G.mana) + '/' + G.maxMana;
   for (const id of SPELL_ORDER) $('b_' + id).style.opacity = G.mana >= SPELLS[id].cost && !(G.spellCd[id] > 0) ? 1 : 0.45;
   for (const id in RESEARCH) { const b = $('b_' + id); if (!isAvail(id)) { b.style.opacity = 0.3; b.title = 'Locked — research it in a Library'; } else { b.title = ''; if (!SPELLS[id]) b.style.opacity = ''; } }
-  renderResearch(); renderObjectives(); renderGuide(); renderEnd(); syncHandCursor(); renderRoster();
-  $('hHeart').textContent = Math.ceil(G.heartHp); $('hHeroes').textContent = G.heroes.filter(h => !h.waiting).length; $('hWave').textContent = !VAR.WAVES ? '—' : VAR.WAVES === Infinity ? G.wave + ' / ∞' : G.wave + '/' + VAR.WAVES;
+  renderResearch(); renderObjectives(); renderGuide(); renderEnd(); syncHandCursor(); renderRoster(); renderTip();
+  for (const k of ['lair', 'hatchery', 'training', 'treasury']) { const b = $('b_' + k), m = G.needs[k]; b.classList.toggle('need', !!m); b.title = m || (ROOM_COST[k] + ' gold for every tile you build'); }       // the room that needs expanding glows, and says why
+  $('tab_build').classList.toggle('need', !!(G.needs.lair || G.needs.hatchery || G.needs.training || G.needs.treasury));
+  $('hHeart').textContent = Math.ceil(G.heartHp); { const live = activeHeroes().filter(h => !h.waiting).length, down = G.heroes.filter(h => !h.dead && h.unconscious).length; $('hHeroes').textContent = live + (down ? ' (+' + down + ' down)' : ''); } $('hWave').textContent = !VAR.WAVES ? '—' : VAR.WAVES === Infinity ? G.wave + ' / ∞' : G.wave + '/' + VAR.WAVES;
   $('hNext').textContent = !VAR.WAVES ? '—' : !G.gateOpen ? 'tunnel to Gate' : G.nextWave === Infinity ? '—' : Math.max(0, Math.ceil(G.nextWave - G.time)) + 's' + (G.gates.length > 1 ? ' · gates ' + G.gates.filter(g => g.open).length + '/' + G.gates.length : '');
   let dig = 0, claim = 0, busy = 0, upkeep = 0; for (const t of G.tasks.values()) { if (t.type === 'DIG') dig++; else if (t.type === 'CLAIM') claim++; else upkeep++; if (t.who.size) busy++; }
   const mood = G.creatures.map(c => c.name + ' #' + c.id + ' Lv' + c.level + ' ' + Math.ceil(c.hp) + '/' + c.maxHp + 'hp: ' + c.mood + (c.lair || c.noLair ? '' : ' (no bed)')).join('<br>');
-  $('tasks').innerHTML = 'Dig tiles <b>' + dig + '</b> · Claim tiles <b>' + claim + '</b> · Repair/rearm <b>' + upkeep + '</b> · in progress <b>' + busy + '</b><br>' +
+  $('tasks').innerHTML = 'Dig tiles <b>' + dig + '</b> · Claim tiles <b>' + claim + '</b> · Repairs <b>' + upkeep + '</b> · in progress <b>' + busy + '</b><br>' +
     'Chickens <b>' + G.chickens.length + '</b> · hungry <b>' + G.creatures.filter(c => !c.noFood && c.hunger >= VAR.HUNGRY_AT).length + '</b> · praying <b>' + G.creatures.filter(c => c.state === 'pray').length + '</b> (+' + prayRate().toFixed(1) + ' mana/s)<br>Prisoners <b>' + G.prisoners.length + '</b> · knocked out <b>' + G.creatures.concat(G.heroes).filter(u => u.unconscious).length + '</b><br>Idle imps <b>' + G.imps.filter(i => i.state === 'idle').length + '</b>/' + G.imps.length + '<br><span style="color:var(--dim)">' + (mood || 'No creatures yet — dig east and claim the purple portal.') + '</span>';
 }
 
@@ -1480,6 +1601,6 @@ function frame(now) {
   renderHud(); requestAnimationFrame(frame);
 }
 requestAnimationFrame(frame);
-const hoverUnit = () => (tool === DEFAULT_TOOL || tool === 'hand') && !G.held && !G.over && mouse.x >= 0 && !mouse.down && mouse.fx !== undefined ? unitAt(mouse) : null;       // the creature the cursor could pick up (a ring under it shows it)
+const hoverUnit = () => (tool === DEFAULT_TOOL || tool === 'hand') && G.hand.length < HAND_MAX && !shiftDown && !G.over && mouse.x >= 0 && !mouse.down && mouse.fx !== undefined ? unitAt(mouse, G.hand.length ? REACH_MORE : REACH) : null;       // the creature the cursor could pick up (a ring under it shows it)
 window.__ui = { get mouse() { return mouse; }, get tool() { return tool; }, inputDown, inputMove, inputUp, guideTarget, hoverUnit };
-window.__game = { gainXp, xpAt, unitAt, dropHeld, cancelTool, LV, LEVEL_TABLE, CAMPAIGN, startFlee, TABS, TAB_OF, setTab, pickUp, renderRoster, finishGame, renderEnd, COND, OBJECTIVES, GUIDE, condState, updateObjectives, guideNow, guideTarget, showBriefing, validateLevel, buildMap, levelSize, levelPos, strike, Chicken, updateHatchery, prayRate, spriteOf, pickKind, RESEARCH, isAvail, unlockAll, addResearch, SKELETON, freeSlot, updateJail, knockOut, KO_SECONDS, TORTURE_SECONDS, SPELLS, SPELL_ORDER, castSpell, TRAPS, DOOR, placeThings, removeThings, doorAt, trapAt, HERO_LAND, W, H, G, HEROES, KINDS, spawnWave, Creature, Imp, Hero, hurt, los, T, TERRAIN, step, tagRect, build, scanTasks, findPath, capacity, goldReleased, damageTile, perApplication, VAR, audioMood, SPELL_SND, release };
+window.__game = { gainXp, xpAt, unitAt, dropHeld, cancelTool, LV, LEVEL_TABLE, CAMPAIGN, startFlee, TABS, TAB_OF, setTab, pickUp, renderRoster, finishGame, renderEnd, COND, OBJECTIVES, GUIDE, condState, updateObjectives, guideNow, guideTarget, showBriefing, validateLevel, buildMap, levelSize, levelPos, strike, Chicken, updateHatchery, prayRate, spriteOf, pickKind, RESEARCH, isAvail, unlockAll, addResearch, SKELETON, freeSlot, updateJail, knockOut, KO_SECONDS, TORTURE_SECONDS, SPELLS, SPELL_ORDER, castSpell, TRAPS, DOOR, placeThings, removeThings, doorAt, trapAt, HERO_LAND, W, H, G, HEROES, KINDS, spawnWave, Creature, Imp, Hero, hurt, los, T, TERRAIN, step, tagRect, build, scanTasks, findPath, capacity, goldReleased, damageTile, perApplication, VAR, audioMood, SPELL_SND, release, buildingInfo, shotClear, checkExpansion, HAND_MAX, activeHeroes, trapCount, TRAP_LIMIT, TRAP_USES };

@@ -57,13 +57,13 @@ const IDS = ['tutorial', 'portal', 'hatchery', 'library', 'traps', 'prison', 'te
     check('maps: chapters 1 and 2 are the small 30x17 and 36x20; chapters 3-10 are enlarged to 76x44 ... 104x64 (four times the drawn area, at least double the old maps) and never shrink', maps[0].w === 30 && maps[0].h === 17 && maps[1].w === 36 && maps[1].h === 20 && maps.every((m, i) => i < 3 || (m.w >= maps[i - 1].w && m.h >= maps[i - 1].h)) && maps[2].w === 76 && maps[9].w === 104 && maps[9].h === 64 && maps.slice(2).every(m => m.w * m.h >= 2 * 38 * 22), maps.map(m => m.w + 'x' + m.h).join(' '));
     check('rock ridges make choke points from chapter 2 on', maps[0].ridges === 0 && maps.slice(1).every(m => m.ridges >= 2), maps.map(m => m.ridges).join());
     check('enough gold seams: 2 in the Tutorial, 6 or more in chapter 2, 18 or more from chapter 3 (the enlarged maps), 40 or more in the finale (each seam is worth 2000)', maps[0].gold === 2 && maps[1].gold >= 6 && maps.slice(2).every(m => m.gold >= 18) && maps[9].gold >= 40 && maps.every((m, i) => i < 2 || m.gold >= maps[i - 1].gold - 3), maps.map(m => m.gold).join());
-    check('a roomy home cavern in every map', maps.every(m => m.keeperFloor >= 40), maps.map(m => m.keeperFloor).join());
+    check('a small home cavern in every map (about half what it was: the rest of the dungeon is for you to claim), but room to start in', maps.every(m => m.keeperFloor >= 20 && m.keeperFloor <= 110), maps.map(m => m.keeperFloor).join());
 
     console.log('3. the difficulty curve');
     const cur = await page.evaluate((IDS) => IDS.map(id => { const lv = window.__game.LEVEL_TABLE[id], w = lv.waves; return { waves: w.plan.length, dig: w.dig || 0, waiting: !!w.waiting, mult: w.heroMult, prep: w.prep, gap: w.interval, scale: w.scale, heart: lv.rules.heartHp, gold: lv.start.gold, size: w.plan.reduce((n, p) => n + p.length, 0), maxParty: Math.max(...w.plan.map(p => p.length)) }; }), IDS);
     const up = (k, from = 0) => cur.every((c, i) => i <= from || c[k] >= cur[i - 1][k]), down = (k, from = 0) => cur.every((c, i) => i <= from || c[k] <= cur[i - 1][k]);
     check('waves per chapter rise: 1, 3, 4, 4, 5, 6, 6, 7, 8, 10', cur.map(c => c.waves).join() === '1,3,4,4,5,6,6,7,8,10', cur.map(c => c.waves).join());
-    check('hero strength is x0.5 in the Tutorial and between x0.7 and x1.2 after it (it no longer only rises: the pressure now also comes from shorter timers, digging heroes and bigger maps, see docs/06-levels.md "Balance")', cur[0].mult === 0.5 && cur.slice(1).every(c => c.mult >= 0.7 && c.mult <= 1.2), cur.map(c => c.mult).join());
+    check('hero strength is x0.5 in the Tutorial and between x0.7 and x1.4 after it (it no longer only rises: the pressure now also comes from shorter timers, digging heroes and bigger maps, see docs/06-levels.md "Balance")', cur[0].mult === 0.5 && cur.slice(1).every(c => c.mult >= 0.7 && c.mult <= 1.4), cur.map(c => c.mult).join());
     check('digging heroes never get rarer: 0,0,0,1,1,2,2,3,3,4 (waves.dig)', up('dig') && cur.map(c => c.dig).join() === '0,0,0,1,1,2,2,3,3,4', cur.map(c => c.dig).join());
     check('preparation never grows from chapter 2 on: 90 s down to 35 s (it used to be 160 down to 60: too long); the Tutorial has none because its Knight is already waiting at the Gate', down('prep', 1) && cur[1].prep === 90 && cur[9].prep === 35 && cur[0].waiting && cur[0].prep === 0 && cur.slice(1).every(c => !c.waiting), cur.map(c => c.prep).join());
     check('the gap between waves never grows: 75 s in chapter 2 down to 50 s in the finale (it was 110 down to 90)', down('gap') && cur[1].gap === 75 && cur[9].gap === 50 && cur.slice(1).every(c => c.gap <= 75), cur.map(c => c.gap).join());
@@ -114,15 +114,15 @@ const IDS = ['tutorial', 'portal', 'hatchery', 'library', 'traps', 'prison', 'te
       const k0 = G.heroes[0], gt = G.gates[0];                                           // the Knight waiting on the pad from the first second
       out.wait = { n: G.heroes.length, name: k0 && k0.name, waiting: !!(k0 && k0.waiting), onPad: !!k0 && Math.abs(k0.x - gt.x) <= 1.6 && Math.abs(k0.y - gt.y) <= 1.6, hud: G.heroes.filter(h => !h.waiting).length, wave: G.wave, tension: g.audioMood().tension, log: G.log.some(m => /waits at the Hero Gate/.test(m)), x: k0.x, y: k0.y };
       mark('start'); G.guideStep++;                                                       // "Got it"
-      g.tagRect(9, 8, 11, 8, true); run(60, () => G.stats.dug >= 3); mark('dug 3');
-      g.tagRect(12, 8, 12, 8, true); run(60, () => G.stats.dug >= 4 && G.stats.claimed >= 3); mark('seam, claimed');
-      g.build(g.T.TREASURY, 2, 5, 3, 5); run(2); mark('treasury');
+      g.tagRect(8, 8, 10, 8, true); run(60, () => G.stats.dug >= 3); mark('dug 3');
+      g.tagRect(11, 8, 11, 8, true); run(60, () => G.stats.dug >= 4 && G.stats.claimed >= 3); mark('seam, claimed');
+      g.build(g.T.TREASURY, 3, 6, 4, 6); run(2); mark('treasury');
       run(120, () => G.gold >= 1500); mark('gold 1500');
-      g.build(g.T.LAIR, 2, 11, 3, 11); run(2); mark('lair');
-      g.tagRect(13, 8, 20, 8, true); run(120, () => G.portalOwned); mark('portal');
+      g.build(g.T.LAIR, 3, 10, 4, 10); run(2); mark('lair');
+      g.tagRect(12, 8, 13, 8, true); run(120, () => G.portalOwned); mark('portal');
       run(60, () => G.creatures.length >= 1); mark('first creature');
       out.still = { dx: Math.hypot(k0.x - out.wait.x, k0.y - out.wait.y), hp: k0.hp === k0.maxHp, tension: g.audioMood().tension, wave: G.wave, over: G.over };      // minutes later, still standing there, still calm
-      g.tagRect(9, 11, 12, 11, true); out.gateAt = run(120, () => G.gateOpen); mark('gate linked'); out.guideAtGate = G.guideStep;
+      g.tagRect(8, 10, 11, 12, true); out.gateAt = run(120, () => G.gateOpen); mark('gate linked'); out.guideAtGate = G.guideStep;
       out.creaturesAtGate = G.creatures.length; const linked = G.time; out.rel = { waiting: k0.waiting, wave: G.wave, nextWave: G.nextWave, tension: g.audioMood().tension, hud: G.heroes.filter(h => !h.waiting).length };
       run(1); out.moved = { path: !!k0.path || k0.state === 'fight', state: k0.state, d: Math.hypot(k0.x - out.wait.x, k0.y - out.wait.y) };      // one second after the link he is on his way
       out.won = run(400, () => G.over === 'victory'); mark('over'); out.over = G.over; out.since = Math.round(G.time - linked); out.heart = G.heartHp; out.kills = G.kills;

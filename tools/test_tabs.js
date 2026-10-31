@@ -44,7 +44,7 @@ const ROOMS = ['treasury', 'lair', 'library', 'hatchery', 'temple', 'prison', 't
     console.log('2. the tabs');
     await page.click('#tab_build'); v = await visible(page);
     check('Buildings: the eight rooms (the Training Room is new) and the three defences (door, gas trap, lightning trap)', ROOMS.concat(DEF).every(id => v.includes('b_' + id)) && !v.includes('b_hand') && !v.includes('b_lightning'), v.join());
-    check('...in two labelled groups: Rooms and Defences', await page.evaluate(() => [...document.querySelectorAll('#tp_build .grp > .lbl')].map(l => l.textContent).join() === 'Rooms,Defences'));
+    check('...in three labelled groups: Rooms, Defences and Sell', await page.evaluate(() => [...document.querySelectorAll('#tp_build .grp > .lbl')].map(l => l.textContent).join() === 'Rooms,Defences,Sell a misplaced room, door or trap'));
     check('...and the open tab is marked', await page.evaluate(() => document.getElementById('tab_build').classList.contains('open') && document.getElementById('tab_build').getAttribute('aria-expanded') === 'true'));
     check('Buildings fits the toolbar slot', await fits(page));
     await page.click('#tab_build'); v = await visible(page);
@@ -111,9 +111,11 @@ const ROOMS = ['treasury', 'lair', 'library', 'hatchery', 'temple', 'prison', 't
     const g1 = await page.evaluate(() => { document.querySelectorAll('#roster .chip .grab')[0].click(); const G = __game.G; return { held: G.held && G.held.name, tool: __ui.tool, holding: document.documentElement.classList.contains('holding') }; });
     check('clicking a chip\'s hand picks that creature up: the Hand tool, the fist cursor', g1.held === 'Goblin' && g1.tool === 'hand' && g1.holding, JSON.stringify(g1));
     await page.evaluate(() => { document.querySelectorAll('#roster .chip .grab')[1].click(); });
-    check('you cannot pick up a second one while carrying (and it says why)', await page.evaluate(() => __game.G.held.name === 'Goblin' && /already carrying/.test(__game.G.log[0])));
-    const dropped = await page.evaluate(() => { const G = __game.G, x = G.heart.x + 3.5, y = G.heart.y + 0.5, p = { x: Math.floor(x), y: Math.floor(y) }, f = { fx: x, fy: y }; __ui.inputDown(p, f, 0); __ui.inputUp(p, f); const c = G.creatures[0]; return { held: G.held, at: [c.x, c.y], flag: c.held }; });
-    check('a click on the map puts it down where you clicked', dropped.held === null && !dropped.flag && Math.abs(dropped.at[0] - 9.5) < 0.01, JSON.stringify(dropped));
+    check('you can pick up a second one while carrying: the hand holds two, the last one picked is on top', await page.evaluate(() => __game.G.hand.length === 2 && __game.G.held === __game.G.creatures[1]));
+    const dropped = await page.evaluate(() => { const G = __game.G; G.imps.length = 0; const drop = (x, y) => { const p = { x: Math.floor(x), y: Math.floor(y) }, f = { fx: x, fy: y }; __ui.inputDown(p, f, 0); __ui.inputUp(p, f); };
+      drop(G.heart.x + 2.5, G.heart.y + 0.5); const mid = { n: G.hand.length, top: G.held === G.creatures[0], dropped: !G.creatures[1].held };      // a click drops the one on top
+      drop(G.heart.x + 3.5, G.heart.y + 0.5); const c = G.creatures[0]; return { mid, held: G.held, n: G.hand.length, at: [c.x, c.y], flag: c.held }; });
+    check('a click on the map puts the top one down where you clicked, the next click the other', dropped.mid.n === 1 && dropped.mid.top && dropped.mid.dropped && dropped.held === null && dropped.n === 0 && !dropped.flag && Math.abs(dropped.at[0] - 9.5) < 0.01, JSON.stringify(dropped));
     await page.evaluate(() => { __game.G.creatures.length = 0; }); await sleep(300);
     check('with no creatures the list says so', await page.evaluate(() => /No creatures yet/.test(document.getElementById('roster').textContent)));
     await page.context().close();

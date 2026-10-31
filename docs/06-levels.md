@@ -155,17 +155,17 @@ and the existing `levelup` sound and log line play on every level. Training make
 
 ## How many creatures you can keep
 
-The army is capped at `min(15, beds, food)`: **beds** are your owned Lair tiles (one creature each); **food** is a larder allowance of 3 plus
-4 per owned Hatchery tile (`VAR.FREE_FEED`, `VAR.FEED_PER_HATCHERY_TILE`); 15 is the Portal's own limit. The Portal stops drawing creatures
+The army is capped at `min(portal, beds, food)`, where the Portal's own limit is **20** (`rules.maxCreatures`; chapters 8-10 set 25): **beds** are your owned Lair tiles (one creature each); **food** is a larder allowance of 3 plus
+4 per owned Hatchery tile (`VAR.FREE_FEED`, `VAR.FEED_PER_HATCHERY_TILE`). The Portal stops drawing creatures
 at the limit and logs "Your dungeon is full" once (the line says whether beds or food are the limit); it resumes when the limit rises.
 Nobody is thrown out if it later falls, the surplus is just not replaced. The top bar reads `Creatures 5/9 beds` and the Monsters tab shows the
 same, both with a tooltip naming the three limits.
 
 The food number is derived from the sim, not guessed: a creature is hungry about every 120 s (`HUNGER_PER_SECOND` 0.5, `HUNGRY_AT` 60) and a
 Hatchery tile lays a chicken every `CHICKEN_SECONDS` 24 s, so a tile feeds 5 creatures in theory; 4 leaves room for walking, eating and the
-12-chicken world cap. The 3-creature allowance is real food: the Dungeon Heart's larder lays chickens like a fifth of a Hatchery tile (at most
-3 about when there is no Hatchery). `node tools/test_capacity.js` plays ten minutes at the limit with 0, 1, 2 and 4 Hatchery tiles and nobody
-starves or leaves. `rules.food: false` removes the food limit (beds still apply): the Tutorial and chapter 2 use it, because the Hatchery is
+12-chicken world cap. The 3-creature allowance is a ration: only a Hatchery lays chickens, so a hungry creature among the first three (everybody on levels
+with `rules.food: false`) that finds no free chicken walks to the Heart and eats there. `node tools/test_capacity.js` plays ten minutes at the limit with 0, 1, 2 and 5 Hatchery tiles and nobody
+starves or leaves. `rules.maxCreatures` (a whole number, 1-60) sets the Portal's limit. `rules.food: false` removes the food limit (beds still apply): the Tutorial and chapter 2 use it, because the Hatchery is
 chapter 3's lesson. Chapter objectives were adjusted so the army they ask for fits: chapter 2 asks for a Lair of 5 (five creatures) and chapter 3
 a Lair of 6 and a Hatchery of 4 (food for 19).
 
@@ -226,7 +226,7 @@ thing, and the difficulty rises through data alone:
 "hero x" is `waves.heroMult`, "prep" the seconds from the first linked Gate to wave 1 (the Tutorial has none: its Knight waits at the Gate and attacks the moment you link it), "gap" the seconds between waves. Starting gold rises
 from 800 to 2500. `waves.scale` (extra strength per wave) is a balancing dial, 0 to 0.14: it is higher where a chapter's early waves are light.
 The Heart shrinks from 3000 to 2500 by chapter 5. Parties never exceed the Gate pad's nine heroes. **Length targets**: the Tutorial 3-5
-minutes, chapters 2-4 10-12, 5-7 12-16, 8-9 16-22, the finale 22-28, about 2.5-3 hours in all (see "Balance" for how that was checked).
+minutes, chapters 2-4 10-12, 5-7 12-16, 8-9 16-22, the finale 22-28, about 2.5-3 hours in all (see "Balance" for how that was checked). The Portal was later moved to about 12 tiles from the Heart and the home cavern halved, which took a few minutes off each chapter for a fast bot.
 
 **Map sizes.** Chapters 1 and 2 are the small maps (30 x 17, 36 x 20). Chapters 3 to 10 are **enlarged**: they are drawn at the old size and `enlargeGrid(grid, salt)`
 in `levels.js` doubles them in both directions (four times the area: 76 x 44 for chapter 3 up to 104 x 64 for the finale) while keeping the drawn
@@ -239,7 +239,7 @@ Things every chapter shares:
 
 - **The maps** are text grids from 30x17 to 52x32. Rock ridges (`#`) with gaps cut each map into chambers, so any tunnel to a Gate must pass
   a gap: those are the choke points for doors and traps. Gold seams are scattered (each is worth 2000), a few gem seams give a trickle
-  late on. The Heart is always at the west, the Portal at the east, the Gates south and north (chapter 10: south-west, north, south-east).
+  late on. The Heart is always at the west, the Portal a short dig to its east, the Gates south and north (chapter 10: south-west, north, south-east).
 - **Objectives** are always "claim the Portal ... tunnel to a Gate ... defeat every wave" plus what the chapter teaches (a room, research,
   doors and traps, spells, creatures, `gate` with `n: 2`). Nothing required depends on luck: a prisoner, for example, is only a bonus.
 - Every chapter after the Tutorial has a **bonus objective** (the third star): more creatures, more traps, more spells, a research
@@ -267,21 +267,26 @@ Results with 8 seeds each (what the test pins, with margins, is in the file):
 
 | # | chapter | steady bot wins | game time | creatures lost per run | bonus star | lazy bot survives |
 |---|---|---|---|---|---|---|
-| 1 | The Awakening | 8/8 | 2.3 min | 0 | - | 8/8 (it is the Tutorial) |
-| 2 | Creatures of the Dark | 8/8 | 8.1 | 0 | 8/8 | 8/8 |
-| 3 | Mouths to Feed | 8/8 | 10.9 | 0 | 8/8 | 0/8 |
-| 4 | The Library | 8/8 | 12.6 | 0 | 8/8 | 0/8 |
-| 5 | Doors and Snares | 8/8 | 12.7 | 0 | 8/8 | 0/8 |
-| 6 | The Dungeon Below | 8/8 | 14.1 | 5 | 8/8 | 0/8 |
-| 7 | Prayers and Power | 8/8 | 14.6 | 0 | 8/8 | 0/8 |
-| 8 | Two Gates | 8/8 | 16.4 | 2 | 8/8 | 0/8 |
-| 9 | The Siege | 6/8 | 18.9 | 11 | 6/6 wins | 0/8 |
-| 10 | The King's Crusade | 3/8 | 19.3 | 12 | 3/3 wins | 0/8 |
+| 1 | The Awakening | 8/8 | 1.8 min | 0 | - | 8/8 (it is the Tutorial) |
+| 2 | Creatures of the Dark | 8/8 | 6.5 | 0 | 8/8 | 2/8 |
+| 3 | Mouths to Feed | 8/8 | 7.9 | 0 | 8/8 | 0/8 |
+| 4 | The Library | 8/8 | 7.8 | 1 | 8/8 | 0/8 |
+| 5 | Doors and Snares | 8/8 | 8.7 | 0 | 8/8 | 0/8 |
+| 6 | The Dungeon Below | 8/8 | 10.2 | 1 | 8/8 | 0/8 |
+| 7 | Prayers and Power | 8/8 | 10.6 | 1 | 8/8 | 0/8 |
+| 8 | Two Gates | 8/8 | 11.7 | 1 | 8/8 | 0/8 |
+| 9 | The Siege | 6/8 | 13.2 | 10 | 6/6 wins | 0/8 |
+| 10 | The King's Crusade | 5/8 | 14.7 | 16 | 5/5 wins | 0/8 |
 
-The bot is a *fast* player, so a first-time human takes longer: its times add up to about 131 minutes, against the 2.5-3 hours aimed for.
+The bot is a *fast* player, so a first-time human takes longer: its times add up to about 93 minutes (the Portal is now a short dig from the Heart), so a first-time human needs roughly two hours.
 "Not trivial" means the lazy bot never wins a chapter after the first and never survives chapters 6-10, while the finale costs even the
 careful bot about 11 creatures and more than half its runs. Chapters 1-8 are meant to be cleared cleanly by a prepared player: they teach, and
 the pressure arrives in 9 and 10.
+
+**After the playtest corrections** (Portal about 12 tiles from the Heart, a half-size home cavern, traps that fire twice, doors that stop archers,
+the Hatchery healing, 20-25 creatures) the steady bot finished every chapter 1 to 5 minutes sooner and the finale became easy (chapter 10 won 8 of 8
+times with 4 creatures lost), so chapters 9 and 10 got stronger heroes (`heroMult` 1.0 to 1.2 and 1.08 to 1.37) and the length windows in
+`tools/test_bots.js` were lowered to match. The bot builds up to four traps (two of each kind) and chapter 5's bonus is now "Set 4 traps".
 
 What the bots showed, and what changed because of it:
 

@@ -73,7 +73,7 @@ worker.execute(): while adjacent/at target, tick executeTask; on isValid()==fals
 * Dead → `Death` + corpse (`DEAD_BODY_DIES_AFTER_SECONDS` 60), `CAN_BE_RESURECTED`, vampire needs `DECOMPOSE_VALUE_NEEDED_FOR_VAMPIRE` 1000.
 * Prison / torture: `PRISON_MODIFY_CREATURE_HEALTH_PER_SECOND` −3, `tortureTimeToConvert`, `tortureMoodChange`.
 
-Prototype doors/traps (`placeThings`, `fireTrap`, `updateTraps` in `web/game.js`): doors block invaders until smashed, traps are hidden, charge-limited and re-armed by imps for gold; OpenKeeper's versions are `DoorsController`/`TrapsController` with `DoorComponent`/`TrapComponent`, manufactured at the Workshop.
+Prototype doors/traps (`placeThings`, `fireTrap`, `updateTraps` in `web/game.js`): doors block invaders until smashed, traps are hidden, fire twice and then crumble away (two of each kind at a time), and ranged shots cannot cross a closed door (`shotClear`); OpenKeeper's versions are `DoorsController`/`TrapsController` with `DoorComponent`/`TrapComponent`, manufactured at the Workshop.
 
 Prototype spells (`SPELLS`, `castSpell`, `updateMana` in `web/game.js`) follow the `KeeperSpellCastValidator` pattern: mana cost + cooldown + valid target before anything fires. Not modelled: researching spells in the Library, Temple prayer mana, possession, slap.
 
