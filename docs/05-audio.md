@@ -59,7 +59,8 @@ audio.js   voices (V)  ->  per-play gain + stereo pan  ->  sfx bus ----+
 | `imp` | imp chatter (every 8-18 s per imp) |
 | `portal` | the portal is claimed, or a creature arrives |
 | `levelup` / `research` / `convert` | creature level-up / research done / torture conversion |
-| `pickup` / `drop` | the Hand |
+| `pickup` / `drop` | the Hand (or a left-click on a creature in the default mode) |
+| `train` | a creature strikes the training dummy in the Training Room (a wooden knock, every 1.1 s while it trains) |
 | `gong` | the tunnel reaches the Hero Gate |
 | `horn` / `boss_horn` | a hero wave / the boss wave (stingers, also `Sound.stinger`) |
 | `victory` / `defeat` | game over (fired from `setMood`) |

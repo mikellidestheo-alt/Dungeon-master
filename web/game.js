@@ -39,11 +39,14 @@ const VAR = {                                         // Variable.MiscVariable.M
   HEART_HEALTH: 2500,
   WAVES: 5, FIRST_WAVE_DELAY: 75, WAVE_INTERVAL: 110, // hero gate invasions (tuning)
   HEAR_DISTANCE: 14,                                  // Attributes.distanceCanHear: keepers sense heroes on own land
-  XP_PER_KILL: 1, XP_PER_LEVEL: 3, MAX_LEVEL: 5,      // CreatureExperienceSystem, reduced
+  XP_PER_KILL: 1, MAX_LEVEL: 10,                      // CreatureExperienceSystem, reduced: a kill is a trickle, training is the way up (see XP_FOR_LEVEL)
+  XP_FOR_LEVEL: [50, 65, 80, 100, 125, 155, 190, 230, 280],     // XP to go from level n to n+1 (index n-1); 1275 in all: at about 30 XP a minute of steady training a creature gains a level every 1.7 minutes at first, 9 minutes at the end
+  LEVEL_STAT_MULT: 1.11, PAY_PER_LEVEL: 0.08,         // hp and damage x1.11 per level (x2.5 at level 10); wages +8% of the base per level above 1
+  TRAIN_SECONDS: 20, TRAIN_XP_PER_SECOND: 0.75, TRAIN_COST: 15, TRAIN_KEEP_GOLD: 100, TRAIN_PAYDAY_WINDOW: 30,      // a session is 20 s for 15 XP and 15 gold; a creature will not train if that leaves the purse under 100, or under the whole payday in the 30 s before it
 };
 
 /* ---- terrain table (Terrain.kwd analogue). flags: S solid, I impenetrable, O ownable, T taggable ---- */
-const T = { ROCK: 0, EARTH: 1, GOLD: 2, GEM: 3, PATH: 4, TREASURY: 5, LAIR: 6, HEART: 7, PORTAL: 8, GATE: 9, PRISON: 10, TORTURE: 11, LIBRARY: 12, HATCHERY: 13, TEMPLE: 14 };
+const T = { ROCK: 0, EARTH: 1, GOLD: 2, GEM: 3, PATH: 4, TREASURY: 5, LAIR: 6, HEART: 7, PORTAL: 8, GATE: 9, PRISON: 10, TORTURE: 11, LIBRARY: 12, HATCHERY: 13, TEMPLE: 14, TRAINING: 15 };
 const HERO_LAND = 2;                                  // tile.owner for the good player (Player.GOOD_PLAYER_ID analogue)
 const TERRAIN = [
   { name: 'Rock',     solid: 1, imp: 1, own: 0, tag: 0, maxHealth: 1 },
@@ -61,6 +64,7 @@ const TERRAIN = [
   { name: 'Library',  solid: 0, own: 1, room: 1, maxHealth: 1000, cost: 120 },
   { name: 'Hatchery', solid: 0, own: 1, room: 1, maxHealth: 1000, cost: 80 },
   { name: 'Temple',   solid: 0, own: 1, room: 1, maxHealth: 1000, cost: 120 },
+  { name: 'Training Room', solid: 0, own: 1, room: 1, maxHealth: 1000, cost: 150 },
 ];
 
 /* ---- tiny seeded RNG so levels are reproducible (?seed=123) ---- */
@@ -140,7 +144,7 @@ function validateLevel(lv) {
   const cond = (c, where) => {                                   // an objective or a guide condition
     const d = c && COND[c.type]; if (!d) { errs.push(where + ': unknown condition type "' + (c && c.type) + '"'); return; }
     for (const k of d.params || []) need(c[k] !== undefined, where + ': "' + c.type + '" needs ' + k);
-    if (d.params && d.params.includes('n')) need(c.n > 0, where + ': n must be positive');
+    if (d.params && d.params.includes('n')) need(c.n > 0, where + ': n must be positive'); if (c.type === 'level') need(c.n >= 2 && c.n <= VAR.MAX_LEVEL, where + ': a level objective needs n between 2 and ' + VAR.MAX_LEVEL);
     if (c.room) need(ROOM_TOOLS[c.room], where + ': no room called ' + c.room); if (c.item) need(RESEARCH[c.item], where + ': nothing to research called ' + c.item);
     if (c.kind) need(KINDS.some(k => k.name === c.kind), where + ': no creature called ' + c.kind);
     if (d.needs === 'waves') need(plan.length, where + ': "' + c.type + '" needs waves.plan'); if (d.needs === 'gate') need(gates.length >= (c.n || 1), where + ': "' + c.type + '" needs ' + (c.n > 1 ? c.n + ' Hero Gates' : 'a Hero Gate')); if (d.needs === 'portal') need(pos.portal, where + ': "' + c.type + '" needs a Portal');
@@ -408,15 +412,22 @@ const spriteOf = (u) => (u.level >= 3 && u.elite) ? u.elite : u.sprite;      // 
 class Creature extends Mover {                    // CreatureMoodSystem / CreatureSleepSystem: reduced to one lair + payday
   constructor(x, y, kind) { super(x, y, 1.6); Object.assign(this, kind); this.energy = 100 + (rand() * 0 | 0); this.anger = 0; this.lair = null; this.state = 'idle'; this.wait = 1;
     this.id = ++Creature.n; this.energy = 70 + rand() * 30;
-    Object.assign(this, { hunger: rand() * 30, victim: null, tortureThink: 0, chicken: null, eatT: 0, foodThink: 0, prayThink: 0, desk: null, studyT: 0, studyThink: 0, maxHp: kind.hp, team: 'k', cd: 0, haste: 0, sight: 7, level: 1, xp: 0, rep: 0, dead: false, flash: 0, held: false }); }
+    Object.assign(this, { hunger: rand() * 30, victim: null, tortureThink: 0, chicken: null, eatT: 0, foodThink: 0, prayThink: 0, desk: null, studyT: 0, studyThink: 0, maxHp: kind.hp, team: 'k', cd: 0, haste: 0, sight: 7, level: 1, xp: 0, rep: 0, dead: false, flash: 0, held: false, pay0: kind.pay, trainThink: 0, nextTrain: false }); }
   get mood() { return this.anger >= 1600 ? 'angry' : this.anger >= 800 ? 'unhappy' : 'content'; }
+  startTraining() {                                                                                 // an idle, fed, rested creature below the top level looks for a free dummy (the purse must afford a session and keep some back)
+    if (this.level >= VAR.MAX_LEVEL || this.path || this.trainThink > 0 || this.hunger >= VAR.HUNGRY_AT || this.energy < 35) return false;
+    this.trainThink = 2;
+    if (G.gold < VAR.TRAIN_COST + trainReserve()) { if (!G.warnTrain && G.map.some(t => t.t === T.TRAINING && t.owner === 1)) { G.warnTrain = 1; say('Not enough gold to train: creatures keep gold back for wages.'); } return false; }
+    const dummy = freeSlot(T.TRAINING, this), p = dummy && findPath(this.tx, this.ty, dummy.x, dummy.y);
+    if (!p) return false; dummy.t.occ = this; this.desk = dummy.t; this.state = 'toTrain'; this.go(p); return true;
+  }
   releaseDesk() { if (this.desk) { this.desk.occ = null; this.desk = null; } }
   releaseVictim() { if (this.victim) { if (this.victim.tormentor === this) this.victim.tormentor = null; this.victim = null; } }
   releaseChicken() { if (this.chicken) { this.chicken.claimedBy = null; this.chicken.frozen = false; this.chicken = null; } }
   update(dt) {
     if (this.dead || this.held) return;
     this.flash = Math.max(0, this.flash - dt);
-    if (this.desk && !['research', 'toDesk', 'pray', 'toAltar'].includes(this.state)) this.releaseDesk();   // anything that interrupts studying or praying frees the seat
+    if (this.desk && !['research', 'toDesk', 'pray', 'toAltar', 'train', 'toTrain'].includes(this.state)) this.releaseDesk();   // anything that interrupts studying or praying frees the seat
     if (this.chicken && this.state !== 'toFood' && this.state !== 'eat') this.releaseChicken();
     if (this.victim && this.state !== 'toRack' && this.state !== 'torture') this.releaseVictim();
     if (this.unconscious) { if (!this.carriedBy) { this.uTime -= dt; if (this.uTime <= 0) { say(this.name + ' #' + this.id + ' bled out.'); kill(this, null); } } return; }
@@ -470,13 +481,22 @@ class Creature extends Mover {                    // CreatureMoodSystem / Creatu
     } else if (this.state === 'pray') {                                   // Temple: prayer turns into mana and soothes the creature
       this.sndT -= dt; if (this.sndT <= 0) { this.sndT = 5 + this.id % 4; sfx('chime', this.x, this.y); }
       this.studyT -= dt; this.anger = Math.max(0, this.anger - 40 * dt); G.mana = Math.min(G.maxMana, G.mana + this.pray * (1 + 0.1 * (this.level - 1)) * dt);
-      if (this.studyT <= 0 || this.energy < 35 || this.hunger >= VAR.HUNGRY_AT) { this.releaseDesk(); this.state = 'idle'; this.wait = 1; }
+      if (this.studyT <= 0 || this.energy < 35 || this.hunger >= VAR.HUNGRY_AT) { this.releaseDesk(); this.state = 'idle'; this.wait = 1; this.nextTrain = true; }
     } else if (this.state === 'toDesk') {
       if (!G.research.current) { this.releaseDesk(); this.state = 'idle'; this.path = null; }
       else if (this.stepMove(dt)) { this.state = 'research'; this.studyT = VAR.STUDY_SECONDS; }
     } else if (this.state === 'research') {                              // task/creature/Research: sit still at a desk and add research points
       this.studyT -= dt; if (G.research.current) addResearch(this.research * (1 + 0.1 * (this.level - 1)) * dt);
-      if (this.studyT <= 0 || !G.research.current || this.energy < 35) { this.releaseDesk(); this.state = 'idle'; this.wait = 1; }
+      if (this.studyT <= 0 || !G.research.current || this.energy < 35) { this.releaseDesk(); this.state = 'idle'; this.wait = 1; this.nextTrain = true; }
+    } else if (this.state === 'toTrain') {                                 // Training Room: walk to a free dummy, pay for the session, then hit it
+      if (this.stepMove(dt)) {
+        if (G.gold >= VAR.TRAIN_COST + trainReserve()) { G.gold -= VAR.TRAIN_COST; this.state = 'train'; this.studyT = VAR.TRAIN_SECONDS; this.sndT = 0; }
+        else { this.releaseDesk(); this.state = 'idle'; this.wait = 1; this.trainThink = 20; if (!G.warnTrain) { G.warnTrain = 1; say('Not enough gold to train: creatures keep gold back for wages.'); } }
+      }
+    } else if (this.state === 'train') {                                   // each strike on the dummy is XP; a session ends on time, hunger, tiredness or the top level
+      this.sndT -= dt; if (this.sndT <= 0) { this.sndT = 1.1; sfx('train', this.x, this.y); }
+      this.studyT -= dt; this.face = Math.atan2(0.4, 1); gainXp(this, VAR.TRAIN_XP_PER_SECOND * dt);
+      if (this.studyT <= 0 || this.energy < 35 || this.hunger >= VAR.HUNGRY_AT || this.level >= VAR.MAX_LEVEL) { this.releaseDesk(); this.state = 'idle'; this.wait = 1; this.nextTrain = false; }
     } else {
       if ((this.energy < 35 || this.hp < this.maxHp * VAR.CREATURE_SLEEPS_WHEN_BELOW_PERCENT_HEALTH / 100) && this.lair) { const p = findPath(this.tx, this.ty, this.lair.x, this.lair.y); if (p) { this.go(p); this.state = 'toBed'; return; } }
       this.foodThink -= dt;
@@ -491,7 +511,8 @@ class Creature extends Mover {                    // CreatureMoodSystem / Creatu
         this.tortureThink = 2; const b = G.prisoners.find(p => p.status === 'torture' && !p.carriedBy && (!p.tormentor || p.tormentor.dead)), pth = b && findPath(this.tx, this.ty, b.tx, b.ty);
         if (pth) { b.tormentor = this; this.victim = b; this.state = 'toRack'; this.go(pth); return; }
       }
-      this.studyThink -= dt; this.prayThink -= dt;
+      this.studyThink -= dt; this.prayThink -= dt; this.trainThink -= dt;
+      if (this.nextTrain && this.startTraining()) return;                                                     // after a session at a desk or an altar, it is the dummy's turn
       if (this.research > 0 && G.research.current && !this.path && this.studyThink <= 0) {                // idle thinkers look for a free desk
         this.studyThink = 2; const desk = freeSlot(T.LIBRARY, this), p = desk && findPath(this.tx, this.ty, desk.x, desk.y);
         if (p) { desk.t.occ = this; this.desk = desk.t; this.state = 'toDesk'; this.go(p); return; }
@@ -500,6 +521,7 @@ class Creature extends Mover {                    // CreatureMoodSystem / Creatu
         this.prayThink = 2.5; const alt = freeSlot(T.TEMPLE, this), p = alt && findPath(this.tx, this.ty, alt.x, alt.y);
         if (p) { alt.t.occ = this; this.desk = alt.t; this.state = 'toAltar'; this.go(p); return; }
       }
+      if (this.startTraining()) return;                                                                         // nothing else to do: train
       if (this.path) this.stepMove(dt); else { this.wait -= dt; if (this.wait <= 0) { this.wait = 1 + rand() * 3; const c = ownedFloor(); if (c) this.go(findPath(this.tx, this.ty, c.x, c.y)); } }
     }
   }
@@ -582,11 +604,15 @@ function kill(t, src) {
   else { G.kills++; say('A hero ' + t.name + ' is slain.'); }
   if (src && src.team === 'k' && src.level && !src.dead) gainXp(src);
 }
-function gainXp(c) {                              // CreatureExperienceSystem, reduced
-  c.xp += VAR.XP_PER_KILL;
-  if (c.level < VAR.MAX_LEVEL && c.xp >= VAR.XP_PER_LEVEL * c.level) {
-    sfx('levelup', c.x, c.y); c.level++; c.maxHp = Math.round(c.maxHp * 1.18); c.dmg *= 1.18; c.hp = Math.min(c.maxHp, c.hp + c.maxHp * 0.3);
-    say(c.name + ' #' + c.id + ' reached level ' + c.level + '!');
+const xpAt = (level) => VAR.XP_FOR_LEVEL.slice(0, Math.max(0, level - 1)).reduce((a, b) => a + b, 0);      // total XP a creature has when it reaches this level
+const trainReserve = () => G.nextPay <= VAR.TRAIN_PAYDAY_WINDOW ? Math.max(VAR.TRAIN_KEEP_GOLD, G.creatures.reduce((t, c) => t + c.pay, 0)) : VAR.TRAIN_KEEP_GOLD;       // what training leaves in the purse: 100, or the wages due when payday is near
+const wageAt = (c) => Math.round(c.pay0 * (1 + VAR.PAY_PER_LEVEL * (c.level - 1)));
+function gainXp(c, amount = VAR.XP_PER_KILL) {    // CreatureExperienceSystem, reduced: kills give a little, the Training Room a lot. xp is the running total; it stops at MAX_LEVEL.
+  if (c.level >= VAR.MAX_LEVEL) return;
+  c.xp = Math.min(xpAt(VAR.MAX_LEVEL), c.xp + amount);
+  while (c.level < VAR.MAX_LEVEL && c.xp >= xpAt(c.level + 1)) {
+    sfx('levelup', c.x, c.y); c.level++; c.maxHp = Math.round(c.maxHp * VAR.LEVEL_STAT_MULT); c.dmg *= VAR.LEVEL_STAT_MULT; c.hp = Math.min(c.maxHp, c.hp + c.maxHp * 0.3); c.pay = wageAt(c);        // stronger, and paid more
+    say(c.name + ' #' + c.id + ' reached level ' + c.level + '!' + (c.level === VAR.MAX_LEVEL ? ' (the highest)' : ''));
   }
 }
 function startFlee(u) {                           // weak and in danger: run to the Heart (keepers) or back to the Gate (heroes)
@@ -731,6 +757,7 @@ const COND = {
   gold:      { params: ['n'], f: (c) => [Math.floor(G.gold), c.n], label: (c) => 'Hold ' + c.n + ' gold' },
   room:      { params: ['room'], f: (c) => [roomCount(c.room), c.n || 1], label: (c) => 'Build a ' + c.room[0].toUpperCase() + c.room.slice(1) + ((c.n || 1) > 1 ? ' of ' + c.n + ' tiles' : '') },
   creatures: { params: ['n'], f: (c) => [G.creatures.filter(u => !u.dead && (!c.kind || u.name === c.kind)).length, c.n], label: (c) => 'Keep ' + c.n + ' ' + (c.kind || 'creature') + (c.n > 1 ? 's' : '') },
+  level:     { params: ['n'], f: (c) => [Math.max(0, ...G.creatures.filter(u => !u.dead).map(u => u.level)), c.n], label: (c) => 'Train a creature to level ' + c.n },
   kills:     { params: ['n'], f: (c) => [G.kills, c.n], label: (c) => 'Slay ' + c.n + ' heroes' },
   research:  { params: ['item'], f: (c) => [G.research.done[c.item] ? 1 : 0, 1], label: (c) => 'Research ' + RESEARCH[c.item].name },
   doors:     { params: ['n'], f: (c) => [G.doors.length, c.n], label: (c) => 'Place ' + c.n + ' door' + (c.n > 1 ? 's' : '') },
@@ -1061,7 +1088,7 @@ const FONT_UNIT = '700 8px Cinzel, Georgia, serif', FONT_NUM = '700 9px Cinzel, 
 if (document.fonts) for (const f of ['700 9px Cinzel', '900 40px "Cinzel Decorative"', 'italic 18px "EB Garamond"']) document.fonts.load(f);
 const hash = (x, y) => { let h = x * 374761393 + y * 668265263; h = (h ^ (h >> 13)) * 1274126177; return ((h ^ (h >> 16)) >>> 0) / 4294967295; };
 const COL = { [T.ROCK]: '#1c1a1a', [T.EARTH]: '#6a4a2c', [T.GOLD]: '#6a4a2c', [T.GEM]: '#4a3a4a', [T.PATH]: '#3b3128' };
-const ROOMCOL = { [T.TREASURY]: '#7a6420', [T.LAIR]: '#4a3a6a', [T.HEART]: '#8a2a2a', [T.PORTAL]: '#5a2a7a', [T.GATE]: '#6a3a2a', [T.PRISON]: '#4a5560', [T.TORTURE]: '#5a2020', [T.LIBRARY]: '#3a4a6a', [T.HATCHERY]: '#6a5a30', [T.TEMPLE]: '#5a4a7a' };
+const ROOMCOL = { [T.TRAINING]: '#6a4030', [T.TREASURY]: '#7a6420', [T.LAIR]: '#4a3a6a', [T.HEART]: '#8a2a2a', [T.PORTAL]: '#5a2a7a', [T.GATE]: '#6a3a2a', [T.PRISON]: '#4a5560', [T.TORTURE]: '#5a2020', [T.LIBRARY]: '#3a4a6a', [T.HATCHERY]: '#6a5a30', [T.TEMPLE]: '#5a4a7a' };
 const carried = (u) => u.held && mouse.fx !== undefined;                       // a carried unit is the fist in the cursor, so the world does not draw it (see cursor.css)
 const scr = (u) => [u.x * TS, u.y * TS];
 function bar(px, py, u) {                                     // health bar above any damaged unit
@@ -1088,6 +1115,7 @@ function draw() {
     if (t.t === T.HATCHERY) { ctx.fillStyle = '#c8a850'; for (let k = 0; k < 6; k++) ctx.fillRect(px + 3 + hash(x + k, y * 3) * 12, py + 3 + hash(x * 5, y + k) * 12, 3, 1.5); }
     if (t.t === T.TEMPLE) { ctx.strokeStyle = '#ffd860'; ctx.beginPath(); ctx.arc(px + TS / 2, py + TS / 2, 6, 0, 7); ctx.stroke(); ctx.fillStyle = '#ffd860'; ctx.fillRect(px + TS / 2 - 1.5, py + TS / 2 - 1.5, 3, 3); }
     if (t.t === T.LIBRARY) { ctx.fillStyle = '#c0a060'; ctx.fillRect(px + 3, py + 3, TS - 6, 4); ctx.fillStyle = '#d06060'; ctx.fillRect(px + 4, py + 4, 3, 2); ctx.fillStyle = '#6090d0'; ctx.fillRect(px + 9, py + 4, 3, 2); ctx.fillStyle = '#8a6a40'; ctx.fillRect(px + 6, py + 11, TS - 12, 5); }
+    if (t.t === T.TRAINING) { ctx.strokeStyle = '#d0a070'; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(px + TS / 2, py + 4); ctx.lineTo(px + TS / 2, py + TS - 4); ctx.moveTo(px + 5, py + 8); ctx.lineTo(px + TS - 5, py + 8); ctx.stroke(); ctx.lineWidth = 1; ctx.fillStyle = t.occ ? '#ffe070' : '#b89a64'; ctx.beginPath(); ctx.arc(px + TS / 2, py + 13, 3.2, 0, 7); ctx.fill(); }
     if (t.t === T.PRISON) { ctx.strokeStyle = '#b8c0d0'; ctx.lineWidth = 1; for (let k = 1; k < 4; k++) { ctx.beginPath(); ctx.moveTo(px + k * TS / 4, py + 3); ctx.lineTo(px + k * TS / 4, py + TS - 3); ctx.stroke(); } }
     if (t.t === T.TORTURE) { ctx.strokeStyle = '#d06a50'; ctx.beginPath(); ctx.moveTo(px + 4, py + 4); ctx.lineTo(px + TS - 4, py + TS - 4); ctx.moveTo(px + TS - 4, py + 4); ctx.lineTo(px + 4, py + TS - 4); ctx.stroke(); }
     if (t.t === T.LAIR) { ctx.fillStyle = '#8a70c0'; ctx.fillRect(px + 4, py + 6, TS - 8, TS - 12); if (t.bed && t.bed.occupant) { ctx.fillStyle = t.bed.occupant.color; ctx.fillRect(px + 6, py + 7, 5, 5); } }
@@ -1117,7 +1145,8 @@ function draw() {
   for (const c of G.creatures) { if (carried(c)) continue; const [px, py] = scr(c); ctx.fillStyle = c.flash > 0 ? '#fff' : c.color; ctx.fillRect(px - 5, py - 5, 10, 10);
     if (c.state === 'fight' || c.state === 'flee') { ctx.strokeStyle = c.state === 'flee' ? '#ffb030' : '#ff4040'; ctx.strokeRect(px - 6.5, py - 6.5, 13, 13); }
     if (c.haste > 0) { ctx.strokeStyle = '#6aa0ff'; ctx.strokeRect(px - 7.5, py - 7.5, 15, 15); }
-    for (let l = 1; l < c.level; l++) { ctx.fillStyle = '#ffe070'; ctx.fillRect(px - 5 + (l - 1) * 3, py + 6, 2, 2); }
+    for (let l = 1; l < c.level; l++) { ctx.fillStyle = l >= 5 ? '#ffb040' : '#ffe070'; ctx.fillRect(px - (c.level - 1) * 1.1 + (l - 1) * 2.2, py + 6, 1.6, 2); }       // one pip per level above 1 (orange from level 6)
+    if (c.state === 'train') { ctx.fillStyle = '#ffe070'; ctx.fillRect(px - 3, py - 11, 6, 3); }
     bar(px, py, c); ctx.fillStyle = '#000'; ctx.font = FONT_UNIT; ctx.textAlign = 'center'; ctx.fillText(c.name[0], px, py + 3);
     if (c.unconscious) { ctx.fillStyle = 'rgba(0,0,0,.55)'; ctx.fillRect(px - 5, py - 5, 10, 10); ctx.fillStyle = '#fff'; ctx.fillText('x', px, py + 3); }
     if (c.state === 'research') { ctx.fillStyle = '#ffd860'; ctx.fillRect(px - 3, py - 11, 6, 4); ctx.fillStyle = '#7a5a10'; ctx.fillRect(px, py - 11, 1, 4); }
@@ -1148,7 +1177,7 @@ function draw() {
 /* ===================================================================================== UI wiring */
 const $ = (id) => document.getElementById(id);
 const TOOLS = [ ['dig', 'Dig / grab'], ['hand', '✋ Hand'], ['treasury', 'Treasury ' + TERRAIN[T.TREASURY].cost + 'g'], ['lair', 'Lair ' + TERRAIN[T.LAIR].cost + 'g'],
-  ['library', 'Library ' + TERRAIN[T.LIBRARY].cost + 'g'], ['hatchery', 'Hatchery ' + TERRAIN[T.HATCHERY].cost + 'g'], ['temple', 'Temple ' + TERRAIN[T.TEMPLE].cost + 'g'], ['prison', 'Prison ' + TERRAIN[T.PRISON].cost + 'g'], ['torture', 'Torture ' + TERRAIN[T.TORTURE].cost + 'g'],
+  ['library', 'Library ' + TERRAIN[T.LIBRARY].cost + 'g'], ['hatchery', 'Hatchery ' + TERRAIN[T.HATCHERY].cost + 'g'], ['temple', 'Temple ' + TERRAIN[T.TEMPLE].cost + 'g'], ['prison', 'Prison ' + TERRAIN[T.PRISON].cost + 'g'], ['torture', 'Torture ' + TERRAIN[T.TORTURE].cost + 'g'], ['training', 'Training ' + TERRAIN[T.TRAINING].cost + 'g'],
   ['door', 'Door ' + DOOR.cost + 'g'], ['gas', 'Gas Trap ' + TRAPS.gas.cost + 'g'], ['bolt', 'Lightning Trap ' + TRAPS.bolt.cost + 'g'],
   ...SPELL_ORDER.map((id, i) => [id, SPELLS[id].icon + ' ' + SPELLS[id].name + ' ' + SPELLS[id].cost + ' [' + (i + 1) + ']']),
   ['sp1', '⏸ Pause'], ['sp2', '1×'], ['sp3', '3×'], ['sp4', '8×'] ];
@@ -1157,13 +1186,13 @@ const TOOL_GROUP = (id) => id.startsWith('sp') ? 'speed' : SPELLS[id] ? 'spell' 
  * full screen): Buildings = the rooms and the defences (doors and traps), Spells = the five spells, Monsters = the Hand and a roster of your
  * creatures. Click a tab again (or press Esc) to close it. Keys: B, C (cast) and H (Hand) open the tabs; 1-5 open Spells and pick a spell. */
 const TABS = [
-  { id: 'build', label: '🏰 Buildings', key: 'B', groups: [['Rooms', ['treasury', 'lair', 'library', 'hatchery', 'temple', 'prison', 'torture']], ['Defences', ['door', 'gas', 'bolt']]] },
+  { id: 'build', label: '🏰 Buildings', key: 'B', groups: [['Rooms', ['treasury', 'lair', 'library', 'hatchery', 'temple', 'prison', 'torture', 'training']], ['Defences', ['door', 'gas', 'bolt']]] },
   { id: 'spells', label: '✨ Spells', key: 'C', groups: [['', SPELL_ORDER]] },
   { id: 'monsters', label: '👹 Monsters', key: 'H', groups: [['Carry', ['hand']]], roster: true },
 ];
 const TAB_OF = {}; for (const t of TABS) for (const [, ids] of t.groups) for (const id of ids) TAB_OF[id] = t.id;
 const LABEL = Object.fromEntries(TOOLS);
-const ROOM_COST = { treasury: TERRAIN[T.TREASURY].cost, lair: TERRAIN[T.LAIR].cost, library: TERRAIN[T.LIBRARY].cost, hatchery: TERRAIN[T.HATCHERY].cost, temple: TERRAIN[T.TEMPLE].cost, prison: TERRAIN[T.PRISON].cost, torture: TERRAIN[T.TORTURE].cost };
+const ROOM_COST = { treasury: TERRAIN[T.TREASURY].cost, lair: TERRAIN[T.LAIR].cost, library: TERRAIN[T.LIBRARY].cost, hatchery: TERRAIN[T.HATCHERY].cost, temple: TERRAIN[T.TEMPLE].cost, prison: TERRAIN[T.PRISON].cost, torture: TERRAIN[T.TORTURE].cost, training: TERRAIN[T.TRAINING].cost };
 let openTab = null, selectedUnit = null;
 function makeToolButton(id) {
   const b = document.createElement('button'); b.className = 'g-' + TOOL_GROUP(id); b.textContent = LABEL[id]; b.id = 'b_' + id;
@@ -1208,8 +1237,9 @@ function renderRoster(force) {
   if (openTab !== 'monsters') return;
   const hungry = G.creatures.filter(c => !c.noFood && c.hunger >= VAR.HUNGRY_AT).length, angry = G.creatures.filter(c => c.mood !== 'content').length, lim = armyLimit(), limTitle = limitText(lim);
   const sum = 'Imps <b>' + G.imps.length + '</b> · Creatures <b>' + G.creatures.length + '</b>/' + lim.cap + ' <small title="' + limTitle + '">' + lim.by + '</small> · hungry <b>' + hungry + '</b> · upset <b>' + angry + '</b>';
-  const chips = G.creatures.map(c => '<button class="chip' + (c.id === selectedUnit ? ' selected' : '') + '" data-id="' + c.id + '" style="--c:' + c.color + '" title="' + c.name + ' #' + c.id + ': ' + c.mood + (c.state ? ', ' + c.state : '') + '. Click to look at it; the hand picks it up."><i></i>' + c.name + ' <em>' + c.level + '</em><span class="hp"><u style="width:' + Math.max(0, Math.round(c.hp / c.maxHp * 100)) + '%"></u></span>' +
-    '<span class="mood">' + (c.unconscious ? '✖' : c.mood === 'angry' ? '😠' : c.mood === 'unhappy' ? '😐' : '') + '</span><span class="grab" data-grab="' + c.id + '">✋</span></button>').join('') || '<span class="none">No creatures yet. Claim the Portal and they will come.</span>';
+  const xpOf = (c) => c.level >= VAR.MAX_LEVEL ? { text: 'highest level', pct: 100 } : { text: Math.floor(c.xp - xpAt(c.level)) + '/' + VAR.XP_FOR_LEVEL[c.level - 1] + ' XP', pct: Math.round((c.xp - xpAt(c.level)) / VAR.XP_FOR_LEVEL[c.level - 1] * 100) };
+  const chips = G.creatures.map(c => { const xp = xpOf(c); return '<button class="chip' + (c.id === selectedUnit ? ' selected' : '') + '" data-id="' + c.id + '" style="--c:' + c.color + '" title="' + c.name + ' #' + c.id + ', level ' + c.level + ' (' + xp.text + '): ' + c.mood + (c.state ? ', ' + c.state : '') + '. Wage ' + c.pay + '. Click to look at it; the hand picks it up."><i></i>' + c.name + ' <em>' + c.level + '</em><span class="hp"><u style="width:' + Math.max(0, Math.round(c.hp / c.maxHp * 100)) + '%"></u></span><span class="xp"><u style="width:' + xp.pct + '%"></u></span>' +
+    '<span class="mood">' + (c.unconscious ? '✖' : c.mood === 'angry' ? '😠' : c.mood === 'unhappy' ? '😐' : '') + '</span><span class="grab" data-grab="' + c.id + '">✋</span></button>'; }).join('') || '<span class="none">No creatures yet. Claim the Portal and they will come.</span>';
   const have = ownedRooms(), kinds = KINDS.map(k => ({ k, ok: arrivalsOpen() || !unmetNeeds(k, have).length })).sort((a, b) => b.ok - a.ok).map(({ k, ok }) => {          // the kinds that can come first
     return '<span class="kchip ' + (ok ? 'ok' : 'no') + '" style="--c:' + k.color + '" title="' + k.name + (ok ? ': the Portal can draw it.' : ': comes once you own ' + needText(k.needs) + '.') + '"><i></i>' + k.name + (ok ? ' <b>✓</b>' : ' <small>needs ' + k.needs.map(([room, n]) => roomName(room) + ' ' + n).join(' + ') + '</small>') + '</span>'; }).join('');
   const body = rosterView === 'arrivals' ? kinds : chips, html = sum + '|' + rosterView + '|' + body; if (html === rosterHtml && !force) return; rosterHtml = html; $('rosterSum').innerHTML = sum; $('roster').innerHTML = body;
@@ -1229,7 +1259,7 @@ addEventListener('keydown', e => {                                // B, C, H ope
 function posF(e) { const r = cv.getBoundingClientRect(); return { fx: (e.clientX - r.left) / r.width * W, fy: (e.clientY - r.top) / r.height * H }; }
 function pos(e) { const r = cv.getBoundingClientRect(); return { x: Math.max(0, Math.min(W - 1, Math.floor((e.clientX - r.left) / r.width * W))), y: Math.max(0, Math.min(H - 1, Math.floor((e.clientY - r.top) / r.height * H))) }; }
 /* Input is expressed in world terms ({x,y} tile, {fx,fy} float tile coords) so the 2D and the 3D view share it. */
-const ROOM_TOOLS = { treasury: T.TREASURY, lair: T.LAIR, library: T.LIBRARY, hatchery: T.HATCHERY, temple: T.TEMPLE, prison: T.PRISON, torture: T.TORTURE };
+const ROOM_TOOLS = { treasury: T.TREASURY, lair: T.LAIR, library: T.LIBRARY, hatchery: T.HATCHERY, temple: T.TEMPLE, prison: T.PRISON, torture: T.TORTURE, training: T.TRAINING };
 /* The default mode is the Dig tool ('dig', shown as "Dig / grab"): left-drag over walls tags them, a left-click on one of your creatures or imps
  * picks it up (and the next left-click puts it down), right-drag untags and also sells any door or trap in the box. Every other tool (a room, door,
  * trap, spell, the Hand) is cancelled by a right-click, which returns to this mode; so does Esc. Right-click while carrying puts the creature down
@@ -1425,4 +1455,4 @@ function frame(now) {
 requestAnimationFrame(frame);
 const hoverUnit = () => (tool === DEFAULT_TOOL || tool === 'hand') && !G.held && !G.over && mouse.x >= 0 && !mouse.down && mouse.fx !== undefined ? unitAt(mouse) : null;       // the creature the cursor could pick up (a ring under it shows it)
 window.__ui = { get mouse() { return mouse; }, get tool() { return tool; }, inputDown, inputMove, inputUp, guideTarget, hoverUnit };
-window.__game = { unitAt, dropHeld, cancelTool, LV, LEVEL_TABLE, CAMPAIGN, startFlee, TABS, TAB_OF, setTab, pickUp, renderRoster, finishGame, renderEnd, COND, OBJECTIVES, GUIDE, condState, updateObjectives, guideNow, guideTarget, showBriefing, validateLevel, buildMap, levelSize, levelPos, strike, Chicken, updateHatchery, prayRate, spriteOf, pickKind, RESEARCH, isAvail, unlockAll, addResearch, SKELETON, freeSlot, updateJail, knockOut, KO_SECONDS, TORTURE_SECONDS, SPELLS, SPELL_ORDER, castSpell, TRAPS, DOOR, placeThings, removeThings, doorAt, trapAt, HERO_LAND, W, H, G, HEROES, KINDS, spawnWave, Creature, Imp, Hero, hurt, los, T, TERRAIN, step, tagRect, build, scanTasks, findPath, capacity, goldReleased, damageTile, perApplication, VAR, audioMood, SPELL_SND, release };
+window.__game = { gainXp, xpAt, unitAt, dropHeld, cancelTool, LV, LEVEL_TABLE, CAMPAIGN, startFlee, TABS, TAB_OF, setTab, pickUp, renderRoster, finishGame, renderEnd, COND, OBJECTIVES, GUIDE, condState, updateObjectives, guideNow, guideTarget, showBriefing, validateLevel, buildMap, levelSize, levelPos, strike, Chicken, updateHatchery, prayRate, spriteOf, pickKind, RESEARCH, isAvail, unlockAll, addResearch, SKELETON, freeSlot, updateJail, knockOut, KO_SECONDS, TORTURE_SECONDS, SPELLS, SPELL_ORDER, castSpell, TRAPS, DOOR, placeThings, removeThings, doorAt, trapAt, HERO_LAND, W, H, G, HEROES, KINDS, spawnWave, Creature, Imp, Hero, hurt, los, T, TERRAIN, step, tagRect, build, scanTasks, findPath, capacity, goldReleased, damageTile, perApplication, VAR, audioMood, SPELL_SND, release };

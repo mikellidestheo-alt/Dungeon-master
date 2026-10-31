@@ -17,7 +17,7 @@ const PORT = process.env.PORT || 8777, ROOT = `http://localhost:${PORT}/`;
 let fails = 0;
 const check = (name, ok, detail) => { console.log((ok ? '  ok   ' : '  FAIL ') + name + (detail ? '  ' + detail : '')); if (!ok) fails++; };
 const sleep = (ms) => new Promise(r => setTimeout(r, ms));
-const ROOMS = ['treasury', 'lair', 'library', 'hatchery', 'temple', 'prison', 'torture'], DEF = ['door', 'gas', 'bolt'], SPELLS = ['lightning', 'heal', 'haste', 'rally', 'imp'];
+const ROOMS = ['treasury', 'lair', 'library', 'hatchery', 'temple', 'prison', 'torture', 'training'], DEF = ['door', 'gas', 'bolt'], SPELLS = ['lightning', 'heal', 'haste', 'rally', 'imp'];
 
 (async () => {
   const server = spawn('python3', ['-m', 'http.server', '-d', path.join(__dirname, '..', 'web'), String(PORT)], { stdio: 'ignore' });
@@ -43,7 +43,7 @@ const ROOMS = ['treasury', 'lair', 'library', 'hatchery', 'temple', 'prison', 't
 
     console.log('2. the tabs');
     await page.click('#tab_build'); v = await visible(page);
-    check('Buildings: the seven rooms and the three defences (door, gas trap, lightning trap)', ROOMS.concat(DEF).every(id => v.includes('b_' + id)) && !v.includes('b_hand') && !v.includes('b_lightning'), v.join());
+    check('Buildings: the eight rooms (the Training Room is new) and the three defences (door, gas trap, lightning trap)', ROOMS.concat(DEF).every(id => v.includes('b_' + id)) && !v.includes('b_hand') && !v.includes('b_lightning'), v.join());
     check('...in two labelled groups: Rooms and Defences', await page.evaluate(() => [...document.querySelectorAll('#tp_build .grp > .lbl')].map(l => l.textContent).join() === 'Rooms,Defences'));
     check('...and the open tab is marked', await page.evaluate(() => document.getElementById('tab_build').classList.contains('open') && document.getElementById('tab_build').getAttribute('aria-expanded') === 'true'));
     check('Buildings fits the toolbar slot', await fits(page));

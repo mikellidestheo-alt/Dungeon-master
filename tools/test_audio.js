@@ -135,10 +135,10 @@ const sleep = (ms) => new Promise(r => setTimeout(r, ms));
       // dig east, build rooms, populate
       g.build(T.TREASURY, 2, 11, 3, 12);
       const gold = cell(hx + 5, hy), gem = cell(hx + 5, hy + 1); gold.t = T.GOLD; gold.hp = 4000; gold.gold = 2000; gem.t = T.GEM; gem.hp = 3000; gem.gold = 1;   // a seam and a gem right next to the Heart
-      g.tagRect(hx + 5, hy, hx + 8, hy, true); g.tagRect(hx + 5, hy + 1, hx + 5, hy + 1, true); g.tagRect(hx + 7, hy, hx + 8, hy, false); run(300); g.build(T.LAIR, 2, 16, 4, 17); g.build(T.HATCHERY, 8, 16, 10, 17); g.build(T.TEMPLE, 8, 11, 10, 12); g.build(T.LIBRARY, 2, 14, 3, 15);
+      g.tagRect(hx + 5, hy, hx + 8, hy, true); g.tagRect(hx + 5, hy + 1, hx + 5, hy + 1, true); g.tagRect(hx + 7, hy, hx + 8, hy, false); run(300); g.build(T.LAIR, 2, 16, 4, 17); g.build(T.HATCHERY, 8, 16, 10, 17); g.build(T.TEMPLE, 8, 11, 10, 12); g.build(T.LIBRARY, 2, 14, 3, 15); g.build(T.TRAINING, 4, 11, 6, 12);
       G.portalOwned = true; G.nextSpawn = 0; G.nextPay = 0.1; G.nextImp = 0; run(5);
       const mk = (i, x, y) => { const c = new g.Creature(x, y, g.KINDS[i]); G.creatures.push(c); return c; };
-      const warlock = mk(2, 8, 13), troll = mk(1, 7, 17), goblin = mk(0, 6, 12), darkelf = mk(3, 5, 17), spider = mk(7, 6, 16); for (const c of G.creatures) c.xp = 2;       // one kill from level 2
+      const warlock = mk(2, 8, 13), troll = mk(1, 7, 17), goblin = mk(0, 6, 12), darkelf = mk(3, 5, 17), spider = mk(7, 6, 16); for (const c of G.creatures) c.xp = 49;       // one XP from level 2 (50 XP: a kill or a training session gets them there)
       warlock.hunger = 100; troll.hunger = 100; for (let i = 0; i < 3; i++) G.chickens.push(new g.Chicken(9, 17));
       for (const c of G.chickens) c.cluckT = 0.1;
       run(900);                                             // prayer, study, eating, clucking, free imps, payday
@@ -168,7 +168,7 @@ const sleep = (ms) => new Promise(r => setTimeout(r, ms));
     });
     const expected = ['click', 'tag', 'build', 'dig', 'mine', 'crumble', 'imp', 'imp_spawn', 'coins', 'payday', 'portal', 'claim', 'chime', 'squawk', 'munch', 'cluck', 'research',
       'untag', 'coin', 'sword', 'club', 'bow', 'arrow_hit', 'magic', 'magic_hit', 'death', 'ko', 'levelup', 'gas', 'lightning', 'clank', 'door_hit', 'door_break', 'heal', 'haste', 'rally', 'deny',
-      'pickup', 'drop', 'horn', 'boss_horn', 'heart_hit', 'bite', 'imp_scream'];
+      'pickup', 'drop', 'train', 'horn', 'boss_horn', 'heart_hit', 'bite', 'imp_scream'];
     const req = scenario.requested;
     console.log('   requested: ' + Object.keys(req).sort().map(k => k + '×' + req[k]).join(' '));
     for (const id of expected) check(`event -> ${id}`, !!req[id]);

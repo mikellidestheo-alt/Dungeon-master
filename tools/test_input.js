@@ -134,7 +134,8 @@ const sleep = (ms) => new Promise(r => setTimeout(r, ms));
     console.log('6. the hover cue');
     page = await open('level=classic&seed=7', '3d');
     await page.evaluate(() => { const g = __game, G = g.G; G.creatures.length = 0; const c = new g.Creature(9, 12, g.KINDS[1]); c.noLair = true; c.noFood = true; G.creatures.push(c); window.__c = c; });
-    const ring = () => page.evaluate(() => { const r = __three.scene.children.find(o => o.geometry && o.geometry.type === 'RingGeometry' && o.renderOrder === 9); return r && { vis: r.visible, x: r.position.x, z: r.position.z }; });
+    const frames = (n = 3) => page.evaluate((n) => new Promise(r => { let k = 0; const f = () => (++k >= n ? r() : requestAnimationFrame(f)); requestAnimationFrame(f); }), n);       // wait for the render loop, whatever the machine's speed
+    const ring = async () => { await frames(4); return page.evaluate(() => { const r = __three.scene.children.find(o => o.geometry && o.geometry.type === 'RingGeometry' && o.renderOrder === 9); return r && { vis: r.visible, x: r.position.x, z: r.position.z }; }); };
     await page.evaluate(() => { const c = __c; __ui.inputMove({ x: Math.floor(c.x), y: Math.floor(c.y) }, { fx: c.x + 0.3, fy: c.y }); }); await sleep(400);
     let rg = await ring();
     check('3D: a ring appears under the creature the cursor is over (default mode)', rg && rg.vis && Math.abs(rg.x - 9.5) < 0.1 && Math.abs(rg.z - 12.5) < 0.1, JSON.stringify(rg));

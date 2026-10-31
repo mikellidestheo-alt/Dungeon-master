@@ -33,7 +33,7 @@ completing its objectives (every chapter includes surviving all its waves) and l
 | Where | What |
 |---|---|
 | Top bar | Gold (held / what your Treasuries can bank), Imps, Creatures (of 15), Payday countdown, Time, Mana, Heart, then Wave, heroes alive and a countdown to the next wave (it says *tunnel to Gate* until a Gate is linked, and *gates 1/2* when a level has more). A **☰ Chapters** (or **☰ Sandbox**) button, **Retire** in endless mode, **⛶ Full screen**, and the sound controls |
-| Toolbar | Always in view: **Dig / grab** (the default mode), three tabs and **Pause / 1× / 3× / 8×**. The tabs open their own commands under the strip (above it in full screen): **🏰 Buildings** (the seven rooms, then the Defences: Door, Gas Trap, Lightning Trap), **✨ Spells** (the five spells with mana cost and hotkey) and **👹 Monsters** (the ✋ Hand and a roster of your creatures). Click a tab again, or press `Esc`, to close it. Anything not yet researched is greyed out |
+| Toolbar | Always in view: **Dig / grab** (the default mode), three tabs and **Pause / 1× / 3× / 8×**. The tabs open their own commands under the strip (above it in full screen): **🏰 Buildings** (the eight rooms, then the Defences: Door, Gas Trap, Lightning Trap), **✨ Spells** (the five spells with mana cost and hotkey) and **👹 Monsters** (the ✋ Hand and a roster of your creatures). Click a tab again, or press `Esc`, to close it. Anything not yet researched is greyed out |
 | Dungeon view | Top left: the **objectives** (ticked as you go, with counters). Bottom: the **hint banner** (✕ hides it; the highlighted toolbar button and the gold marker on the map show what it means) |
 | Below the view | **Task board** (digging queue, chickens, hungry, praying, prisoners, and the mood of every creature), **Log**, **Research** panel, and a short help scroll (the basics: digging, rooms, creatures, the invasion, objectives, camera) |
 
@@ -59,7 +59,7 @@ completing its objectives (every chapter includes surviving all its waves) and l
 2. **Bank it.** Build a **Treasury** (50 gold a tile). Your Heart holds 2000 gold on its own and each Treasury tile adds 3000; gold beyond that cannot be carried home.
 3. **Claim the Portal** by digging to it and letting your imps claim the floor. A creature arrives about every 25 seconds, up to 15, and **which kind** depends on what you have built: Goblins, Spiders and Flies come to a bare Lair, Trolls and Black Knights want a Treasury, Salamanders and Bile Demons a Hatchery, Warlocks and Dark Elves a Library, Vampires and Dark Angels a Temple, the Mistress a Torture Chamber, the Assassin a Prison and the Reaper both. The Monsters tab's *Who will come* view lists them.
 4. **Look after them.** Each creature needs a **Lair** tile to sleep in, **food** (a **Hatchery** raises chickens, they get hungry about every two minutes; the Heart's own larder feeds 3 creatures and every Hatchery tile feeds 4 more) and **wages** at every **payday** (every 90 seconds, 60 to 220 gold each; fifteen creatures cost about 1650 a payday). **The size of your Lair and Hatchery caps your army**: you can keep at most `min(15, Lair tiles, 3 + 4 per Hatchery tile)` creatures, the top bar shows `Creatures 5/9 beds` (or *food*, or *Portal*) with a tooltip naming all three limits, and the Portal waits (with a log line) while you are full. Unhappy creatures turn angry and eventually leave. The Task board shows every creature's mood.
-5. **Prepare.** Build what the chapter teaches: Library and research, Prison and Torture, Temple, doors and traps. The gaps in the rock ridges are natural choke points.
+5. **Prepare.** Build what the chapter teaches: Library and research, Prison and Torture, Temple, doors and traps, and a **Training Room** so your creatures level up (stronger, but their wages rise too). The gaps in the rock ridges are natural choke points.
 6. **Open a Gate.** Tunnel to the red-tinted **Hero Gate** (a path of open floor from Gate to Heart). The first wave arrives after the chapter's preparation countdown (in the Tutorial the Knight is already standing in the Gate cavern and attacks the moment you break through). *Tip:* dig the whole tunnel except its last tile, set your doors and traps, and only then dig the last tile.
 7. **Fight.** Creatures fight on their own and level up from kills. You cast spells, move creatures with the Hand and keep a few imps alive (they re-arm traps and mend doors, and they run from heroes, so replace them with `5`). Heroes that get weak run back to their Gate and escape, so you will slay only a part of each wave.
 8. **Win or lose.** The end screen shows time, heroes slain, Heart left, and up to three stars. Next chapter, Retry and Chapters are one click away.
@@ -153,6 +153,7 @@ Tick as you go; write down anything surprising in the template at the end.
 - [ ] **Who will come:** with only a Lair, only Goblins, Spiders and Flies arrive. Build a Library (3 tiles) and a Warlock or Dark Elf turns up with a log line saying why. The Monsters tab > *Who will come* lists all 14 kinds, ticked or saying what they need. Is the rule easy to discover? Does a chapter ever feel stuck with weak creatures?
 - [ ] **Capacity:** with 4 Lair tiles and no Hatchery the bar says `Creatures 3/3 food` and the log says the dungeon is full; a Hatchery tile makes it `4/4 beds`; more Lair tiles raise it. Does the tooltip make clear what to build? Does anyone starve at the limit?
 - [ ] **Creatures:** arrival, beds, anger, leaving, leveling to elite sprites at level 3, healing in the Lair. Are the Task board lines understandable?
+- [ ] **Training:** build a Training Room (Buildings tab; chapter 5 hints at it). Idle creatures walk to a dummy, hit it with a wooden knock, and level up (the roster chip shows an XP bar, the level-up chime and log line play, elite art from level 3). Gold drops 15 a session; with little gold they stop. Do wages feel fair as levels rise? Is the pace of levelling (about 1.5 minutes to level 2) pleasant? Does the dummy look acceptable as a stand-in for real art?
 - [ ] **Hatchery:** chickens appear, hungry creatures eat, anger drops. What happens if you never build one?
 - [ ] **Library:** research bars fill, an item completes, the toolbar unlocks it.
 - [ ] **Doors and traps:** heroes stop at doors; traps fire and run out; imps repair and re-arm; right-click sells for half.
@@ -224,7 +225,7 @@ Tick as you go; write down anything surprising in the template at the end.
 - Chapters opened from the menu are silent until your first click, because browsers refuse sound before a gesture.
 - Heroes that flee escape through their Gate, so only about 40 % of a wave is ever "slain"; this is how the kill bonuses were sized.
 - There is no keyboard shortcut for pause or speed, and no way to sell a room.
-- The scripted bots never use the Hand and rarely level creatures; a human should be able to beat them.
+- The scripted bots never use the Hand and level creatures only by building a Training Room (their average creature is level 2 at the end of a chapter); a human should be able to beat them.
 
 **Write-up template** (one row per chapter or problem)
 
@@ -249,7 +250,7 @@ Tick as you go; write down anything surprising in the template at the end.
 | `.github/workflows/pages.yml` | Publishes `web/` to GitHub Pages on every push to `main` (see *Playing it online*) |
 | `web/menu.html`, `web/progress.js` | The chapter menu (the front door), saved progress in localStorage and the three-star rules. See `docs/06-levels.md` |
 | `web/index.html`, `web/game.js` | **Playable prototype**: the headless-style simulation plus a 2D canvas view, no copyrighted assets |
-| `web/audio.js` | **Sound and music**, all synthesised with WebAudio (no audio files): 56 effect voices driven by game events (including the briefing, objectives, tutorial hints, end-screen stars and the menus), quieter and panned by distance from the camera, plus a procedural dark-ambient score that builds with the invasion. HUD mute/volume. See `docs/05-audio.md` |
+| `web/audio.js` | **Sound and music**, all synthesised with WebAudio (no audio files): 57 effect voices driven by game events (including the briefing, objectives, tutorial hints, end-screen stars and the menus), quieter and panned by distance from the camera, plus a procedural dark-ambient score that builds with the invasion. HUD mute/volume. See `docs/05-audio.md` |
 | `web/render3d.js` | **3D view** (three.js). Isometric camera, your prop sprites as billboards, pixel-art floor/wall textures generated in code, stand-in shapes for units. Only reads the sim state |
 | `web/assets/sprites/` | Your hand-made art as transparent PNGs: 12 props (Heart, Portal, Hero Gate, Temple, door, traps, cage, rack, bed, bookshelf, treasure pile, wall) and 40 characters, plus `manifest.json` |
 | `web/assets/anim/` | Animation strips (`<unit>.png`, 15 frames side by side) and `anim.json` with their sizes; generated by `tools/make_frames.py`, replaceable with hand-drawn strips |
@@ -264,6 +265,7 @@ Tick as you go; write down anything surprising in the template at the end.
 | `tools/test_arrivals.js` | Headless Chromium checks for which creature kinds the Portal draws, by the rooms you have built, and the Monsters tab's *Who will come*: `node tools/test_arrivals.js` |
 | `tools/test_capacity.js` | Headless Chromium checks for the army limit (beds, food, Portal), the Heart's larder and ten minutes without starvation: `node tools/test_capacity.js` |
 | `tools/test_input.js` | Headless Chromium checks for the default mouse mode (Dig / grab), right-click cancelling a tool, carrying and dropping, selling doors and traps, and the hover ring: `node tools/test_input.js` |
+| `tools/test_training.js` | Headless Chromium checks for levels 1-10: the Training Room, XP and the cap, stats and wages, gold per session, the `level` objective, the toolbar button and the roster XP bar: `node tools/test_training.js` |
 | `tools/test_gates.js` | Headless Chromium checks for several Hero Gates (linking, split waves, fleeing, 3D): `node tools/test_gates.js` |
 | `tools/test_sandbox.js` | Headless Chromium checks for the sandbox, the wave generator and endless mode: `node tools/test_sandbox.js` |
 | `tools/test_campaign.js` | Headless Chromium checks for the chapter menu, saved progress, stars and the Victory / Defeat screens: `node tools/test_campaign.js` |
@@ -290,7 +292,7 @@ The camera is isometric (45°, narrow field of view) to match the sprite art; `?
 
 **Art status:** props and characters use your sprites (billboards with a soft ground shadow, mirrored to face the way they
 walk, and a faint x-ray silhouette when a wall hides them); floors, walls and effects are drawn in code. The 2D fallback view
-(`?view=2d`) does not use the sprites.
+(`?view=2d`) does not use the sprites. **The Training Room has no art yet**: in 3D each tile is a dummy built from primitives (a post, an arm, a swinging sack) in `render3d.js`; real art is wanted.
 
 **Roster (from the character art):** your creatures come through the portal weighted by kind (and only the kinds whose rooms you have built, see *Who comes through the Portal* in `docs/06-levels.md`): Goblin, Troll, Warlock (the
 best researcher), Dark Elf (fast archer), Bile Demon (slow tank), Vampire (strong caster), Salamander (fire fighter) and
@@ -338,6 +340,7 @@ seams, room building, lair assignment, mood/anger, sleep and payday, free-imp sp
   not picked up within 60 s bleeds out. Prisoners lose health; if one starves a **Skeleton** rises for you. Imps move
   prisoners to a **Torture Chamber** (150g/tile) where, after 30 s, 70 % convert into your creatures (`Ex-Knight` ...) and
   30 % die. Imps still run from live heroes, so capturing only works once you are winning the fight.
+* **Levels and the Training Room:** creatures have levels 1 to 10. Build a **Training Room** (150g/tile, available from the start, one dummy per tile): idle, fed, rested creatures below level 10 walk to a free dummy, train for 20 s (15 XP) and pay 15 gold a session, but never leave you with under 100 gold, or under the whole payday's wages in the 30 s before payday. XP needed per level: 50, 65, 80, 100, 125, 155, 190, 230, 280 (a kill gives only 1 XP). Every level multiplies hp and damage by 1.11 (x2.5 at level 10) and adds 8 % to the creature's wage. One creature training without a break reaches level 5 in about 8 minutes and level 10 in about 35. The roster chip shows the level and an XP bar; elite sprites appear from level 3. Chapter 5 introduces it with a hint and a bonus objective (*Train a creature to level 3*). `tools/test_training.js` checks the rules.
 * **Library and research:** Prison, Temple, Torture Chamber, Gas Trap, Lightning Trap and the spells Heal, Speed, Lightning and
   Call to Arms start **locked** (greyed out; build attempts and casts are refused for free). Treasury, Lair, Library, Hatchery,
   Doors and Create Imp are available from the start. Build a **Library** (120g/tile, one desk per tile): idle creatures

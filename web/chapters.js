@@ -6,7 +6,7 @@
  *   2   Creatures of the Dark   the Portal                3     0.70   160   110    1     nothing
  *   3   Mouths to Feed          Hatchery                  4     0.90   120   110    1     nothing
  *   4   The Library             research                  4     1.05   100   100    1     nothing (you research Gas Trap, Heal)
- *   5   Doors and Snares        doors, traps; Dwarf       5     1.05   100   100    1     Gas and Lightning traps
+ *   5   Doors and Snares        doors, traps; Dwarf, Training       5     1.05   100   100    1     Gas and Lightning traps
  *   6   The Dungeon Below       Prison, Torture; Monk     6     1.05   100   100    1     + Prison, Torture Chamber
  *   7   Prayers and Power       Temple, spells; Fairy     6     1.20    90   100    1     + Temple and every spell
  *   8   Two Gates               two entrances; Giant      7     1.20    80   100    2     everything
@@ -222,7 +222,7 @@
 
   L.traps = {
     id: 'traps', name: 'Doors and Snares', seed: 105, tagline: 'Doors, traps and the Dwarf.',
-    briefing: 'Heroes follow your tunnels, so make the tunnels deadly. Doors hold them in front of your creatures, Gas and Lightning Traps hurt them as they come. But beware the Dwarf: he smashes doors and disarms traps.',
+    briefing: 'Heroes follow your tunnels, so make the tunnels deadly. Doors hold them in front of your creatures, Gas and Lightning Traps hurt them as they come. But beware the Dwarf: he smashes doors and disarms traps. And a creature that fights is a creature that grows: a Training Room lets idle creatures train for a fee, and every level (up to 10) makes them tougher and hungrier for wages.',
     stars: { heart: 0.5 },
     terrain: { grid: [
       '##########################################',
@@ -262,11 +262,13 @@
       { type: 'gate', text: 'Tunnel to the Hero Gate' },
       { type: 'survive', text: 'Defeat all 5 waves' },
       { type: 'traps', n: 6, optional: true, text: 'Set 6 traps' },
+      { type: 'level', n: 3, optional: true, text: 'Train a creature to level 3' },
     ],
     guide: [
       { text: 'Claim the Portal and raise your army. The gaps in the rock ridges are narrow: perfect places for doors and traps.', tool: 'dig', when: { type: 'portal' } },
       { text: 'Choose <b>Door</b> and click a tunnel tile. Doors block heroes (they must smash them) but open for your own creatures. Imps repair them.', tool: 'door', when: { type: 'doors', n: 2 } },
       { text: 'Choose <b>Gas Trap</b> or <b>Lightning Trap</b> and click a tunnel tile. Heroes cannot see them. Imps re-arm them for a little gold.', tool: 'gas', when: { type: 'traps', n: 3 } },
+      { text: 'Creatures grow with <b>levels</b> (1 to 10), and training is the quick way. Open <b>Buildings</b>, choose <b>Training Room</b> and drag over three floor tiles: idle creatures train there, 20 seconds and 15 gold a session, and wages rise with every level. Bonus: train one to level 3.', tool: 'training', when: { type: 'room', room: 'training', n: 3 } },
       { text: 'Beware the <b>Dwarf</b>: he breaks doors quickly and disarms traps. Kill him before he reaches them. Tunnel to the Gate when you are ready.', when: { type: 'gate' } },
     ],
   };

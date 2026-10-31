@@ -85,6 +85,8 @@ Prototype hatchery/temple (`Chicken`, `updateHatchery`, the `eat`/`pray` creatur
 
 Arrivals in the prototype (`NEEDS`, `pickKind`, the Monsters tab's *Who will come* in `web/game.js`): my own rule, not OpenKeeper's. DK2 gates creature kinds by the rooms you own (its level scripts list which creatures can be attracted); the prototype keeps that spirit with a small table of room and tile count per kind and a deterministic weighted draw over the kinds you qualify for.
 
+Levels in the prototype (`XP_FOR_LEVEL`, `gainXp`, the `train` creature state, the Training Room): DK2 has a Training Room where creatures gain experience and `CreatureExperienceSystem` levels them up to 10; the prototype keeps levels 1-10 and the room but the numbers (XP table, 20 s sessions at 15 gold, x1.11 stats, +8% wages a level) are my own tuning, checked by `tools/test_training.js`.
+
 Capacity in the prototype (`armyLimit`, the larder in `updateHatchery`): in DK2 the Portal's supply stops at the level's creature cap and creatures leave when they have no lair or food; the prototype turns both into one visible rule, min(Portal limit, Lair tiles, 3 + 4 per Hatchery tile). The numbers are my own tuning.
 
 Creature tricks in the prototype (`ambush`, `cleave`, `armor`, `heals`, `torturer`, `flying` on the `KINDS` entries in `web/game.js`) are loosely inspired by DK2's creature specials (`Creature.SpecialAbility`, `JobType.TORTURE`); the numbers are my own tuning, not OpenKeeper's.

@@ -77,6 +77,7 @@
   V.deny = (k, d, t, p) => { for (let i = 0; i < 2; i++) k.tone(d, 'square', 150 * p.pitch, 130 * p.pitch, t + i * 0.11, 0.09, 0.2, 0.005, { lp: 700 }); };
   V.build = (k, d, t, p) => { for (let i = 0; i < 2; i++) { const tt = t + i * 0.14; k.tone(d, 'sine', 140 * p.pitch, 70, tt, 0.1, 0.5, 0.002); k.noise(d, tt, 0.06, 0.3, { type: 'lowpass', f0: 900, q: 0.7 }); k.tone(d, 'triangle', 1800, 1700, tt, 0.04, 0.08, 0.001); } };
   V.pickup = (k, d, t, p) => { k.tone(d, 'sine', 280 * p.pitch, 520 * p.pitch, t, 0.12, 0.25, 0.02); k.noise(d, t, 0.08, 0.1, { f0: 1200, q: 1 }); };
+  V.train = (k, d, t, p) => { k.tone(d, 'triangle', 190 * p.pitch, 90 * p.pitch, t, 0.14, 0.4, 0.003, { lp: 900 }); k.tone(d, 'sine', 95 * p.pitch, 60 * p.pitch, t + 0.02, 0.18, 0.25, 0.004); k.noise(d, t, 0.05, 0.28, { f0: 1800, q: 1.2 }); };      // a wooden strike on the training dummy
   V.drop = (k, d, t, p) => { k.tone(d, 'sine', 400 * p.pitch, 160 * p.pitch, t, 0.12, 0.3, 0.004); k.noise(d, t, 0.06, 0.2, { type: 'lowpass', f0: 700, q: 0.7 }); };
   // combat
   V.sword = (k, d, t, p) => {
@@ -172,7 +173,7 @@
   /* per-voice behaviour: [min seconds between plays, volume, rough length in s, random pitch spread, floor gain when positional] */
   const DEFAULT = [0.05, 0.8, 0.6, 0.08, 0];
   const DEF = {
-    click: [0.03, 0.8, 0.1], tag: [0.05, 0.8, 0.1], untag: [0.05, 0.8, 0.1], deny: [0.15, 0.8, 0.35], build: [0.12, 0.9, 0.5], pickup: [0.1, 0.7, 0.25], drop: [0.1, 0.7, 0.25],
+    click: [0.03, 0.8, 0.1], tag: [0.05, 0.8, 0.1], untag: [0.05, 0.8, 0.1], deny: [0.15, 0.8, 0.35], build: [0.12, 0.9, 0.5], pickup: [0.1, 0.7, 0.25], drop: [0.1, 0.7, 0.25], train: [0.4, 0.7, 0.3, 0.1],
     sword: [0.045, 1, 0.3, 0.12], clank: [0.1, 0.8, 0.3], bite: [0.05, 1, 0.2], club: [0.06, 1, 0.3], bow: [0.06, 0.8, 0.25], arrow_hit: [0.05, 0.9, 0.2], magic: [0.06, 0.8, 0.4], magic_hit: [0.06, 0.9, 0.3],
     heart_hit: [0.15, 1, 0.6, 0.05, 0.4], ko: [0.15, 0.9, 0.8], death: [0.1, 0.9, 0.8, 0.1], levelup: [0.3, 0.8, 1.2],
     lightning: [0.15, 1, 1, 0.06, 0.15], gas: [0.3, 0.8, 1.8], heal: [0.2, 0.8, 0.8], haste: [0.3, 0.8, 0.8], rally: [0.5, 0.9, 1.6], imp_spawn: [0.2, 0.7, 0.3],

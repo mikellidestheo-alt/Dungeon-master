@@ -69,8 +69,9 @@ out of the log; `optional: true` marks a bonus that the chapter stars will use.
 | `mined` | `n` | `n` gold has been released from seams |
 | `claimed` | `n` | imps have claimed `n` floor tiles |
 | `gold` | `n` | you hold `n` banked gold (needs Treasury space) |
-| `room` | `room`, `n`=1 | you own `n` tiles of `treasury` / `lair` / `library` / `hatchery` / `temple` / `prison` / `torture` |
+| `room` | `room`, `n`=1 | you own `n` tiles of `treasury` / `lair` / `library` / `hatchery` / `temple` / `prison` / `torture` / `training` |
 | `creatures` | `n`, `kind`? | `n` live creatures (of that kind, e.g. `'Warlock'`) |
+| `level` | `n` (2 to 10) | one of your creatures has reached level `n` ("Train a creature to level 5"); training in the Training Room is the quick way |
 | `kills` | `n` | `n` heroes slain |
 | `research` | `item` | that item is researched (`prison`, `temple`, `torture`, `gas`, `bolt`, `heal`, `haste`, `lightning`, `rally`) |
 | `doors`, `traps` | `n` | `n` doors / traps are placed |
@@ -134,6 +135,23 @@ arrives, the log says why ("A Warlock has heard of your Library."). `rules.arriv
 old behaviour); `?unlock=1` is unrelated and still means "research everything". Chapters 1-3 have no Library, so their
 armies are Goblins, Spiders and Flies until you build Treasury and Hatchery tiles for Trolls, Salamanders and Bile Demons; chapter 4
 teaches the Library, chapter 6 the Prison and Torture Chamber, chapter 7 the Temple.
+
+## Levels and the Training Room
+
+Creatures have levels 1 to 10 (`VAR.MAX_LEVEL`). A **Training Room** (150 gold a tile, available from the start, `training` in objectives) holds one
+dummy per tile. An idle creature that is fed, rested and below level 10 walks to a free dummy and trains for `TRAIN_SECONDS` 20 s: it gains
+`TRAIN_XP_PER_SECOND` 0.75 XP a second (15 a session) and the session costs `TRAIN_COST` 15 gold, paid at the dummy. A creature will not train if
+that leaves the purse under `TRAIN_KEEP_GOLD` 100, or under the whole payday's wages in the 30 s before payday (`TRAIN_PAYDAY_WINDOW`): wages come first, and the log says so once. The priority order stays hunger, sleep, torture duty,
+then study and prayer; after a session at a desk or an altar the creature's next choice is the dummy, and with nothing else to do it trains.
+A kill gives `XP_PER_KILL` 1 XP (a trickle: kills alone barely move a creature now). The XP table is `VAR.XP_FOR_LEVEL`: 50, 65, 80, 100, 125,
+155, 190, 230, 280 to go from level 1 to 10 (1275 in all). Measured with one creature training without a break: level 2 after 1.5 minutes, 5 after
+8, 8 after 21 and 10 after 35 minutes, so level 10 is for the long chapters.
+
+Each level multiplies hp and damage by `LEVEL_STAT_MULT` 1.11 (x2.5 at level 10; it was 1.18 per level up to 5) and adds 8% of the base wage
+(`PAY_PER_LEVEL`): a level-10 Troll costs 155 instead of 90 at payday. Research and prayer rates still scale +10% a level. The elite sprite shows from level 3.
+Show: the roster chip has the level and an XP bar (tooltip "Troll #3, level 4 (12/100 XP)"), the 2D view draws one pip per level (orange from 6),
+and the existing `levelup` sound and log line play on every level. Training makes its own wooden `train` sound. In 3D the room is a procedural
+dummy (post, arm, swinging sack) because no art exists for it yet.
 
 ## How many creatures you can keep
 

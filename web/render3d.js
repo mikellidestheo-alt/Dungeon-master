@@ -131,7 +131,7 @@ function start() {
 
   // floor tints (multiplied with the grey flagstone texture, so these are deliberately bright)
   const COL = { floor: 0x7a6e60, owned: 0x6a80b8, hero: 0xa04c44, earth: 0x8a6a46, near: 0x8d93a6, rock: 0x4a4a58, gold: 0x9a7a44, gem: 0x5a4a6a,
-    [T.TREASURY]: 0xb09848, [T.LAIR]: 0x7a68a0, [T.HEART]: 0xa04040, [T.PORTAL]: 0x80509a, [T.GATE]: 0xb0a070, [T.PRISON]: 0x7a8490, [T.TORTURE]: 0x8a3c3c, [T.LIBRARY]: 0x5a6aa0, [T.HATCHERY]: 0x9a8450, [T.TEMPLE]: 0x8a7ab0 };
+    [T.TREASURY]: 0xb09848, [T.LAIR]: 0x7a68a0, [T.HEART]: 0xa04040, [T.PORTAL]: 0x80509a, [T.GATE]: 0xb0a070, [T.PRISON]: 0x7a8490, [T.TORTURE]: 0x8a3c3c, [T.LIBRARY]: 0x5a6aa0, [T.HATCHERY]: 0x9a8450, [T.TEMPLE]: 0x8a7ab0, [T.TRAINING]: 0x9a6a50 };
   const tmpOwned = new THREE.Color(COL.owned);
   const ownedFloor = (x, y) => { const t = G.map[y * W + x]; return !!t && t.owner === 1 && !TERRAIN[t.t].solid; };
   const tileSprites = { treasure: new Map(), bed: new Map(), bookshelf: new Map(), cage: new Map(), rack: new Map(), nest: new Map() };
@@ -161,8 +161,22 @@ function start() {
     for (const [k, s] of roomSprites) if (!live.has(k)) { disposeSprite(s); roomSprites.delete(k); }
   }
 
+  /* Training Room: no sprite art exists for it yet, so each tile gets a training dummy built from primitives (a post, a cross-arm, a hanging sack and a
+   * stone base); the sack swings while a creature is hitting it. Replace with real art when it arrives (README: "Art status"). */
+  const dummies = new Map(), woodMat = new THREE.MeshLambertMaterial({ color: 0x7a5430 }), sackMat = new THREE.MeshLambertMaterial({ color: 0xb89a64 }), baseMat = new THREE.MeshLambertMaterial({ color: 0x6a6660 });
+  const postGeo = new THREE.CylinderGeometry(.05, .06, .85, 8), armGeo = new THREE.BoxGeometry(.62, .07, .07), sackGeo = new THREE.SphereGeometry(.17, 10, 8), baseGeo = new THREE.BoxGeometry(.5, .06, .5);
+  function makeDummy() {
+    const g = new THREE.Group(), base = new THREE.Mesh(baseGeo, baseMat), post = new THREE.Mesh(postGeo, woodMat), arm = new THREE.Mesh(armGeo, woodMat), pivot = new THREE.Group(), sack = new THREE.Mesh(sackGeo, sackMat);
+    base.position.y = .03; post.position.y = .46; arm.position.y = .78; pivot.position.set(.2, .78, 0); sack.position.y = -.3; sack.scale.set(.9, 1.3, .9); pivot.add(sack); g.add(base, post, arm, pivot); g.userData.pivot = pivot; scene.add(g); return g;
+  }
+  function syncDummies(live) {                                    // live: Map(tile index -> the tile)
+    for (const [i, t] of live) { let g = dummies.get(i); if (!g) { g = makeDummy(); g.position.set((i % W) + .5, 0, ((i / W) | 0) + .5); dummies.set(i, g); }
+      const busy = t.occ && t.occ.state === 'train'; g.userData.pivot.rotation.z = busy ? Math.sin(G.time * 11 + i) * .55 : Math.sin(G.time * 1.3 + i) * .04; }
+    for (const [i, g] of dummies) if (!live.has(i)) { scene.remove(g); dummies.delete(i); }
+  }
+
   function updateTiles() {
-    let nGold = 0, nGem = 0, nTag = 0; const templeTiles = [], used = {}; for (const k in tileSprites) used[k] = new Set();
+    let nGold = 0, nGem = 0, nTag = 0; const templeTiles = [], used = {}, trainTiles = new Map(); for (const k in tileSprites) used[k] = new Set();
     const fill = Math.min(1, G.gold / Math.max(1, capacity()));
     const sprite = (kind, i, x, y, k = 1, lift = 0, opacity = 1) => {
       used[kind].add(i); let s = tileSprites[kind].get(i); if (!s) { s = makeSprite(SPRITE_OF_KIND[kind] || kind); tileSprites[kind].set(i, s); }
@@ -203,9 +217,10 @@ function start() {
         else if (t.t === T.TEMPLE) templeTiles.push({ x, y });
         else if (t.t === T.PRISON) sprite('cage', i, x, y, 1, 0, t.occ ? 0.5 : 1);
         else if (t.t === T.TORTURE) sprite('rack', i, x, y, 1, 0, t.occ ? 0.7 : 1);
+        else if (t.t === T.TRAINING) trainTiles.set(i, t);
       }
     }
-    syncRooms(templeTiles);
+    syncRooms(templeTiles); syncDummies(trainTiles);
     for (const kind in tileSprites) for (const [i, s] of tileSprites[kind]) if (!used[kind].has(i)) { disposeSprite(s); tileSprites[kind].delete(i); }
     for (const [m, c] of [[goldBits, nGold], [gemBits, nGem], [tags, nTag]]) { m.count = c; m.instanceMatrix.needsUpdate = true; }
     for (const m of [floorMesh, wallDirt, wallBrick]) { m.instanceMatrix.needsUpdate = true; m.instanceColor.needsUpdate = true; }
@@ -266,7 +281,7 @@ function start() {
       if (strip) {
         N = meta.attack[1]; const ph = d.phase, spd = (u.speed || 1.6) * (u.haste > 0 ? 1.6 : 1);
         if (u.cdMax && u.cd > u.cdMax - 0.5) f = meta.attack[0] + Math.min(4, Math.floor((u.cdMax - u.cd) / 0.5 * 5));            // the swing starts the moment the blow lands
-        else if ((u.isImp && u.state === 'work') || u.state === 'torture') f = meta.attack[0] + Math.floor(G.time * 5 + ph) % 5;                              // imps dig with the swing loop
+        else if ((u.isImp && u.state === 'work') || u.state === 'torture' || u.state === 'train') f = meta.attack[0] + Math.floor(G.time * 5 + ph) % 5;                              // imps dig with the swing loop
         else if (moving) f = meta.walk[0] + Math.floor(G.time * spd * 0.9 * 6 + ph * 6) % 6;
         else f = meta.idle[0] + Math.floor(G.time * (u.state === 'sleep' ? 1.5 : 3.5) + ph * 4) % 4;
       }
