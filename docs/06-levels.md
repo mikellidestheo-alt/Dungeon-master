@@ -35,6 +35,7 @@ keeper. Winning means beating every wave; losing means the Dungeon Heart falls.
   waves: {
     endless: false,              // true = no plan: generated waves that never stop (see "The sandbox and endless mode")
     prep: 75,                    // seconds from linking the Hero Gate to the first wave
+    dig: 0,                      // 0-4: how many heroes tunnel through the earth towards your creatures (see "Heroes that dig")
     waiting: false,              // true = wave 1 is already standing on the Gate pad from the first second (see "A party that waits at the Gate")
     interval: 110,               // seconds between waves
     scale: 0.12,                 // each wave's heroes are this much stronger than the last (1 + scale * waveNumber)
@@ -107,7 +108,7 @@ joins it to your Heart. Rules:
 - Heroes that flee run back to **the Gate they came out of** and escape through it.
 - The `gate` objective can ask for several: `{ type: 'gate', n: 2 }` ("Link tunnels to 2 Hero Gates").
 - 3D: every Gate has its own sprite and light, dim until linked, glowing once linked.
-- Sandbox: `&gates=2` adds a second hero cavern and Gate in the north of the classic map (the sandbox page has a "Two Gates" switch).
+- Sandbox: `&gates=N` (1 to 6) puts N Hero Gates round the edge of the sandbox map, each in its own hero cavern, so the heroes can come from different directions (see "The sandbox and endless mode"); the sandbox page has a 1-6 selector.
 
 ## Who comes through the Portal
 
@@ -168,6 +169,27 @@ starves or leaves. `rules.food: false` removes the food limit (beds still apply)
 chapter 3's lesson. Chapter objectives were adjusted so the army they ask for fits: chapter 2 asks for a Lair of 5 (five creatures) and chapter 3
 a Lair of 6 and a Hatchery of 4 (food for 19).
 
+## Heroes that dig
+
+`waves.dig` (0-4, default 0) lets heroes tunnel. A **digger** aims at the nearest creature within `VAR.HERO_DIG_SENSE` 20 tiles, else at your Heart,
+and routes through earth and gold (not rock or gem seams) when that is the only way or under `HERO_DIG_SHORTCUT` 0.6 x the length of the walk (a wall tile
+costs `HERO_DIG_COST` 6 steps). It walks to the wall and digs it like an imp, the tile becomes floor, and the rest of its party (who follow the leader) walk
+through the tunnel it leaves. A digger leads its party, and more than one digger digs in parallel, so a tunnel goes faster. This bypasses the doors and traps
+of the tunnel you built, so it is the counter to a fortress: put creatures, traps and doors near your Heart as well. What is dug by heroes is
+no business of your objectives (their tiles and gold are not counted), the log says "Heroes are tunnelling through the earth towards you!" once, and
+heroes can open an unlinked Gate this way, since a Gate links as soon as floor joins it to your Heart.
+
+| `dig` | who digs | digging speed (imps are 80 %) |
+|---|---|---|
+| 0 | nobody | - |
+| 1 | the first hero of each Gate's group, every 4th after it, and Dwarves | 45 % |
+| 2 | every 3rd, and Dwarves | 55 % |
+| 3 | every 2nd, and Dwarves | 70 % |
+| 4 | every hero | 85 % |
+
+Bosses (Prince, King) and flyers (Fairy) never dig. The campaign sets it by chapter: 0 in chapters 1-3, 1 in 4-5, 2 in 6-7, 3 in 8-9 and 4 in the
+finale; the sandbox sets it by difficulty (Apprentice 0, Keeper 1, Overlord 2, Dungeon Master 3). `tools/test_digging.js` checks the rules.
+
 ## A party that waits at the Gate
 
 `waves.waiting: true` turns the first wave into a party that is **already there**. When the level opens, wave 1's heroes stand on the
@@ -191,20 +213,27 @@ thing, and the difficulty rises through data alone:
 | # | id | chapter | new | waves | hero x | prep | gap | Gates | unlocked at the start |
 |---|---|---|---|---|---|---|---|---|---|
 | 1 | `tutorial` | The Awakening | dig, mine, claim, Treasury, Lair, Portal; one weak Knight, waiting at the Gate | 1 | 0.50 | - (waits) | 110 | 1 | nothing |
-| 2 | `portal` | Creatures of the Dark | the Portal, beds, wages | 3 | 0.70 | 160 | 110 | 1 | nothing |
-| 3 | `hatchery` | Mouths to Feed | hunger, the Hatchery | 4 | 0.90 | 120 | 110 | 1 | nothing |
-| 4 | `library` | The Library | research (you study Gas Trap and Heal) | 4 | 1.05 | 100 | 100 | 1 | nothing |
-| 5 | `traps` | Doors and Snares | doors, traps; **Dwarf** | 5 | 1.05 | 100 | 100 | 1 | Gas, Lightning traps |
-| 6 | `prison` | The Dungeon Below | Prison, Torture Chamber; **Monk** | 6 | 1.05 | 100 | 100 | 1 | + Prison, Torture |
-| 7 | `temple` | Prayers and Power | Temple, spells; **Fairy** | 6 | 1.20 | 90 | 100 | 1 | + Temple, every spell |
-| 8 | `gates` | Two Gates | two entrances; **Giant** | 7 | 1.20 | 80 | 100 | 2 | everything |
-| 9 | `siege` | The Siege | **Prince**, **Stone Knight** | 8 | 1.30 | 70 | 100 | 2 | everything |
-| 10 | `crusade` | The King's Crusade | the **King**; three entrances | 10 | 1.30 | 60 | 90 | 3 | everything |
+| 2 | `portal` | Creatures of the Dark | the Portal, beds, wages | 3 | 0.70 | 90 | 75 | 1 | nothing |
+| 3 | `hatchery` | Mouths to Feed | hunger, the Hatchery | 4 | 0.90 | 75 | 70 | 1 | nothing |
+| 4 | `library` | The Library | research (you study Gas Trap and Heal) | 4 | 1.05 | 60 | 65 | 1 | nothing |
+| 5 | `traps` | Doors and Snares | doors, traps, Training Room; **Dwarf** | 5 | 0.85 | 55 | 60 | 1 | Gas, Lightning traps |
+| 6 | `prison` | The Dungeon Below | Prison, Torture Chamber; **Monk** | 6 | 0.85 | 55 | 60 | 1 | + Prison, Torture |
+| 7 | `temple` | Prayers and Power | Temple, spells; **Fairy** | 6 | 1.20 | 50 | 60 | 1 | + Temple, every spell |
+| 8 | `gates` | Two Gates | two entrances; **Giant** | 7 | 1.00 | 45 | 55 | 2 | everything |
+| 9 | `siege` | The Siege | **Prince**, **Stone Knight** | 8 | 1.00 | 40 | 55 | 2 | everything |
+| 10 | `crusade` | The King's Crusade | the **King**; three entrances | 10 | 1.08 | 35 | 50 | 3 | everything |
 
 "hero x" is `waves.heroMult`, "prep" the seconds from the first linked Gate to wave 1 (the Tutorial has none: its Knight waits at the Gate and attacks the moment you link it), "gap" the seconds between waves. Starting gold rises
 from 800 to 2500. `waves.scale` (extra strength per wave) is a balancing dial, 0 to 0.14: it is higher where a chapter's early waves are light.
 The Heart shrinks from 3000 to 2500 by chapter 5. Parties never exceed the Gate pad's nine heroes. **Length targets**: the Tutorial 3-5
 minutes, chapters 2-4 10-12, 5-7 12-16, 8-9 16-22, the finale 22-28, about 2.5-3 hours in all (see "Balance" for how that was checked).
+
+**Map sizes.** Chapters 1 and 2 are the small maps (30 x 17, 36 x 20). Chapters 3 to 10 are **enlarged**: they are drawn at the old size and `enlargeGrid(grid, salt)`
+in `levels.js` doubles them in both directions (four times the area: 76 x 44 for chapter 3 up to 104 x 64 for the finale) while keeping the drawn
+ridges and gaps, so every chapter keeps its choke points. Each drawn cell becomes a 2 x 2 block (a gold seam keeps its two tiles, a gem one, the Heart / Portal /
+Gate markers become one marker with floor around it) and a seeded hash, salted with the chapter's name, adds extra gold seams, 2 x 2 rock pillars and a few hidden
+caves (a small open floor with seams in its corners) to the middle of big earth fields. Distances double, so tunnels and armies take longer to place; the
+wave timers were shortened to keep the pressure up (prep 90 s down to 35 s, gap 75 s down to 50 s: they were 160 down to 60 and 110 down to 90).
 
 Things every chapter shares:
 
@@ -219,7 +248,7 @@ Things every chapter shares:
   carries you from the first dig to the Knight. `?guide=0` turns them off.
 - In chapters 9 and 10 you need only **one** Gate linked to start the clock: link one and fight on a single front, or open more and
   every wave is split between them.
-- `lesson`, `classic` and `tiny` stay in `levels.js` as fixtures and the sandbox's base map; they are not part of the campaign.
+- `lesson`, `classic` and `tiny` stay in `levels.js` as fixtures; they are not part of the campaign (the sandbox has its own, larger map).
 
 ## Balance
 
@@ -303,7 +332,7 @@ throws. `?nosave=1` skips saving (bots and experiments). The menu's "Erase saved
 
 `sandbox.html` (linked from the chapter menu) builds a level from a few options instead of a hand-written one. It opens
 `index.html?level=sandbox&...` and `makeSandbox(params)` at the end of `levels.js` turns the URL into an ordinary level object, so it
-goes through `validateLevel` like any other. It always plays on the `classic` map; the seed picks the dungeon.
+goes through `validateLevel` like any other. It plays on its own large map (`window.SANDBOX_MAP`: **88 x 60 tiles**, 4.7 times the 40 x 28 classic map): your Heart in the west, the Portal in the east and up to six Hero Gates round the edge (south, north, south-east, north-east, south-west, north-west), each in its own hero cavern. The seed picks the dungeon (random blobs of rock and gold between the fixed caverns; no rock is dropped on the lanes between the Heart, the Portal and the Gates, so every seed can be dug through, checked over 25 seeds with six Gates in `test_sandbox.js`).
 
 | param | meaning | range / default |
 |---|---|---|
@@ -311,11 +340,12 @@ goes through `validateLevel` like any other. It always plays on the `classic` ma
 | `waves` | how many waves to beat (fixed mode) | 3-15, 8 |
 | `endless=1` | endless mode instead of `waves` | off |
 | `gold`, `mana` | starting resources | 200-5000 (1500), 0-1000 (300) |
+| `gates` | how many Hero Gates (south, north, south-east, north-east, south-west, north-west, in that order); each wave is split between the ones you have linked | 1-6, 1 |
 | `unlocks=all` | everything researched from the start | `none` |
 | `seed` | map and random seed | 7 |
 
 Out-of-range numbers are clamped and unknown words fall back to the defaults. The presets live in `window.DIFFICULTY` as plain data
-(`heroMult`, `scale`, `prep`, `interval`, `minInterval`, `heartHp`); each is strictly harder than the one before it.
+(`heroMult`, `scale`, `prep`, `interval`, `minInterval`, `heartHp`, `dig`); each is strictly harder than the one before it. `dig` is how many heroes tunnel: 0, 1, 2, 3 (see "Heroes that dig").
 
 **The waves** come from `window.sandboxParty(n)`, a pure function: the same `n` always gives the same party. Waves 1-2 are Knights and
 Archers, a new hero type joins every wave or two, parties grow from 2 to 9 (the Hero Gate's pad), at most two healers, and **every 5th wave

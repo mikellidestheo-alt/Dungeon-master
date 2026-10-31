@@ -66,7 +66,7 @@
       /* what a sensible player adds once the basics stand: the rooms that draw stronger creatures through the Portal (the Monsters tab lists what each kind needs), and a Training Room */
       if (c >= 3 && chapter >= 3) w.library = Math.max(w.library, 3);                              // Warlocks and Dark Elves
       if (c >= 3 && chapter >= 6 && g.isAvail('temple')) w.temple = Math.max(w.temple, 3);         // Vampires and Dark Angels
-      w.training = c >= 3 && (chapter >= 4 || need("level") > 0) ? Math.min(6, 1 + Math.floor(c / 2)) : 0;
+      w.training = c >= 2 && (chapter >= 4 || need("level") > 0) ? Math.min(6, 2 + Math.floor(c / 2)) : 0;
       return w;
     }
     function buildRooms() {
@@ -98,9 +98,9 @@
     const capacityLeft = () => g.capacity() + 1;       // gold can only be banked up to the Treasury's capacity
 
     /* ---- the Gate: a tunnel that stops one tile short, doors and traps along it, then the last tile ---- */
-    function planGates() {
+    function planGates() {                          // the goal is any floor of that Gate's cavern (the enlarged chapters have a 14 x 14 one)
       if (S.routes || !G.gates.length) return;
-      const per = G.gates.map((gt, gi) => { const r = route((t, x, y) => t.owner === 2 && isOpen(t) && Math.abs(x - gt.x) <= 3 && Math.abs(y - gt.y) <= 2); if (r) r.gate = gi; return r; }).filter(Boolean);
+      const per = G.gates.map((gt, gi) => { const r = route((t, x, y) => t.owner === 2 && isOpen(t) && Math.abs(x - gt.x) <= 8 && Math.abs(y - gt.y) <= 8); if (r) r.gate = gi; return r; }).filter(Boolean);
       if (!per.length) return;
       const wantBoth = obj('gate').some(o => (o.n || 1) > 1), sorted = per.sort((a, b) => a.cost - b.cost);
       S.routes = wantBoth ? sorted.slice(0, 2) : sorted.slice(0, 1);                       // one front, unless the chapter asks for both Gates
@@ -137,7 +137,8 @@
     function maybeLink() {
       if (S.linked || !S.routes) return;
       if (!steady) { if (G.stats.claimed >= 4 || G.time > 60) link(); return; }
-      const army = Math.max(need('creatures', undefined, undefined, true), 3), defended = G.doors.length + G.traps.length >= Math.min(8, need('doors', undefined, undefined, true) + need('traps', undefined, undefined, true));
+      const army = Math.max(need('creatures', undefined, undefined, true), Math.min(12, 3 + chapter)),       // a sensible newcomer opens the Gate with an army that grows with the chapter now that the waves come quickly
+         defended = G.doors.length + G.traps.length >= Math.min(8, need('doors', undefined, undefined, true) + need('traps', undefined, undefined, true));
       if (ready() && G.creatures.length >= army && defended && G.time > 90) link();
       else if (G.time > 1100) link();                                                    // never wait for ever
     }

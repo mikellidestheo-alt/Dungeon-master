@@ -60,9 +60,10 @@ completing its objectives (every chapter includes surviving all its waves) and l
 3. **Claim the Portal** by digging to it and letting your imps claim the floor. A creature arrives about every 25 seconds, up to 15, and **which kind** depends on what you have built: Goblins, Spiders and Flies come to a bare Lair, Trolls and Black Knights want a Treasury, Salamanders and Bile Demons a Hatchery, Warlocks and Dark Elves a Library, Vampires and Dark Angels a Temple, the Mistress a Torture Chamber, the Assassin a Prison and the Reaper both. The Monsters tab's *Who will come* view lists them.
 4. **Look after them.** Each creature needs a **Lair** tile to sleep in, **food** (a **Hatchery** raises chickens, they get hungry about every two minutes; the Heart's own larder feeds 3 creatures and every Hatchery tile feeds 4 more) and **wages** at every **payday** (every 90 seconds, 60 to 220 gold each; fifteen creatures cost about 1650 a payday). **The size of your Lair and Hatchery caps your army**: you can keep at most `min(15, Lair tiles, 3 + 4 per Hatchery tile)` creatures, the top bar shows `Creatures 5/9 beds` (or *food*, or *Portal*) with a tooltip naming all three limits, and the Portal waits (with a log line) while you are full. Unhappy creatures turn angry and eventually leave. The Task board shows every creature's mood.
 5. **Prepare.** Build what the chapter teaches: Library and research, Prison and Torture, Temple, doors and traps, and a **Training Room** so your creatures level up (stronger, but their wages rise too). The gaps in the rock ridges are natural choke points.
-6. **Open a Gate.** Tunnel to the red-tinted **Hero Gate** (a path of open floor from Gate to Heart). The first wave arrives after the chapter's preparation countdown (in the Tutorial the Knight is already standing in the Gate cavern and attacks the moment you break through). *Tip:* dig the whole tunnel except its last tile, set your doors and traps, and only then dig the last tile.
-7. **Fight.** Creatures fight on their own and level up from kills. You cast spells, move creatures with the Hand and keep a few imps alive (they re-arm traps and mend doors, and they run from heroes, so replace them with `5`). Heroes that get weak run back to their Gate and escape, so you will slay only a part of each wave.
-8. **Win or lose.** The end screen shows time, heroes slain, Heart left, and up to three stars. Next chapter, Retry and Chapters are one click away.
+6. **Mind the digging.** From chapter 4 some heroes **tunnel through the earth** towards your creatures (more in later chapters, and in the sandbox by difficulty), so a fortress of doors and traps in one tunnel is not enough: defend your Heart and army too. Chapters 3-10 are big maps (76 x 44 up to 104 x 64 tiles), and the waves come sooner after you open a Gate (90 s in chapter 2 down to 35 s in the finale).
+7. **Open a Gate.** Tunnel to the red-tinted **Hero Gate** (a path of open floor from Gate to Heart). The first wave arrives after the chapter's preparation countdown (in the Tutorial the Knight is already standing in the Gate cavern and attacks the moment you break through). *Tip:* dig the whole tunnel except its last tile, set your doors and traps, and only then dig the last tile.
+8. **Fight.** Creatures fight on their own and level up from kills. You cast spells, move creatures with the Hand and keep a few imps alive (they re-arm traps and mend doors, and they run from heroes, so replace them with `5`). Heroes that get weak run back to their Gate and escape, so you will slay only a part of each wave.
+9. **Win or lose.** The end screen shows time, heroes slain, Heart left, and up to three stars. Next chapter, Retry and Chapters are one click away.
 
 **Chapters, stars and saves.** The chapter menu lists ten chapters; each unlocks when the one before it is won. Stars: **1** win; **2** finish with at least half the Heart left; **3** also complete the chapter's **bonus objective**. Progress, best times and stars are saved in this browser (`localStorage`, key `dm.save.v1`); *Erase saved progress* on the menu clears them.
 
@@ -89,6 +90,7 @@ stronger, and a boss (Prince, then King) leads every fifth one. Your score is th
 |---|---|
 | `level=<id>` | a chapter (`tutorial`, `portal`, `hatchery`, `library`, `traps`, `prison`, `temple`, `gates`, `siege`, `crusade`), `classic`, `tiny`, `lesson` or `sandbox` |
 | `seed=<n>` | another random seed (a different creature mix; for `classic` and the sandbox, a different map) |
+| `gates=<1-6>` | with `level=sandbox`: how many Hero Gates, spread round the edge of the big sandbox map (south, north, south-east, north-east, south-west, north-west) |
 | `brief=1` | open behind the chapter's briefing card; `guide=0` turns the hints off |
 | `unlock=1` | everything researched from the start |
 | `view=2d`, `cam=top` | the flat canvas view, or the steeper top-down 3D camera |
@@ -99,7 +101,7 @@ stronger, and a boss (Prince, then King) leads every fifth one. Your score is th
 ## Playtest checklist
 
 The scripted bots (`node tools/test_bots.js`) say every chapter is *winnable* and *not trivial*, and that a fast player's times add up to about
-140 minutes. They cannot say whether it is **fun, clear or fair**, whether the art sits right, or how the sound feels. That is what this list is for.
+130 minutes. They cannot say whether it is **fun, clear or fair**, whether the art sits right, or how the sound feels. That is what this list is for.
 Tick as you go; write down anything surprising in the template at the end.
 
 **Before you start**
@@ -136,16 +138,16 @@ Tick as you go; write down anything surprising in the template at the end.
 
 | # | Chapter | Target (first play) | A good player should find | Check in particular |
 |---|---|---|---|---|
-| I | The Awakening | 5-8 min | trivial | the whole guide |
-| II | Creatures of the Dark | 10-12 | easy | creature moods; beds; the first payday |
-| III | Mouths to Feed | 10-12 | easy | does hunger show clearly? is the Hatchery obvious? |
-| IV | The Library | 10-12 | easy, first real tension | choosing research in the panel; do desks fill? |
+| I | The Awakening | 3-5 min | trivial | the whole guide; the waiting Knight |
+| II | Creatures of the Dark | 8-12 | easy | creature moods; beds; the first payday |
+| III | Mouths to Feed | 10-13 | easy | the enlarged map (four times the area): does it feel big or empty? does hunger show clearly? is the Hatchery obvious? |
+| IV | The Library | 10-14 | easy, first real tension | choosing research in the panel; do desks fill? the first heroes who tunnel |
 | V | Doors and Snares | 12-16 | fair | placing doors and traps; the Dwarf; the bonus (6 traps) |
 | VI | The Dungeon Below | 12-16 | fair | capturing, imprisoning, torturing, converting |
 | VII | Prayers and Power | 12-16 | fair | the Temple; mana; all five spells; the Fairy |
 | VIII | Two Gates | 16-22 | fair, long | linking one Gate versus both; defending two tunnels |
 | IX | The Siege | 16-22 | hard | gold running low; armour and the Prince; the last wave |
-| X | The King's Crusade | 22-28 | the hardest; about half of careful runs win | the three Gates; the King's wave; the finish |
+| X | The King's Crusade | 18-28 | the hardest; about half of careful runs win | the three Gates; every hero digs; the King's wave; the finish |
 
 **4. Systems**
 
@@ -168,7 +170,8 @@ Tick as you go; write down anything surprising in the template at the end.
 **5. Sandbox, endless and saves**
 
 - [ ] Every control on the sandbox page changes the summary; *Begin* opens exactly that game; Retry reopens the same one (same seed).
-- [ ] Two Gates in the sandbox: the second cavern is in the north and works.
+- [ ] Hero Gates in the sandbox: pick 1 to 6; each extra Gate is in a new place round the edge (the hint under the buttons names them); tunnel to several and every wave is split between them. Is the 88 x 60 map big enough? Too big to cross?
+- [ ] Digging heroes: in a chapter from IV on, watch a hero stop at a wall and dig towards your creatures (the log says so once; the swing animation plays). Do the waves feel too fast now (35-90 s before the first, 50-75 s between)? Can you answer a tunnel (creatures, traps near your Heart)?
 - [ ] Endless: waves never stop, the gap shrinks, a boss leads waves 5, 10, 15, 20. *Retire* banks the score; *Overrun* when the Heart falls; the best per difficulty is saved and shown on the sandbox page.
 - [ ] Stars and best times are saved across a reload; chapters unlock in order; *Erase saved progress* resets all of it.
 - [ ] In a private window (storage blocked) the game still runs and nothing throws.
@@ -267,6 +270,7 @@ Tick as you go; write down anything surprising in the template at the end.
 | `tools/test_capacity.js` | Headless Chromium checks for the army limit (beds, food, Portal), the Heart's larder and ten minutes without starvation: `node tools/test_capacity.js` |
 | `tools/test_input.js` | Headless Chromium checks for the default mouse mode (Dig / grab), right-click cancelling a tool, carrying and dropping, selling doors and traps, and the hover ring: `node tools/test_input.js` |
 | `tools/test_training.js` | Headless Chromium checks for levels 1-10: the Training Room, XP and the cap, stats and wages, gold per session, the `level` objective, the toolbar button and the roster XP bar: `node tools/test_training.js` |
+| `tools/test_digging.js` | Headless Chromium checks for heroes that dig (who digs by `waves.dig`, tunnelling to a walled-in creature, rock stopping it, shortcuts only when worth it, doors and traps bypassed): `node tools/test_digging.js` |
 | `tools/test_gates.js` | Headless Chromium checks for several Hero Gates (linking, split waves, fleeing, 3D): `node tools/test_gates.js` |
 | `tools/test_sandbox.js` | Headless Chromium checks for the sandbox, the wave generator and endless mode: `node tools/test_sandbox.js` |
 | `tools/test_campaign.js` | Headless Chromium checks for the chapter menu, saved progress, stars and the Victory / Defeat screens: `node tools/test_campaign.js` |
@@ -341,7 +345,7 @@ seams, room building, lair assignment, mood/anger, sleep and payday, free-imp sp
   not picked up within 60 s bleeds out. Prisoners lose health; if one starves a **Skeleton** rises for you. Imps move
   prisoners to a **Torture Chamber** (150g/tile) where, after 30 s, 70 % convert into your creatures (`Ex-Knight` ...) and
   30 % die. Imps still run from live heroes, so capturing only works once you are winning the fight.
-* **Levels and the Training Room:** creatures have levels 1 to 10. Build a **Training Room** (150g/tile, available from the start, one dummy per tile): idle, fed, rested creatures below level 10 walk to a free dummy, train for 20 s (15 XP) and pay 15 gold a session, but never leave you with under 100 gold, or under the whole payday's wages in the 30 s before payday. XP needed per level: 50, 65, 80, 100, 125, 155, 190, 230, 280 (a kill gives only 1 XP). Every level multiplies hp and damage by 1.11 (x2.5 at level 10) and adds 8 % to the creature's wage. One creature training without a break reaches level 5 in about 8 minutes and level 10 in about 35. The roster chip shows the level and an XP bar; elite sprites appear from level 3. Chapter 5 introduces it with a hint and a bonus objective (*Train a creature to level 3*). `tools/test_training.js` checks the rules.
+* **Levels and the Training Room:** creatures have levels 1 to 10. Build a **Training Room** (150g/tile, available from the start, one dummy per tile): idle, fed, rested creatures below level 10 walk to a free dummy, train for 20 s (15 XP) and pay 15 gold a session, but never leave you with under 100 gold, or under the whole payday's wages in the 30 s before payday. XP needed per level: 50, 65, 80, 100, 125, 155, 190, 230, 280 (a kill gives only 1 XP). Every level multiplies hp and damage by 1.11 (x2.5 at level 10) and adds 8 % to the creature's wage. One creature training without a break reaches level 5 in about 8 minutes and level 10 in about 35. The roster chip shows the level and an XP bar; elite sprites appear from level 3. Chapter 5 introduces it with a hint and a bonus objective (*Train a creature to level 2*). `tools/test_training.js` checks the rules.
 * **Library and research:** Prison, Temple, Torture Chamber, Gas Trap, Lightning Trap and the spells Heal, Speed, Lightning and
   Call to Arms start **locked** (greyed out; build attempts and casts are refused for free). Treasury, Lair, Library, Hatchery,
   Doors and Create Imp are available from the start. Build a **Library** (120g/tile, one desk per tile): idle creatures

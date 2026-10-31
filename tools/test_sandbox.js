@@ -78,6 +78,29 @@ const HEROES = ['Knight', 'Archer', 'Mage', 'Thief', 'Guard', 'Monk', 'Prince', 
     check('the seed picks the map: same seed same dungeon, another seed another', h11 === lv.hash && h12 !== h11, [h11, h12, lv.hash].join(' '));
     await ctx.close();
 
+    console.log('3b. the big map and the number of Hero Gates');
+    ctx = await fresh(); page = await game(ctx, 'level=sandbox&gates=6&seed=5&nosave=1');
+    const big = await page.evaluate(() => {
+      const g = window.__game, G = g.G, M = window.makeSandbox, S = window.SANDBOX_MAP, out = { size: [g.W, g.H], gates: G.gates.map(q => [q.x, q.y]), counts: [] };
+      for (const n of ['0', '1', '2', '3', '6', '7', 'x']) { const lv = M({ gates: n }); out.counts.push([n, lv.gates.length, lv.sandbox.gates, g.validateLevel(lv).length]); }
+      out.dig = Object.keys(window.DIFFICULTY).map(id => [id, M({ diff: id }).waves.dig, window.DIFFICULTY[id].dig].join(':'));
+      out.names = S.names.length;
+      // every seed can be dug from the Heart to the Portal and every Gate (rock and gems cannot): the map is rebuilt 25 times from the seeded generator
+      const open = (t) => t.t !== g.T.ROCK && t.t !== g.T.GEM, bad = [];
+      for (let k = 0; k < 25; k++) {
+        g.buildMap(); const seen = new Uint8Array(g.W * g.H), q = [G.heart.y * g.W + G.heart.x]; seen[q[0]] = 1;
+        for (let i = 0; i < q.length; i++) { const c = q[i], x = c % g.W, y = (c / g.W) | 0; for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) { const nx = x + dx, ny = y + dy; if (nx < 0 || ny < 0 || nx >= g.W || ny >= g.H) continue; const ni = ny * g.W + nx; if (!seen[ni] && open(G.map[ni])) { seen[ni] = 1; q.push(ni); } } }
+        for (const [name, p] of [['portal', G.portal], ...G.gates.map((gt, i) => ['gate' + (i + 1), gt])]) if (!seen[p.y * g.W + p.x]) bad.push(k + ':' + name);
+      }
+      out.bad = bad; out.rock = G.map.filter(t => t.t === g.T.ROCK).length; out.gold = G.map.filter(t => t.t === g.T.GOLD).length;
+      return out; });
+    check('the sandbox map is 88 x 60 tiles (4.7 times the classic 40 x 28)', big.size.join('x') === '88x60', big.size.join('x'));
+    check('six Hero Gates, all in different places round the edge of the map', big.gates.length === 6 && new Set(big.gates.map(q => q.join())).size === 6 && big.gates.every(([x, y]) => y <= 6 || y >= 53) && big.names === 6, JSON.stringify(big.gates));
+    check('the number of Gates is clamped to 1-6 (0 and junk give 1, 7 gives 6) and every count validates', big.counts.map(c => c[0] + '>' + c[1] + '/' + c[2] + '/' + c[3]).join() === '0>1/1/0,1>1/1/0,2>2/2/0,3>3/3/0,6>6/6/0,7>6/6/0,x>1/1/0', big.counts.join(' '));
+    check('the sandbox difficulty sets how many heroes dig: Apprentice 0, Keeper 1, Overlord 2, Dungeon Master 3', big.dig.join() === 'easy:0:0,normal:1:1,hard:2:2,brutal:3:3', big.dig.join());
+    check('every one of 25 random maps with six Gates can be dug from the Heart to the Portal and to every Gate (no walled-off Gate)', big.bad.length === 0 && big.rock > 200 && big.gold > 80, JSON.stringify(big.bad) + ' rock ' + big.rock + ' gold ' + big.gold);
+    await ctx.close();
+
     console.log('4. a fixed sandbox, played to victory');
     ctx = await fresh(); page = await game(ctx, 'level=sandbox&diff=easy&waves=3&seed=5');
     const f = await page.evaluate(() => { const g = window.__game, G = g.G, out = { sizes: [], scales: [] }; G.gateOpen = true;
@@ -151,9 +174,14 @@ const HEROES = ['Knight', 'Archer', 'Mage', 'Thief', 'Guard', 'Monk', 'Prince', 
     check('endless disables the waves slider, shows ∞, renames Begin', s.wavesDis && s.wavesOut === '∞' && /Endless/.test(s.begin) && /ever faster/.test(s.summary), s.wavesOut + ' / ' + s.begin);
     const q = await page.evaluate(() => Object.fromEntries(window.__sandbox.params()));
     check('the URL carries every option (endless: no waves)', JSON.stringify(q) === JSON.stringify({ level: 'sandbox', diff: 'hard', gold: '3000', mana: '500', unlocks: 'all', seed: '42', endless: '1', brief: '1', view: '2d', sound: '0' }), JSON.stringify(q));      // view and sound are passed through
+    check('the Hero Gates row has six buttons, 1 to 6, each saying where the next Gate is', await page.evaluate(() => [...document.querySelectorAll('#gates .opt')].map(b => b.dataset.v).join() === '1,2,3,4,5,6' && /south-east/.test(document.querySelector('#gates .opt[data-v="3"]').textContent)));
+    await page.click('#gates .opt[data-v="4"]'); s = await sb(); const q4 = await page.evaluate(() => Object.fromEntries(window.__sandbox.params()));
+    check('choosing 4 Gates: the summary and the hint name them, the URL carries gates=4', s.st.gates === 4 && /4 Hero Gates/.test(s.summary) && /north-east/.test(await page.evaluate(() => document.getElementById('gatesHint').textContent)) && q4.gates === '4', s.summary.slice(0, 160));
+    check('the summary says how many heroes dig for the preset (Overlord: many) and the map size', /tunnel through the earth/.test(s.summary) && /88 × 60/.test(s.summary), s.summary);
+    await page.click('#gates .opt[data-v="1"]');
     const help = await page.evaluate(() => ({ items: document.querySelectorAll('.help li').length, text: document.querySelector('.help').textContent, hints: document.querySelectorAll('.hint').length, overflow: document.documentElement.scrollWidth > document.documentElement.clientWidth }));
     check('the page explains itself: a "How the sandbox works" panel of 6 points, no horizontal overflow', help.items === 6 && /How the sandbox works/.test(help.text) && !help.overflow, JSON.stringify([help.items, help.overflow]));
-    check('the help covers the map, starting the invasion, fixed versus endless (Retire), difficulty and stars', ['classic dungeon', 'tunnel links a Gate', 'no stars', 'Retire', 'Heart\'s health'].every(k => help.text.includes(k)), help.text.length + ' chars');
+    check('the help covers the map, starting the invasion, fixed versus endless (Retire), difficulty and stars', ['large dungeon', 'tunnel links a Gate', 'no stars', 'Retire', 'Heart\'s health'].every(k => help.text.includes(k)), help.text.length + ' chars');
     await page.reload({ waitUntil: 'load' }); await sleep(200); s = await sb();
     check('settings are remembered', s.st.mode === 'endless' && s.st.diff === 'hard' && s.st.gold === 3000 && s.st.seed === 42 && s.st.unlocks);
     await page.click('.opt[data-v="fixed"]'); const d0 = (await sb()).st.seed; await page.click('#dice'); const d1 = (await sb()).st.seed;

@@ -29,9 +29,9 @@ const sleep = (ms) => new Promise(r => setTimeout(r, ms));
       await page.goto(ROOT + 'index.html?sound=0&view=' + view + '&' + query, { waitUntil: 'load' }); await sleep(view === '2d' ? 300 : 2500);
       await page.evaluate(() => { window.__game.G.speed = 0; }); return page;
     };
-    // a corridor of claimed floor from the Heart's cavern to a Gate's cavern (sandbox map): trunk along y=14, then up or down x=22
+    // a corridor of claimed floor from the Heart's cavern to a Gate's cavern (the 88 x 60 sandbox map): trunk along y=29, then up or down x=44
     const carve = (page, which) => page.evaluate((which) => { const g = window.__game, G = g.G, W = g.W; const cut = (x, y) => { const t = G.map[y * W + x]; t.t = g.T.PATH; t.hp = 1000; t.owner = 1; t.gold = 0; t.tag = 0; };
-      if (which === 'trunk') for (let x = 11; x <= 22; x++) cut(x, 14); if (which === 'south') for (let y = 15; y <= 19; y++) cut(22, y); if (which === 'north') for (let y = 7; y <= 13; y++) cut(22, y); G.dirty = true; }, which);
+      if (which === 'trunk') for (let x = 11; x <= 44; x++) cut(x, 29); if (which === 'south') for (let y = 30; y <= 50; y++) cut(44, y); if (which === 'north') for (let y = 9; y <= 28; y++) cut(44, y); G.dirty = true; }, which);
     const run = (page, secs) => page.evaluate((secs) => { const g = window.__game; for (let s = 0; s < secs && !g.G.over; s += 0.05) g.step(0.05); }, secs);
     const wave = (page) => page.evaluate(() => { const g = window.__game, G = g.G; G.nextWave = G.time; g.step(0.05); const gt = G.gates;
       return { n: G.wave, heroes: G.heroes.map(h => ({ name: h.name, gate: gt.indexOf(h.homeGate), near: gt.findIndex(q => Math.abs(h.x - q.x - .5) <= 1.6 && Math.abs(h.y - q.y - .5) <= 1.6), group: G.heroes.filter(o => o.party === h.party).length, leader: h.leader && h.leader.id === h.id })) }; });
@@ -43,7 +43,7 @@ const sleep = (ms) => new Promise(r => setTimeout(r, ms));
       return { sb: g.validateLevel(g.LV), sbEndless: g.validateLevel(M({ gates: '2', endless: '1' })), two: bad('tiny', l => { l.terrain.grid[2] = l.terrain.grid[2].slice(0, 3) + 'X' + l.terrain.grid[2].slice(4); l.terrain.grid[3] = l.terrain.grid[3].slice(0, 2) + 'hhhhh' + l.terrain.grid[3].slice(7); }),
         gate2one: bad('tiny', l => { l.objectives = [{ type: 'gate', n: 2 }]; }), gate1: bad('tiny', l => { l.objectives = [{ type: 'gate' }]; }), n: g.G.gates.length, pos: g.G.gates.map(q => [q.x, q.y]), t: g.G.gates.map(q => g.G.map[q.y * g.W + q.x].t === g.T.GATE) }; });
     check('the sandbox with two Gates validates (fixed and endless)', v.sb.length === 0 && v.sbEndless.length === 0, v.sb.join('; '));
-    check('it has two Gates, south (22,23) and north (22,4), both built as rooms', v.n === 2 && JSON.stringify(v.pos) === '[[22,23],[22,4]]' && v.t.every(Boolean), JSON.stringify(v.pos));
+    check('it has two Gates, south (44,54) and north (44,5), both built as rooms', v.n === 2 && JSON.stringify(v.pos) === '[[44,54],[44,5]]' && v.t.every(Boolean), JSON.stringify(v.pos));
     check('the `gate` objective can ask for 2 Gates, and says so when the level has one', v.gate2one.some(e => /2 Hero Gates/.test(e)) && v.gate1.length === 0, v.gate2one.join('; '));
     const cond = await page.evaluate(() => { const g = window.__game, G = g.G, c = { type: 'gate', n: 2 }, out = [g.condState(c).v]; G.gates[0].open = true; out.push(g.condState(c).v, g.condState(c).done); G.gates[1].open = true; out.push(g.condState(c).v, g.condState(c).done, g.COND.gate.label(c)); G.gates.forEach(q => { q.open = false; }); return out; });
     check('the objective counts linked Gates: 0, 1 (not done), 2 (done)', JSON.stringify(cond) === '[0,1,false,2,true,"Link tunnels to 2 Hero Gates"]', JSON.stringify(cond));
@@ -105,18 +105,18 @@ const sleep = (ms) => new Promise(r => setTimeout(r, ms));
     await carve(page, 'trunk'); await carve(page, 'south'); await run(page, 3); await sleep(500);
     const th = await page.evaluate(() => { const T = window.__three, sprites = []; T.scene.traverse(o => { if (o.userData && o.userData.name === 'hero_gate') sprites.push({ x: o.position.x, z: o.position.z, vis: o.visible, c: o.material.color.r }); });
       const lights = []; T.scene.traverse(o => { if (o.isPointLight && o.distance === 8) lights.push({ x: o.position.x, z: o.position.z, i: o.intensity }); }); return { sprites, lights }; });
-    check('two Gate sprites stand at the two Gates, both visible', th.sprites.length === 2 && th.sprites.every(s => s.vis) && th.sprites.map(s => s.x + ',' + s.z).sort().join('|') === '22.5,23.5|22.5,4.5', JSON.stringify(th.sprites));
+    check('two Gate sprites stand at the two Gates, both visible', th.sprites.length === 2 && th.sprites.every(s => s.vis) && th.sprites.map(s => s.x + ',' + s.z).sort().join('|') === '44.5,5.5|44.5,54.5', JSON.stringify(th.sprites));
     check('a linked Gate glows brighter than a shut one (sprite and light)', th.sprites.find(s => s.z > 20).c > 0.9 && th.sprites.find(s => s.z < 10).c === 0.5 && th.lights.length === 2 && th.lights.find(l => l.z > 20).i === 1.8 && th.lights.find(l => l.z < 10).i === 0.6, JSON.stringify(th));
     await page.close();
     page = await (await browser.newContext({ viewport: { width: 1200, height: 900 } })).newPage(); page.on('pageerror', e => problems.push('pageerror: ' + e));
     await page.goto(ROOT + 'sandbox.html?view=2d&sound=0', { waitUntil: 'load' }); await sleep(300);
     const q0 = await page.evaluate(() => Object.fromEntries(window.__sandbox.params()));
     await page.click('#gates .opt[data-v="2"]'); const q1 = await page.evaluate(() => ({ p: Object.fromEntries(window.__sandbox.params()), sum: document.getElementById('summary').textContent, on: [...document.querySelectorAll('#gates .on')].map(b => b.dataset.v) }));
-    check('the sandbox page: one Gate sends no gates param; Two Gates sends gates=2 and says so', q0.gates === undefined && q1.p.gates === '2' && /two Hero Gates/.test(q1.sum) && q1.on.join() === '2', JSON.stringify(q1.p));
+    check('the sandbox page: one Gate sends no gates param; Two Gates sends gates=2 and says so', q0.gates === undefined && q1.p.gates === '2' && /2 Hero Gates/.test(q1.sum) && q1.on.join() === '2', JSON.stringify(q1.p));
     await page.reload({ waitUntil: 'load' }); await sleep(200);
     check('the choice is remembered', await page.evaluate(() => window.__sandbox.state.gates === 2));
     await Promise.all([page.waitForURL(/index\.html\?/), page.click('#begin')]); await sleep(900);
-    check('Begin starts a game with two Gates behind a briefing that mentions the second one', await page.evaluate(() => window.__game.G.gates.length === 2 && /second Gate in the north/.test(document.getElementById('briefText').textContent)));
+    check('Begin starts a game with two Gates behind a briefing that mentions the second one', await page.evaluate(() => window.__game.G.gates.length === 2 && /2 Hero Gates \(south, north\)/.test(document.getElementById('briefText').textContent)));
     await page.context().close();
 
     check('no page errors or warnings in any run', problems.length === 0, problems.slice(0, 3).join(' | '));

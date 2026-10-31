@@ -1,18 +1,20 @@
 /* The campaign: ten chapters, each a plain level object in the format of levels.js (docs/06-levels.md). Every chapter teaches one thing and
  * the difficulty rises through data alone:
  *
- *   #   chapter                 new                    waves  hero x  prep  gap   Gates  start unlock
- *   1   The Awakening           dig, mine, claim, build   1     0.50    -    110    1     nothing   (its Knight waits on the Gate pad: no countdown)
- *   2   Creatures of the Dark   the Portal                3     0.70   160   110    1     nothing
- *   3   Mouths to Feed          Hatchery                  4     0.90   120   110    1     nothing
- *   4   The Library             research                  4     1.05   100   100    1     nothing (you research Gas Trap, Heal)
- *   5   Doors and Snares        doors, traps; Dwarf, Training       5     1.05   100   100    1     Gas and Lightning traps
- *   6   The Dungeon Below       Prison, Torture; Monk     6     1.05   100   100    1     + Prison, Torture Chamber
- *   7   Prayers and Power       Temple, spells; Fairy     6     1.20    90   100    1     + Temple and every spell
- *   8   Two Gates               two entrances; Giant      7     1.20    80   100    2     everything
- *   9   The Siege               Prince, Stone Knight      8     1.30    70   100    2     everything   (waves.scale 0.13: levelled creatures made it too easy)
- *   10  The King's Crusade      the King; three Gates    10     1.30    60    90    3     everything
+ *   #   chapter                 new                    map      waves  hero x  prep  gap   dig  Gates  start unlock
+ *   1   The Awakening           dig, mine, claim, build  30x17     1     0.50    -    110    0    1     nothing   (its Knight waits on the Gate pad: no countdown)
+ *   2   Creatures of the Dark   the Portal               36x20     3     0.70    90    75    0    1     nothing
+ *   3   Mouths to Feed          Hatchery                 76x44     4     0.90    75    70    0    1     nothing
+ *   4   The Library             research                 80x44     4     1.05    60    65    1    1     nothing (you research Gas Trap, Heal)
+ *   5   Doors and Snares        doors, traps; Dwarf, Training  84x48  5  0.85    55    60    1    1     Gas and Lightning traps
+ *   6   The Dungeon Below       Prison, Torture; Monk    88x48     6     0.85    55    60    2    1     + Prison, Torture Chamber
+ *   7   Prayers and Power       Temple, spells; Fairy    92x52     6     1.20    50    60    2    1     + Temple and every spell
+ *   8   Two Gates               two entrances; Giant     96x56     7     1.00    45    55    3    2     everything
+ *   9   The Siege               Prince, Stone Knight    100x60     8     1.00    40    55    3    2     everything   (waves.scale 0.11)
+ *   10  The King's Crusade      the King; three Gates   104x64    10     1.08    35    50    4    3     everything
  *
+ * Chapters 3-10 are drawn at half size and enlarged to twice the width and height by enlargeGrid (levels.js); "map" is the size you play on.
+ * "dig" is waves.dig: how many heroes tunnel through the earth towards your creatures (0 none ... 4 every hero; docs/06-levels.md "Heroes that dig").
  * "hero x" is waves.heroMult, "prep" the seconds from the first linked Gate to wave 1 (none in the Tutorial: waves.waiting), "gap" the seconds between waves.
  * The maps are text grids (legend in levels.js). Ridges of rock (#) with gaps cut each map into chambers, so every tunnel to a Gate has
  * choke points for doors and traps. tools/test_chapters.js checks that every chapter validates and teaches what the table says;
@@ -101,7 +103,7 @@
       '####################################'
     ] },
     start: { gold: 1000, mana: 300, imps: 3, unlock: 'none', research: null, pretag: [], welcome: 'Claim the Portal in the east, then raise an army.' },
-    waves: { prep: 160, interval: 110, scale: 0.06, heroMult: 0.7, plan: W('K A', 'K K A', 'K A A T') },
+    waves: { prep: 90, interval: 75, scale: 0.06, heroMult: 0.7, dig: 0, plan: W('K A', 'K K A', 'K A A T') },
     rules: { heartHp: 2800, food: false },
     objectives: [
       { type: 'portal', text: 'Claim the Portal' },
@@ -149,7 +151,7 @@
       '######################################'
     ] },
     start: { gold: 1000, mana: 300, imps: 3, unlock: 'none', research: null, pretag: [], welcome: 'Hungry creatures are angry creatures. Build a Hatchery.' },
-    waves: { prep: 120, interval: 110, scale: 0.07, heroMult: 0.9, plan: W('K A', 'K A T', 'G K A A', 'K T A G A') },
+    waves: { prep: 75, interval: 70, scale: 0.07, heroMult: 0.9, dig: 0, plan: W('K A', 'K A T', 'G K A A', 'K T A G A') },
     rules: { heartHp: 2800 },
     objectives: [
       { type: 'portal', text: 'Claim the Portal' },
@@ -171,7 +173,7 @@
 
   L.library = {
     id: 'library', name: 'The Library', seed: 104, tagline: 'Research new rooms, traps and spells.',
-    briefing: 'Knowledge is power. Build a Library and your thinkers will sit at its desks and study. Choose what to research in the panel below the view: begin with the Gas Trap and the Heal spell, and let them serve you when the heroes arrive. A Library of 3 tiles also draws Warlocks and Dark Elves through the Portal.',
+    briefing: 'Knowledge is power. Build a Library and your thinkers will sit at its desks and study. Choose what to research in the panel below the view: begin with the Gas Trap and the Heal spell, and let them serve you when the heroes arrive. A Library of 3 tiles also draws Warlocks and Dark Elves through the Portal. Beware: from now on some heroes dig their own tunnels towards your creatures.',
     stars: { heart: 0.5 },
     terrain: { grid: [
       '########################################',
@@ -198,7 +200,7 @@
       '########################################'
     ] },
     start: { gold: 1000, mana: 400, imps: 3, unlock: 'none', research: null, pretag: [], welcome: 'Build a Library, then pick what to study in the Research panel.' },
-    waves: { prep: 100, interval: 100, scale: 0.08, heroMult: 1.05, plan: W('K A M T', 'G K A T M', 'K M M A T G', 'G G K M A T A') },
+    waves: { prep: 60, interval: 65, scale: 0.08, heroMult: 1.05, dig: 1, plan: W('K A M T', 'G K A T M', 'K M M A T G', 'G G K M A T A') },
     rules: { heartHp: 2700 },
     objectives: [
       { type: 'portal', text: 'Claim the Portal' },
@@ -216,7 +218,7 @@
       { text: 'Choose <b>Library</b> and drag over four floor tiles. Each tile holds a desk, and three tiles draw Warlocks and Dark Elves to your Portal.', tool: 'library', when: { type: 'room', room: 'library', n: 4 } },
       { text: 'Open the <b>Research</b> panel below the view and click <b>Gas Trap</b>. Creatures studying at desks add progress; the bar fills as they work.', when: { type: 'research', item: 'gas' } },
       { text: 'Now click <b>Heal</b> in the Research panel. Spells cost mana, which rises with your territory.', when: { type: 'research', item: 'heal' } },
-      { text: 'Well studied. Tunnel to the Hero Gate in the south when your army is ready.', when: { type: 'gate' } },
+      { text: 'Well studied. Some heroes <b>dig through the earth</b> towards your creatures from this chapter on, so keep your army near your Heart as well as in the tunnel. Tunnel to the Hero Gate in the south when your army is ready.', when: { type: 'gate' } },
     ],
   };
 
@@ -251,7 +253,7 @@
       '##########################################'
     ] },
     start: { gold: 1200, mana: 400, imps: 3, unlock: TRAPS, research: null, pretag: [], welcome: 'Doors and traps are ready. The gaps in the rock ridges are your choke points.' },
-    waves: { prep: 100, interval: 100, scale: 0.09, heroMult: 1.05, plan: W('K A T D', 'D K A T A', 'G D K A M T', 'D D G M A T K', 'D G K M A T A G') },
+    waves: { prep: 55, interval: 60, scale: 0.09, heroMult: 0.85, dig: 1, plan: W('K A T D', 'D K A T A', 'G D K A M T', 'D D G M A T K', 'D G K M A T A G') },
     rules: { heartHp: 2500 },
     objectives: [
       { type: 'portal', text: 'Claim the Portal' },
@@ -262,13 +264,13 @@
       { type: 'gate', text: 'Tunnel to the Hero Gate' },
       { type: 'survive', text: 'Defeat all 5 waves' },
       { type: 'traps', n: 6, optional: true, text: 'Set 6 traps' },
-      { type: 'level', n: 3, optional: true, text: 'Train a creature to level 3' },
+      { type: 'level', n: 2, optional: true, text: 'Train a creature to level 2' },
     ],
     guide: [
       { text: 'Claim the Portal and raise your army. The gaps in the rock ridges are narrow: perfect places for doors and traps.', tool: 'dig', when: { type: 'portal' } },
       { text: 'Choose <b>Door</b> and click a tunnel tile. Doors block heroes (they must smash them) but open for your own creatures. Imps repair them.', tool: 'door', when: { type: 'doors', n: 2 } },
       { text: 'Choose <b>Gas Trap</b> or <b>Lightning Trap</b> and click a tunnel tile. Heroes cannot see them. Imps re-arm them for a little gold.', tool: 'gas', when: { type: 'traps', n: 3 } },
-      { text: 'Creatures grow with <b>levels</b> (1 to 10), and training is the quick way. Open <b>Buildings</b>, choose <b>Training Room</b> and drag over three floor tiles: idle creatures train there, 20 seconds and 15 gold a session, and wages rise with every level. Bonus: train one to level 3.', tool: 'training', when: { type: 'room', room: 'training', n: 3 } },
+      { text: 'Creatures grow with <b>levels</b> (1 to 10), and training is the quick way. Open <b>Buildings</b>, choose <b>Training Room</b> and drag over three floor tiles: idle creatures train there, 20 seconds and 15 gold a session, and wages rise with every level. Bonus: train one to level 2.', tool: 'training', when: { type: 'room', room: 'training', n: 3 } },
       { text: 'Beware the <b>Dwarf</b>: he breaks doors quickly and disarms traps. Kill him before he reaches them. Tunnel to the Gate when you are ready.', when: { type: 'gate' } },
     ],
   };
@@ -304,7 +306,7 @@
       '############################################'
     ] },
     start: { gold: 1500, mana: 400, imps: 3, unlock: [...TRAPS, 'prison', 'torture'], research: null, pretag: [], welcome: 'The Prison and Torture Chamber are ready. Heroes who fall can be taken alive.' },
-    waves: { prep: 100, interval: 100, scale: 0.09, heroMult: 1.05, plan: W('K H A T', 'G K H A T M', 'D K H M A T G', 'G G H K M A T D', 'D G K H H M A T K', 'G D K H M A T D K') },
+    waves: { prep: 55, interval: 60, scale: 0.09, heroMult: 0.85, dig: 2, plan: W('K H A T', 'G K H A T M', 'D K H M A T G', 'G G H K M A T D', 'D G K H H M A T K', 'G D K H M A T D K') },
     rules: { heartHp: 2500 },
     objectives: [
       { type: 'portal', text: 'Claim the Portal' },
@@ -357,7 +359,7 @@
       '##############################################'
     ] },
     start: { gold: 1500, mana: 500, imps: 3, unlock: [...TRAPS, ...ROOMS, ...SPELLS], research: null, pretag: [], welcome: 'Every spell is ready. Build a Temple to refill your mana.' },
-    waves: { prep: 90, interval: 100, scale: 0.12, heroMult: 1.2, plan: W('K F A T', 'G K F M A D', 'D K F A T G H', 'G D F F K M A T', 'G G D F K M A T H', 'D G K F F M A T A') },
+    waves: { prep: 50, interval: 60, scale: 0.12, heroMult: 1.2, dig: 2, plan: W('K F A T', 'G K F M A D', 'D K F A T G H', 'G D F F K M A T', 'G G D F K M A T H', 'D G K F F M A T A') },
     rules: { heartHp: 2500 },
     objectives: [
       { type: 'portal', text: 'Claim the Portal' },
@@ -413,7 +415,7 @@
       '################################################'
     ] },
     start: { gold: 2000, mana: 500, imps: 4, unlock: 'all', research: null, pretag: [], welcome: 'Two Hero Gates, north and south. Everything is researched.' },
-    waves: { prep: 80, interval: 100, scale: 0.14, heroMult: 1.2,
+    waves: { prep: 45, interval: 55, scale: 0.14, heroMult: 1.0, dig: 3,
       plan: W('K A N T', 'G D F K A M', 'N K H M A T G', 'G N D F K A M T', 'N N G H K M A T D', 'D G N F K H M A T', 'N G D H F K M A T') },
     rules: { heartHp: 2500 },
     objectives: [
@@ -467,7 +469,7 @@
       '##################################################'
     ] },
     start: { gold: 2000, mana: 600, imps: 4, unlock: 'all', research: null, pretag: [], welcome: 'Eight waves are coming. Two Gates, and the Prince himself.' },
-    waves: { prep: 70, interval: 100, scale: 0.13, heroMult: 1.3,
+    waves: { prep: 40, interval: 55, scale: 0.11, heroMult: 1.0, dig: 3,
       plan: W('K A T', 'G D K H A', 'N K F M A T', 'S G K H M A T', 'P G D H F M A T', 'N G H F K M A T A', 'S G D H F M A T A', 'P S G D H F M A') },
     rules: { heartHp: 2500 },
     objectives: [
@@ -522,7 +524,7 @@
       '####################################################'
     ] },
     start: { gold: 2500, mana: 600, imps: 4, unlock: 'all', research: null, pretag: [], welcome: 'The King is coming. Three Gates, ten waves, and everything researched.' },
-    waves: { prep: 60, interval: 90, scale: 0.07, heroMult: 1.3,
+    waves: { prep: 35, interval: 50, scale: 0.07, heroMult: 1.08, dig: 4,
       plan: W('K A T', 'G K H A', 'S K H A M T', 'P G K H A M T', 'S G D H F M A', 'N G K H F M A T', 'P S G H F M A T', 'S G D H F M A T', 'S G D H F M A T', 'Y P S G N H F M A') },
     rules: { heartHp: 2500 },
     objectives: [
@@ -538,6 +540,10 @@
     ],
     victory: 'The King has fallen and the kingdom kneels. The dungeon is yours, Keeper.',
   };
+
+  /* Chapters 1 and 2 stay as drawn; chapters 3 to 10 are drawn at half size and enlarged to twice the width and height (four times the area) by
+   * enlargeGrid in levels.js. The shape, the ridges and their gaps are the drawn ones; the seams, pillars and caves are added by a seeded hash. */
+  for (const id of ['hatchery', 'library', 'traps', 'prison', 'temple', 'gates', 'siege', 'crusade']) L[id].terrain.grid = window.enlargeGrid(L[id].terrain.grid, id);
 
   window.CAMPAIGN = ['tutorial', 'portal', 'hatchery', 'library', 'traps', 'prison', 'temple', 'gates', 'siege', 'crusade'];
 })();

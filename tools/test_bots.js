@@ -66,7 +66,8 @@ const mean = (a) => a.length ? a.reduce((x, y) => x + y, 0) / a.length : 0;
     if (has(8) && has(10)) check('the finale is harder than chapter 8: it loses more creatures and wins less', fell(10) > fell(8) + 5 && rate(10) < rate(8));
     console.log('length: a fast bot should land inside the chapter\'s target, a first-time human takes longer');
     const window_ = { 1: [1.8, 5],        // chapter 1: the Knight now waits at the Gate, so the 3-minute countdown is gone (it was 4.5-8.5)
-       2: [9.5, 12.5], 3: [9.5, 12.5], 4: [9.5, 12.5], 5: [11.5, 16], 6: [11.5, 16], 7: [11.5, 16], 8: [15.5, 22], 9: [15.5, 22.5], 10: [21.5, 28] };
+       // later windows follow the new wave timers (prep 90 -> 35 s, gap 75 -> 50 s): the chapters are bigger but the first wave comes sooner, so most are a little shorter or equal
+      2: [7, 12.5], 3: [9.5, 12.5], 4: [9.5, 14], 5: [11.5, 16], 6: [11.5, 16], 7: [11.5, 16], 8: [15, 22], 9: [15.5, 22.5], 10: [17.5, 28] };
     for (const n of WANT) { const m = mean(sum[n].st.filter(r => r.outcome === 'victory').map(r => r.time)) / 60, [lo, hi] = window_[n]; if (m) check(`chapter ${n}: ${m.toFixed(1)} min is inside ${lo}-${hi}`, m >= lo && m <= hi); }
     if (WANT.length === 10) { const tot = WANT.reduce((a, n) => a + mean(sum[n].st.filter(r => r.outcome === 'victory').map(r => r.time)) / 60, 0); check(`the whole campaign: ${tot.toFixed(0)} min for a fast bot (125-170), so 2.5-3 h for a person`, tot >= 125 && tot <= 170); }
     console.log('stars: the third star is reachable');

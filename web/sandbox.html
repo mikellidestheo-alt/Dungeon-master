@@ -32,8 +32,8 @@
   input[type=range]::-moz-range-thumb { width: 12px; height: 12px; border: 1px solid #2a1a05; border-radius: 2px; transform: rotate(45deg); background: radial-gradient(circle at 35% 30%, #ffeab0, #c98d22 60%, #6d4a0e); }
   input[type=range]:disabled { opacity: .35; cursor: not-allowed; }
   input:focus-visible, button:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
-  .seg { display: grid; gap: 6px; } .seg.two { grid-template-columns: 1fr 1fr; } .seg.four { grid-template-columns: repeat(4, 1fr); }
-  @media (max-width: 560px) { .seg.four { grid-template-columns: 1fr 1fr; } }
+  .seg { display: grid; gap: 6px; } .seg.two { grid-template-columns: 1fr 1fr; } .seg.four { grid-template-columns: repeat(4, 1fr); } .seg.six { grid-template-columns: repeat(6, 1fr); }
+  @media (max-width: 560px) { .seg.four { grid-template-columns: 1fr 1fr; } .seg.six { grid-template-columns: repeat(3, 1fr); } }
   .opt { padding: 8px 10px; text-align: center; cursor: pointer; font: 600 13px var(--head); letter-spacing: .04em; color: #e9d6a6; background: linear-gradient(180deg, #3b2e20, #221911); border: 1px solid var(--bronze); border-radius: 3px; box-shadow: inset 0 1px 0 #ffffff1c, 0 1px 3px #000b; }
   .opt:hover { border-color: var(--gold); } .opt.on { color: #fff6d8; border-color: #ffd36b; background: linear-gradient(180deg, #8a5d17, #4d330d); box-shadow: inset 0 0 12px #ffd36b66, 0 0 10px #f0a53a88; }
   .opt small { display: block; margin-top: 2px; font: italic 400 12.5px var(--prose); letter-spacing: 0; color: #bda982; } .opt.on small { color: #f0dba8; }
@@ -71,7 +71,7 @@
         <div class="seg two" id="mode"><button class="opt" data-v="fixed">A fixed siege<small>beat every wave to win</small></button><button class="opt" data-v="endless">Endless<small>waves never stop; a boss every 5th</small></button></div></div>
       <div class="row"><label class="t" for="waves">Waves <output id="wavesOut"></output></label><input type="range" id="waves"><div class="hint" id="wavesHint"></div></div>
       <div class="row"><h2>Difficulty</h2><div class="seg four" id="diff"></div></div>
-      <div class="row"><h2>Hero Gates</h2><div class="seg two" id="gates"><button class="opt" data-v="1">One Gate<small>heroes come from the south</small></button><button class="opt" data-v="2">Two Gates<small>each wave is split between them</small></button></div><div class="hint">With two Gates, tunnel to one to fight on a single front or to both to split every wave. A Gate you never link sends nobody.</div></div>
+      <div class="row"><h2>Hero Gates <output id="gatesOut"></output></h2><div class="seg six" id="gates"></div><div class="hint" id="gatesHint"></div></div>
       <div class="row"><label class="t" for="gold">Starting gold <output id="goldOut"></output></label><input type="range" id="gold" step="100"><div class="hint">Your Heart holds 2000 gold by itself and every Treasury tile 3000 more.</div></div>
       <div class="row"><label class="t" for="mana">Starting mana <output id="manaOut"></output></label><input type="range" id="mana" step="50"><div class="hint">Spells cost 80 to 150. Mana also rises with the floor you claim and with prayer in a Temple.</div></div>
       <div class="row"><label class="check"><input type="checkbox" id="unlocks"> Everything researched from the start</label><div class="hint">Prison, Temple, Torture Chamber, traps and every spell, without a Library.</div></div>
@@ -89,11 +89,11 @@
   <section class="help" aria-labelledby="helpH">
     <h2 id="helpH">How the sandbox works</h2>
     <ul>
-      <li><b>The map.</b> You play on the classic dungeon: your Dungeon Heart in the west, the Portal in the east, a Hero Gate in the south (and one in the north with Two Gates). The seed decides the rock and the gold, so the same seed is the same dungeon every time.</li>
+      <li><b>The map.</b> A large dungeon (88 × 60 tiles): your Dungeon Heart in the west, the Portal in the east and up to six Hero Gates round the edge (south, north, south-east, north-east, south-west, north-west), so heroes can come from different directions. The seed decides the rock and the gold, so the same seed is the same dungeon every time.</li>
       <li><b>You start the invasion.</b> Nothing happens until a tunnel links a Gate to your Heart; then the countdown to the first wave begins. Dig most of the tunnel, set doors and traps, and open the last tile when you are ready.</li>
       <li><b>A fixed siege</b> is won by beating every wave. It gives no stars and does not unlock or change any chapter.</li>
       <li><b>Endless</b> has no victory. Waves grow stronger and come faster, and a boss leads every fifth one (the Prince, then the King). Press <b>Retire</b> in the top bar to bank your score, or hold on until the Heart falls. The score is the waves you survived.</li>
-      <li><b>Difficulty</b> sets hero strength, the countdown before the first wave, the gap between waves and the Heart's health. Without <b>Everything researched</b> you must study Prison, Temple, traps and spells in a Library.</li>
+      <li><b>Difficulty</b> sets hero strength, the countdown before the first wave, the gap between waves, the Heart's health and how many heroes <b>dig their own tunnels</b> to reach your creatures (none for Apprentice, every hero for Dungeon Master). Without <b>Everything researched</b> you must study Prison, Temple, traps and spells in a Library.</li>
       <li><b>Playing</b> works as in the chapters: tag earth with Dig, build on claimed floor, keep your creatures housed, fed and paid, and keep imps alive to re-arm traps. The README has the full guide.</li>
     </ul>
   </section>
@@ -104,6 +104,7 @@
 <script>
 (function () {
   const qs = new URLSearchParams(location.search), $ = (id) => document.getElementById(id), L = window.SANDBOX_LIMITS, D = window.DIFFICULTY, STORE = 'dm.sandbox';
+  const DIGTEXT = ['Heroes only walk the tunnels you dig.', 'Some heroes tunnel through the earth towards your creatures, and Dwarves always do.', 'Many heroes tunnel through the earth towards your creatures.', 'Most heroes tunnel through the earth, round your doors and traps.', 'Every hero tunnels through the earth.'];
   const def = { gates: 1, mode: 'fixed', waves: L.waves[2], diff: 'normal', gold: L.gold[2], mana: L.mana[2], unlocks: false, seed: 7 };
   let st = Object.assign({}, def);
   try { Object.assign(st, JSON.parse(localStorage.getItem(STORE)) || {}); } catch (e) { /* storage blocked: defaults */ }
@@ -112,7 +113,7 @@
   for (const k of ['waves', 'gold', 'mana']) { const el = $(k); el.min = L[k][0]; el.max = L[k][1]; el.oninput = () => { st[k] = +el.value; render(); if (window.Sound) Sound.play('tag', undefined, undefined, { pitch: 0.8 + 0.5 * (el.value - L[k][0]) / (L[k][1] - L[k][0]) }); }; }      /* a tick that rises with the slider */
   const dEl = $('diff'); for (const id in D) { const b = document.createElement('button'); b.className = 'opt'; b.dataset.v = id; b.innerHTML = D[id].name + '<small>×' + D[id].heroMult + ' heroes</small>'; b.onclick = () => { st.diff = id; render(); }; dEl.appendChild(b); }
   for (const b of $('mode').children) b.onclick = () => { st.mode = b.dataset.v; render(); };
-  for (const b of $('gates').children) b.onclick = () => { st.gates = +b.dataset.v; render(); };
+  const M = window.SANDBOX_MAP, gEl = $('gates'); for (let n = L.gates[0]; n <= L.gates[1]; n++) { const b = document.createElement('button'); b.className = 'opt'; b.dataset.v = n; b.innerHTML = n + (n === 1 ? ' Gate' : ' Gates') + '<small>' + (n === 1 ? M.names[0] : '+ ' + M.names[n - 1]) + '</small>'; b.onclick = () => { st.gates = n; render(); }; gEl.appendChild(b); }
   $('unlocks').onchange = () => { st.unlocks = $('unlocks').checked; render(); };
   $('seed').oninput = () => { st.seed = clamp2($('seed').value); render(true); };
   const clamp2 = (v) => Math.max(0, Math.min(999999, Number.isFinite(parseInt(v, 10)) ? parseInt(v, 10) : 7));
@@ -120,19 +121,19 @@
 
   function params() {
     const p = new URLSearchParams(); p.set('level', 'sandbox'); p.set('diff', st.diff); p.set('gold', st.gold); p.set('mana', st.mana); p.set('unlocks', st.unlocks ? 'all' : 'none'); p.set('seed', st.seed);
-    if (st.gates === 2) p.set('gates', '2');
+    if (st.gates > 1) p.set('gates', st.gates);
     if (st.mode === 'endless') p.set('endless', '1'); else p.set('waves', st.waves);
     p.set('brief', '1'); for (const k of ['view', 'sound']) if (qs.get(k) !== null) p.set(k, qs.get(k)); return p;
   }
   function render(keepSeedField) {
-    st.waves = clamp(st.waves, 'waves'); st.gold = clamp(st.gold, 'gold'); st.mana = clamp(st.mana, 'mana'); if (!D[st.diff]) st.diff = 'normal'; if (st.mode !== 'endless') st.mode = 'fixed'; st.gates = st.gates === 2 ? 2 : 1;
-    for (const b of $('mode').children) b.classList.toggle('on', b.dataset.v === st.mode); for (const b of dEl.children) b.classList.toggle('on', b.dataset.v === st.diff); for (const b of $('gates').children) b.classList.toggle('on', +b.dataset.v === st.gates);
+    st.waves = clamp(st.waves, 'waves'); st.gold = clamp(st.gold, 'gold'); st.mana = clamp(st.mana, 'mana'); if (!D[st.diff]) st.diff = 'normal'; if (st.mode !== 'endless') st.mode = 'fixed'; st.gates = clamp(st.gates, 'gates');
+    for (const b of $('mode').children) b.classList.toggle('on', b.dataset.v === st.mode); for (const b of dEl.children) b.classList.toggle('on', b.dataset.v === st.diff); for (const b of gEl.children) b.classList.toggle('on', +b.dataset.v === st.gates); $('gatesOut').textContent = st.gates; $('gatesHint').textContent = st.gates === 1 ? 'Heroes come from the ' + M.names[0] + '. More Gates make every wave strike from several directions at once.' : 'Gates: ' + M.names.slice(0, st.gates).join(', ') + '. Tunnel to one to fight on a single front, or to several to split every wave. A Gate you never link sends nobody.';
     $('waves').value = st.waves; $('gold').value = st.gold; $('mana').value = st.mana; $('unlocks').checked = !!st.unlocks; if (!keepSeedField) $('seed').value = st.seed;
     const endless = st.mode === 'endless'; $('waves').disabled = endless; $('wavesOut').textContent = endless ? '∞' : st.waves; $('wavesHint').textContent = endless ? 'Endless mode has no last wave.' : 'Boss waves (Prince, King) come every 5th wave.';
     $('goldOut').textContent = st.gold; $('manaOut').textContent = st.mana;
     const d = D[st.diff];
     $('summary').innerHTML = '<b>' + d.name + '</b>: ' + d.blurb + '<br>Heroes are <b>×' + d.heroMult + '</b> strength; the first wave lands <b>' + fmt(d.prep) + '</b> after you link the Hero Gate, then one every <b>' + fmt(d.interval) + '</b>' + (endless ? ', ever faster' : '') +
-      '. The Dungeon Heart holds <b>' + d.heartHp + '</b>.' + (st.gates === 2 ? ' Heroes will pour from <b>two Hero Gates</b>.' : '') + '<br>' + (endless ? 'How long can you last?' : 'Survive <b>' + st.waves + '</b> waves.') + ' You start with <b>' + st.gold + '</b> gold' + (st.mana ? ' and <b>' + st.mana + '</b> mana' : '') + (st.unlocks ? ', everything researched' : '') + '.';
+      '. The Dungeon Heart holds <b>' + d.heartHp + '</b>.' + (st.gates > 1 ? ' Heroes will pour from <b>' + st.gates + ' Hero Gates</b>.' : '') + ' ' + DIGTEXT[d.dig] + ' The map is <b>' + M.size[0] + ' × ' + M.size[1] + '</b> tiles.' + '<br>' + (endless ? 'How long can you last?' : 'Survive <b>' + st.waves + '</b> waves.') + ' You start with <b>' + st.gold + '</b> gold' + (st.mana ? ' and <b>' + st.mana + '</b> mana' : '') + (st.unlocks ? ', everything researched' : '') + '.';
     $('best').innerHTML = Object.keys(D).map(id => '<tr class="' + (id === st.diff ? 'cur' : '') + '"><td>' + D[id].name + '</td><td>' + (Progress.endlessBest(id) || '—') + '</td></tr>').join('');
     $('begin').textContent = endless ? 'Begin the Endless Siege' : 'Begin sandbox';
     try { localStorage.setItem(STORE, JSON.stringify(st)); } catch (e) { /* not remembered */ }

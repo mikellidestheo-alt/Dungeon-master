@@ -132,7 +132,7 @@ const sleep = (ms) => new Promise(r => setTimeout(r, ms));
     });
     check('"Train a creature to level 3" is done once a creature has level 3, not before; level 5 not yet', !ob.a && ob.b && !ob.d && ob.label === 'Train a creature to level 5', JSON.stringify(ob));
     check('validation: level 5 is fine; 1, 11 and a missing n are rejected', ob.v.length === 0 && ob.v1.some(e => /level objective/.test(e)) && ob.v11.some(e => /level objective/.test(e)) && ob.v0.length > 0, JSON.stringify([ob.v1, ob.v11]));
-    check('chapter 5 teaches it: a bonus "Train a creature to level 3" and a guide step that points at the Training Room button; the chapter still validates', ob.bonus === 1 && ob.valid.length === 0 && ob.step && ob.step.when.room === 'training', JSON.stringify([ob.bonus, ob.valid]));
+    check('chapter 5 teaches it: a bonus "Train a creature to level 2" and a guide step that points at the Training Room button; the chapter still validates', ob.bonus === 1 && ob.valid.length === 0 && ob.step && ob.step.when.room === 'training', JSON.stringify([ob.bonus, ob.valid]));
     await page.close();
 
     console.log('6. the interface');

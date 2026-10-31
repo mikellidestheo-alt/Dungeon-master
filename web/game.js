@@ -39,6 +39,7 @@ const VAR = {                                         // Variable.MiscVariable.M
   HEART_HEALTH: 2500,
   WAVES: 5, FIRST_WAVE_DELAY: 75, WAVE_INTERVAL: 110, // hero gate invasions (tuning)
   HEAR_DISTANCE: 14,                                  // Attributes.distanceCanHear: keepers sense heroes on own land
+  HERO_DIG_COST: 6, HERO_DIG_SHORTCUT: 0.6, HERO_DIG_SENSE: 20, HERO_DIG_EFF: [0, 45, 55, 70, 85], HERO_DIG_PERIOD: [Infinity, 4, 3, 2, 1],      // a wall tile costs a digger 6 steps of walking (about 3-6 s of digging against 0.6 s a step); it tunnels when that is under 0.6x the way round; creatures within 20 tiles draw it; efficiency % by level (imps are 80); every 4th / 3rd / 2nd / every hero digs by level, and Dwarves always do
   XP_PER_KILL: 1, MAX_LEVEL: 10,                      // CreatureExperienceSystem, reduced: a kill is a trickle, training is the way up (see XP_FOR_LEVEL)
   XP_FOR_LEVEL: [50, 65, 80, 100, 125, 155, 190, 230, 280],     // XP to go from level n to n+1 (index n-1); 1275 in all: at about 30 XP a minute of steady training a creature gains a level every 1.7 minutes at first, 9 minutes at the end
   LEVEL_STAT_MULT: 1.11, PAY_PER_LEVEL: 0.08,         // hp and damage x1.11 per level (x2.5 at level 10); wages +8% of the base per level above 1
@@ -73,6 +74,7 @@ function rng(seed) { return function () { seed |= 0; seed = seed + 0x6D2B79F5 | 
 const WV = LV.waves || {};
 Object.assign(VAR, { HEART_HEALTH: LV.rules.heartHp, WAVES: WV.endless ? Infinity : (WV.plan || []).length, FIRST_WAVE_DELAY: WV.prep === undefined ? 75 : WV.prep, WAVE_INTERVAL: WV.interval || 110 });   // the level sets the invasion's pace
 const qs = new URLSearchParams(location.search);
+const DIG = WV.dig || 0;                              // how many heroes tunnel (waves.dig, 0-4), see "Heroes that dig" below
 const rand = rng(parseInt(qs.get('seed') || LV.seed || '7', 10));
 
 /* ===================================================================================== world */
@@ -112,9 +114,9 @@ function buildMap() {
       G.map[idx(x, y)] = { t: border ? T.ROCK : T.EARTH, owner: 0, hp: border ? 1 : 12000, gold: 0, tag: 0, stored: 0, room: 0 };
     }
     const blob = (cx, cy, r, id) => { for (let y = cy - r; y <= cy + r; y++) for (let x = cx - r; x <= cx + r; x++) {
-        if (inb(x, y) && x > 0 && y > 0 && x < W - 1 && y < H - 1 && Math.hypot(x - cx, y - cy) <= r + rand() * 0.9 && G.map[idx(x, y)].t === T.EARTH) {
+        if (inb(x, y) && x > 0 && y > 0 && x < W - 1 && y < H - 1 && Math.hypot(x - cx, y - cy) <= r + rand() * 0.9 && G.map[idx(x, y)].t === T.EARTH && !(id === T.ROCK && lanes.some(l => x >= l[0] && x <= l[2] && y >= l[1] && y <= l[3]))) {
           const t = G.map[idx(x, y)]; t.t = id; t.hp = TERRAIN[id].maxHealth; t.gold = TERRAIN[id].goldValue || 0; } } };
-    const gen = tl.generate, scatter = (o, id) => { for (let i = 0; i < o.count; i++) blob(o.x + (rand() * o.xSpan | 0), o.y + (rand() * o.ySpan | 0), o.rMin + (o.rSpan ? (rand() * o.rSpan | 0) : 0), id); };
+    const gen = tl.generate, lanes = gen.lanes || [], scatter = (o, id) => { for (let i = 0; i < o.count; i++) blob(o.x + (rand() * o.xSpan | 0), o.y + (rand() * o.ySpan | 0), o.rMin + (o.rSpan ? (rand() * o.rSpan | 0) : 0), id); };
     scatter(gen.rock, T.ROCK); scatter(gen.gold, T.GOLD);
     for (const gm of gen.gems || []) blob(gm.x, gm.y, gm.r, T.GEM);
     for (const c of tl.caverns || []) carve(...c.rect, OWNER[c.owner]);
@@ -139,6 +141,7 @@ function validateLevel(lv) {
   need(!(plan.length || endless) || gates.length, 'waves need at least one Hero Gate for the heroes to arrive from');
   plan.forEach((wv, i) => wv.forEach(nm => need(HEROES.some(k => k.name === nm), 'wave ' + (i + 1) + ': no hero called ' + nm)));
   need(!lv.waves || (lv.waves.prep >= 0 && lv.waves.interval > 0), 'waves.prep and waves.interval');
+  if (lv.waves && lv.waves.dig !== undefined) need(Number.isInteger(lv.waves.dig) && lv.waves.dig >= 0 && lv.waves.dig <= 4, 'waves.dig must be a whole number from 0 (nobody digs) to 4 (every hero digs)');
   if (lv.waves && lv.waves.waiting !== undefined) { need(typeof lv.waves.waiting === 'boolean', 'waves.waiting must be true or false'); need(!lv.waves.waiting || (plan.length && !endless), 'waves.waiting needs a waves.plan (and cannot be endless): wave 1 is the party that waits'); } need(lv.start && typeof lv.start.gold === 'number', 'start.gold'); need(lv.rules && lv.rules.heartHp > 0, 'rules.heartHp'); need(!lv.rules || lv.rules.food === undefined || typeof lv.rules.food === 'boolean', 'rules.food must be true or false'); need(!lv.rules || lv.rules.arrivals === undefined || ['any', 'rooms'].includes(lv.rules.arrivals), 'rules.arrivals must be "rooms" (the default) or "any"');
   if (lv.stars) { need(lv.stars.heart === undefined || (lv.stars.heart > 0 && lv.stars.heart <= 1), 'stars.heart must be between 0 and 1'); need(lv.stars.par === undefined || lv.stars.par > 0, 'stars.par must be positive seconds'); }
   const cond = (c, where) => {                                   // an objective or a guide condition
@@ -158,22 +161,25 @@ function validateLevel(lv) {
 /* ===================================================================================== path-finding
  * A* over the tile grid like game/navigation/pathfinding/MapIndexedGraph: 4-neighbours always,
  * diagonals only when both orthogonal neighbours are open (no corner cutting). */
-function findPath(sx, sy, gx, gy) {
+const PG = new Float32Array(W * H), PFROM = new Int32Array(W * H), PSEEN = new Uint32Array(W * H), PDONE = new Uint32Array(W * H); let pstamp = 0;      // search buffers, reused: a stamp marks what this call has touched, so nothing is cleared or allocated per search
+const diggable = (x, y) => { const t = tile(x, y); return !!t && !!TERRAIN[t.t].solid && !!TERRAIN[t.t].tag && !TERRAIN[t.t].imp; };      // earth and gold: what imps (and digging heroes) can remove
+function findPath(sx, sy, gx, gy, digCost) {      // digCost: also route through diggable walls at that cost per tile (orthogonal steps only); the path then has .cost and may contain solid tiles
   if (sx === gx && sy === gy) return [];
   if (solid(gx, gy)) return null;
-  const open = [], g = new Float32Array(W * H).fill(Infinity), from = new Int32Array(W * H).fill(-1), done = new Uint8Array(W * H);
+  const stamp = ++pstamp, open = [], g = PG, from = PFROM;
   const h = (x, y) => { const dx = Math.abs(x - gx), dy = Math.abs(y - gy); return Math.max(dx, dy) + 0.4142 * Math.min(dx, dy); };
   const push = (n) => { open.push(n); let i = open.length - 1; while (i > 0) { const p = (i - 1) >> 1; if (open[p].f <= open[i].f) break; [open[p], open[i]] = [open[i], open[p]]; i = p; } };
   const pop = () => { const top = open[0], last = open.pop(); if (open.length) { open[0] = last; let i = 0; for (;;) { let l = 2 * i + 1, r = l + 1, m = i;
       if (l < open.length && open[l].f < open[m].f) m = l; if (r < open.length && open[r].f < open[m].f) m = r; if (m === i) break; [open[m], open[i]] = [open[i], open[m]]; i = m; } } return top; };
-  g[idx(sx, sy)] = 0; push({ x: sx, y: sy, f: h(sx, sy) });
+  const si = idx(sx, sy); g[si] = 0; PSEEN[si] = stamp; push({ x: sx, y: sy, f: h(sx, sy) });
   while (open.length) {
-    const c = pop(), ci = idx(c.x, c.y); if (done[ci]) continue; done[ci] = 1;
-    if (c.x === gx && c.y === gy) { const path = []; for (let i = ci; i !== idx(sx, sy); i = from[i]) path.push({ x: i % W, y: (i / W) | 0 }); return path.reverse(); }
+    const c = pop(), ci = idx(c.x, c.y); if (PDONE[ci] === stamp) continue; PDONE[ci] = stamp;
+    if (c.x === gx && c.y === gy) { const path = []; for (let i = ci; i !== si; i = from[i]) path.push({ x: i % W, y: (i / W) | 0 }); path.reverse(); if (digCost) path.cost = g[ci]; return path; }
     for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) {
-      if (!dx && !dy) continue; const nx = c.x + dx, ny = c.y + dy;
-      if (solid(nx, ny)) continue; if (dx && dy && (solid(c.x + dx, c.y) || solid(c.x, c.y + dy))) continue;
-      const ni = idx(nx, ny), ng = g[ci] + (dx && dy ? 1.4142 : 1); if (ng < g[ni]) { g[ni] = ng; from[ni] = ci; push({ x: nx, y: ny, f: ng + h(nx, ny) }); }
+      if (!dx && !dy) continue; const nx = c.x + dx, ny = c.y + dy; let step = dx && dy ? 1.4142 : 1;
+      if (solid(nx, ny)) { if (!digCost || (dx && dy) || !diggable(nx, ny)) continue; step = digCost; }
+      else if (dx && dy && (solid(c.x + dx, c.y) || solid(c.x, c.y + dy))) continue;
+      const ni = idx(nx, ny), ng = g[ci] + step; if (PSEEN[ni] !== stamp || ng < g[ni]) { PSEEN[ni] = stamp; g[ni] = ng; from[ni] = ci; push({ x: nx, y: ny, f: ng + h(nx, ny) }); }
     }
   }
   return null;
@@ -184,7 +190,7 @@ const pathLen = (p) => p ? p.length : Infinity;
  * MapController.damageTile / healTile and TileWork. Rates are per game second here. */
 const perApplication = (rate, eff) => Math.round(Math.abs(rate) * eff / 100);
 function goldReleased(total, maxHealth, health) { return maxHealth <= 0 ? total : Math.floor(total * (maxHealth - health) / maxHealth); }
-function damageTile(x, y, dt, eff) {            // returns gold released
+function damageTile(x, y, dt, eff, quiet) {      // returns gold released; quiet: a hero digging, which is no business of your objectives
   const t = tile(x, y), tr = TERRAIN[t.t];
   const rate = t.gold > 0 ? VAR.MINE_GOLD_HEALTH : VAR.DIG_ROCK_HEALTH;
   const dmg = perApplication(rate, eff) * dt;
@@ -192,11 +198,11 @@ function damageTile(x, y, dt, eff) {            // returns gold released
   if (t.gold > 0 && !tr.imp) {                   // TileWork.mine: gold comes out in proportion to health lost
     const nh = Math.max(0, t.hp - dmg);
     const ng = Math.min(t.gold, tr.goldValue - goldReleased(tr.goldValue, tr.maxHealth, nh));
-    released = t.gold - ng; t.gold = ng; t.hp = nh; destroyed = nh === 0; G.stats.mined += released;
+    released = t.gold - ng; t.gold = ng; t.hp = nh; destroyed = nh === 0; if (!quiet) G.stats.mined += released;
   } else if (tr.imp) {                           // gems never run out: collapse, refill, pay a little
     t.hp -= dmg; if (t.hp <= 0) { t.hp = tr.maxHealth; released = VAR.GOLD_MINED_FROM_GEMS; sfx('coin', x + .5, y + .5); }
   } else { t.hp -= dmg; destroyed = t.hp <= 0; }
-  if (destroyed) { setTerrain(t, tr.destroyedTo); t.gold = 0; G.dirty = true; G.stats.dug++; sfx('crumble', x + .5, y + .5); }
+  if (destroyed) { setTerrain(t, tr.destroyedTo); t.gold = 0; G.dirty = true; if (!quiet) G.stats.dug++; sfx('crumble', x + .5, y + .5); }
   return released;
 }
 function claimable(x, y) {                       // ClaimTileTask: unowned floor next to our territory
@@ -658,7 +664,7 @@ const HEROES = [
   { name: 'Monk',   letter: 'H', color: '#c8a060', hp: 70,  dmg: 5,  range: 4.5, cdMax: 1.4, ranged: 1, speed: 1.7, sprite: 'monk', heals: true },   // heals wounded allies
   { name: 'Prince', letter: 'P', color: '#e8c050', hp: 300, dmg: 15, range: 1.2, cdMax: 1.0, ranged: 0, speed: 1.6, sprite: 'prince', fearless: true, boss: true },   // leads the last wave
   // added with the last unused character art, each countering something different
-  { name: 'Dwarf',        letter: 'D', color: '#c07838', hp: 120, dmg: 10, range: 1.2, cdMax: 1.0, ranged: 0, speed: 1.5, sprite: 'dwarf', disarms: true, doorBreaker: 2.5 },                  // sets off nothing: it disarms traps; chews through doors
+  { name: 'Dwarf',        letter: 'D', color: '#c07838', hp: 120, dmg: 10, range: 1.2, cdMax: 1.0, ranged: 0, speed: 1.5, sprite: 'dwarf', disarms: true, digs: true, doorBreaker: 2.5 },                  // sets off nothing: it disarms traps; chews through doors
   { name: 'Giant',        letter: 'N', color: '#7a5a40', hp: 250, dmg: 20, range: 1.3, cdMax: 2.0, ranged: 0, speed: 1.1, sprite: 'giant', stunImmune: true, doorBreaker: 3, fearless: true },       // slow, huge, shrugs off lightning stuns
   { name: 'Stone Knight', letter: 'S', color: '#8a9080', hp: 190, dmg: 12, range: 1.2, cdMax: 1.3, ranged: 0, speed: 1.2, sprite: 'stone_knight', armor: 0.25, gasImmune: true },            // a statue: no breathing, thick skin
   { name: 'Fairy',        letter: 'F', color: '#70e0c0', hp: 45,  dmg: 4,  range: 4,   cdMax: 1.1, ranged: 1, speed: 2.2, sprite: 'fairy', flying: true, heals: true, healAmt: 16, healEvery: 2 },  // flies over doors and floor traps
@@ -673,7 +679,28 @@ class Hero extends Mover {
   constructor(x, y, kind, scale, party) { super(x, y, kind.speed); Object.assign(this, kind);
     this.hp = this.maxHp = Math.round(kind.hp * scale); this.dmg = kind.dmg * scale; this.team = 'h'; this.cd = 0; this.sight = 7;
     this.state = 'idle'; this.rep = 0; this.think = 0; this.party = party; this.dead = false; this.flash = 0; this.held = false; this.id = ++G.nextId; }
-  get leader() { return this.party.find(h => !h.dead && !h.unconscious && h.state !== 'flee') || null; }
+  get leader() { const ok = (h) => !h.dead && !h.unconscious && h.state !== 'flee'; return this.party.find(h => ok(h) && h.digger) || this.party.find(ok) || null; }      // a digger leads, so the party follows its tunnel
+  /* Heroes that dig (waves.dig): a digger aims at the nearest creature within HERO_DIG_SENSE tiles, else at the Heart, and routes through earth and gold
+   * (not rock or gems) when that is the only way or under HERO_DIG_SHORTCUT x the walk: it walks to the wall and digs it like an imp, the tile becomes
+   * floor, and so a party can bypass the doors and traps of the tunnel you built. Followers use the tunnel. */
+  digGoal() {
+    let best = null, bd = VAR.HERO_DIG_SENSE; for (const c of G.creatures) { if (c.dead || c.held || c.unconscious) continue; const d = dist(this, c); if (d < bd) { bd = d; best = c; } }
+    return best ? { x: best.tx, y: best.ty } : { x: G.heart.x, y: G.heart.y };
+  }
+  route() {
+    const goal = this.digger ? this.digGoal() : G.heart, p0 = findPath(this.tx, this.ty, goal.x, goal.y);
+    if (this.digger) {
+      const p1 = findPath(this.tx, this.ty, goal.x, goal.y, VAR.HERO_DIG_COST);
+      if (p1 && p1.length && (!p0 || p1.cost < p0.length * VAR.HERO_DIG_SHORTCUT)) { const i = p1.findIndex(q => solid(q.x, q.y)); if (i >= 0) { this.go(p1.slice(0, i)); this.digAt = { x: p1[i].x, y: p1[i].y }; return; } }
+    }
+    this.digAt = null; this.go(p0);
+  }
+  digStep(dt) {                                                       // true while it is digging the wall it stands at
+    const d = this.digAt; if (!diggable(d.x, d.y)) { this.digAt = null; this.think = 0; return false; }
+    this.face = Math.atan2(d.y + .5 - this.y, d.x + .5 - this.x); this.digSnd = (this.digSnd || 0) - dt; if (this.digSnd <= 0) { this.digSnd = 0.6; sfx(tile(d.x, d.y).gold > 0 ? 'mine' : 'dig', d.x + .5, d.y + .5); }
+    if (!G.warnDig) { G.warnDig = 1; say('Heroes are tunnelling through the earth towards you!'); }
+    damageTile(d.x, d.y, dt, VAR.HERO_DIG_EFF[DIG], true); return true;
+  }
   update(dt) {
     if (this.dead) return; this.flash = Math.max(0, this.flash - dt);
     if (this.unconscious) { if (!this.carriedBy) { this.uTime -= dt; if (this.uTime <= 0) { say('A hero ' + this.name + ' bled out.'); kill(this, null); } } return; }
@@ -689,7 +716,7 @@ class Hero extends Mover {
       this.path = null; this.face = Math.atan2(heartTarget.y - this.y, heartTarget.x - this.x); if (this.cd <= 0) strike(this, heartTarget); return;
     }
     const lead = this.leader; this.think -= dt;
-    if (lead === this) { if (this.think <= 0 || !this.path) { this.think = 1; this.go(findPath(this.tx, this.ty, G.heart.x, G.heart.y)); } }
+    if (lead === this || this.digger) { if (this.digAt && !this.path && this.digStep(dt)) return; if (this.think <= 0 || (!this.path && !this.digAt)) { this.think = 1; this.route(); } }
     else if (lead && dist(this, lead) > 2.2 && (this.think <= 0 || !this.path)) { this.think = 0.6; this.go(findPath(this.tx, this.ty, lead.tx, lead.ty)); }   // FollowTarget
     this.stepMove(dt);
     if (this.blocker && !this.blocker.dead) { this.face = Math.atan2(this.blocker.y - this.y, this.blocker.x - this.x); if (this.cd <= 0) strike(this, this.blocker); }   // smash the door
@@ -702,7 +729,7 @@ function makeParty(n, gates, waiting) {
   kinds.forEach((kind, j) => {
     const gi = (j + n) % gates.length, gt = gates[gi], party = parties[gi], slot = party.length;
     // a waiting party fills the pad from the front (the side facing the camera) so the Gate's big sprite does not hide it
-    const ox = slot % 3, oy = (slot / 3) | 0, h = new Hero(waiting ? gt.x + 1 - ox : gt.x - 1 + ox, waiting ? gt.y + 1 - oy : gt.y - 1 + oy, kind, scale, party); h.homeGate = gt; h.waiting = !!waiting; party.push(h); G.heroes.push(h);
+    const ox = slot % 3, oy = (slot / 3) | 0, h = new Hero(waiting ? gt.x + 1 - ox : gt.x - 1 + ox, waiting ? gt.y + 1 - oy : gt.y - 1 + oy, kind, scale, party); h.homeGate = gt; h.waiting = !!waiting; h.digger = DIG > 0 && !kind.boss && !kind.flying && (!!kind.digs || slot % VAR.HERO_DIG_PERIOD[DIG] === 0); party.push(h); G.heroes.push(h);
   });
   return kinds;
 }

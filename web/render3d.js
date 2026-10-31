@@ -28,9 +28,10 @@ function start() {
   cv2d.style.display = 'none'; stage.appendChild(canvas);
 
   const scene = new THREE.Scene();
-  scene.background = new THREE.Color(0x0b0907); scene.fog = ISO ? new THREE.Fog(0x0b0907, 48, 100) : new THREE.Fog(0x0b0907, 20, 46);
+  scene.background = new THREE.Color(0x0b0907); const BIG = W * H > 2400;                                   // the enlarged chapters and the sandbox: zoom out further and fade the distance later
+  scene.fog = ISO ? new THREE.Fog(0x0b0907, BIG ? 80 : 48, BIG ? 170 : 100) : new THREE.Fog(0x0b0907, 20, 46);
   const camera = new THREE.PerspectiveCamera(ISO ? 26 : 45, 800 / 560, 0.1, 200);
-  const cam = ISO ? { x: G.heart.x + 5, z: G.heart.y + 1, dist: 28, pitch: 40 * Math.PI / 180, yaw: Math.PI / 4, min: 12, max: 60 }
+  const cam = ISO ? { x: G.heart.x + 5, z: G.heart.y + 1, dist: 28, pitch: 40 * Math.PI / 180, yaw: Math.PI / 4, min: 12, max: BIG ? 100 : 60 }
                   : { x: G.heart.x + 6, z: G.heart.y + 1, dist: 22, pitch: 58 * Math.PI / 180, yaw: 0, min: 6, max: 30 };
   function placeCamera() {
     const h = Math.cos(cam.pitch) * cam.dist;
@@ -268,7 +269,7 @@ function start() {
       if (strip) {
         N = meta.attack[1]; const ph = d.phase, spd = (u.speed || 1.6) * (u.haste > 0 ? 1.6 : 1);
         if (u.cdMax && u.cd > u.cdMax - 0.5) f = meta.attack[0] + Math.min(4, Math.floor((u.cdMax - u.cd) / 0.5 * 5));            // the swing starts the moment the blow lands
-        else if ((u.isImp && u.state === 'work') || u.state === 'torture' || u.state === 'train') f = meta.attack[0] + Math.floor(G.time * 5 + ph) % 5;                              // imps dig with the swing loop
+        else if ((u.isImp && u.state === 'work') || u.state === 'torture' || u.state === 'train' || (u.digAt && !u.path)) f = meta.attack[0] + Math.floor(G.time * 5 + ph) % 5;                              // imps dig with the swing loop
         else if (moving) f = meta.walk[0] + Math.floor(G.time * spd * 0.9 * 6 + ph * 6) % 6;
         else f = meta.idle[0] + Math.floor(G.time * (u.state === 'sleep' ? 1.5 : 3.5) + ph * 4) % 4;
       }
