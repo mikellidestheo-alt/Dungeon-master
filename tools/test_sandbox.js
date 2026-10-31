@@ -151,6 +151,9 @@ const HEROES = ['Knight', 'Archer', 'Mage', 'Thief', 'Guard', 'Monk', 'Prince', 
     check('endless disables the waves slider, shows ∞, renames Begin', s.wavesDis && s.wavesOut === '∞' && /Endless/.test(s.begin) && /ever faster/.test(s.summary), s.wavesOut + ' / ' + s.begin);
     const q = await page.evaluate(() => Object.fromEntries(window.__sandbox.params()));
     check('the URL carries every option (endless: no waves)', JSON.stringify(q) === JSON.stringify({ level: 'sandbox', diff: 'hard', gold: '3000', mana: '500', unlocks: 'all', seed: '42', endless: '1', brief: '1', view: '2d', sound: '0' }), JSON.stringify(q));      // view and sound are passed through
+    const help = await page.evaluate(() => ({ items: document.querySelectorAll('.help li').length, text: document.querySelector('.help').textContent, hints: document.querySelectorAll('.hint').length, overflow: document.documentElement.scrollWidth > document.documentElement.clientWidth }));
+    check('the page explains itself: a "How the sandbox works" panel of 6 points, no horizontal overflow', help.items === 6 && /How the sandbox works/.test(help.text) && !help.overflow, JSON.stringify([help.items, help.overflow]));
+    check('the help covers the map, starting the invasion, fixed versus endless (Retire), difficulty and stars', ['classic dungeon', 'tunnel links a Gate', 'no stars', 'Retire', 'Heart\'s health'].every(k => help.text.includes(k)), help.text.length + ' chars');
     await page.reload({ waitUntil: 'load' }); await sleep(200); s = await sb();
     check('settings are remembered', s.st.mode === 'endless' && s.st.diff === 'hard' && s.st.gold === 3000 && s.st.seed === 42 && s.st.unlocks);
     await page.click('.opt[data-v="fixed"]'); const d0 = (await sb()).st.seed; await page.click('#dice'); const d1 = (await sb()).st.seed;
