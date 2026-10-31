@@ -150,8 +150,7 @@ A kill gives `XP_PER_KILL` 1 XP (a trickle: kills alone barely move a creature n
 Each level multiplies hp and damage by `LEVEL_STAT_MULT` 1.11 (x2.5 at level 10; it was 1.18 per level up to 5) and adds 8% of the base wage
 (`PAY_PER_LEVEL`): a level-10 Troll costs 155 instead of 90 at payday. Research and prayer rates still scale +10% a level. The elite sprite shows from level 3.
 Show: the roster chip has the level and an XP bar (tooltip "Troll #3, level 4 (12/100 XP)"), the 2D view draws one pip per level (orange from 6),
-and the existing `levelup` sound and log line play on every level. Training makes its own wooden `train` sound. In 3D the room is a procedural
-dummy (post, arm, swinging sack) because no art exists for it yet.
+and the existing `levelup` sound and log line play on every level. Training makes its own wooden `train` sound. In 3D each tile shows the owner's training-stand sprite (`training.png`), which rocks while a creature hits it.
 
 ## How many creatures you can keep
 

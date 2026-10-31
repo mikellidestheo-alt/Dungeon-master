@@ -1,6 +1,8 @@
 # Sound and music (`web/audio.js`)
 
-Everything you hear is synthesised in the browser with WebAudio. No audio file is needed and none is shipped, so the prototype
+**Update:** the background music is now the owner's recording `web/assets/music/beneath_the_sunken_hall.mp3` (see the README beside it), looped seamlessly on the music bus by `TrackMusic` in `audio.js`: tension opens a lowpass and raises the level a little, the track dips under the victory / defeat sting, and if the file cannot be loaded the synthesised score described below plays instead (the offline renders in `test_audio.js` also use that score). All sound *effects* are still synthesised.
+
+Everything else you hear is synthesised in the browser with WebAudio. No audio file is needed for it and none is shipped, so the prototype
 stays free of EA's Dungeon Keeper II audio. `docs/02-file-formats.md` lists the SDT/BankMap/SF formats for the later
 bring-your-own-assets mode; this module does not read any of them.
 

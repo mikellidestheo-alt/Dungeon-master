@@ -88,7 +88,8 @@ function start() {
     heart:     { w: 4.2, ay: 0.05 }, portal:   { w: 4.0, ay: -0.04 }, hero_gate: { w: 4.3, ay: -0.02 },
     treasure:  { w: 1.5, ay: 0.30 }, cage:     { w: 1.05, ay: 0.12 }, bookshelf: { w: 1.35, ay: 0.14 },
     bed:       { w: 1.2, ay: 0.45 }, rack:     { w: 1.45, ay: 0.20 }, door:      { w: 1.4, ay: 0.04 },
-    trap_gas:  { w: 1.5, ay: 0.36 }, trap_bolt: { w: 1.5, ay: 0.36 }, temple: { w: 1, ay: 0.38 },        // one big building per Temple room: width is set from the room's size (see syncRooms)
+    trap_gas:  { w: 1.5, ay: 0.36 }, trap_bolt: { w: 1.5, ay: 0.36 }, temple: { w: 1, ay: 0.38 },
+    training:  { w: 1.15, ay: 0.06 }, hatchery: { w: 2.2, ay: 0.05 },        // the owner's art: one dummy per Training Room tile, one chicken coop per 2x2 patch of Hatchery        // one big building per Temple room: width is set from the room's size (see syncRooms)
   };
   /* Sprites are flat quads facing the camera, so the lower part of a tall sprite lies "in front of" the floor tile it stands on and gets
    * clipped by it. This offsets a sprite's depth towards the camera (by `uBias` world units) without moving it on screen. */
@@ -134,8 +135,8 @@ function start() {
     [T.TREASURY]: 0xb09848, [T.LAIR]: 0x7a68a0, [T.HEART]: 0xa04040, [T.PORTAL]: 0x80509a, [T.GATE]: 0xb0a070, [T.PRISON]: 0x7a8490, [T.TORTURE]: 0x8a3c3c, [T.LIBRARY]: 0x5a6aa0, [T.HATCHERY]: 0x9a8450, [T.TEMPLE]: 0x8a7ab0, [T.TRAINING]: 0x9a6a50 };
   const tmpOwned = new THREE.Color(COL.owned);
   const ownedFloor = (x, y) => { const t = G.map[y * W + x]; return !!t && t.owner === 1 && !TERRAIN[t.t].solid; };
-  const tileSprites = { treasure: new Map(), bed: new Map(), bookshelf: new Map(), cage: new Map(), rack: new Map(), nest: new Map() };
-  const SPRITE_OF_KIND = { nest: 'bed' };                         // tile-sprite kinds that reuse another picture
+  const tileSprites = { treasure: new Map(), bed: new Map(), bookshelf: new Map(), cage: new Map(), rack: new Map(), hatchery: new Map(), training: new Map() };
+  const SPRITE_OF_KIND = {};                                      // tile-sprite kinds that reuse another picture (none now)
 
   /* A Temple is drawn as ONE building per connected group of Temple tiles: scaled to the group's footprint, centred on its bounding box. */
   const roomSprites = new Map();
@@ -161,22 +162,8 @@ function start() {
     for (const [k, s] of roomSprites) if (!live.has(k)) { disposeSprite(s); roomSprites.delete(k); }
   }
 
-  /* Training Room: no sprite art exists for it yet, so each tile gets a training dummy built from primitives (a post, a cross-arm, a hanging sack and a
-   * stone base); the sack swings while a creature is hitting it. Replace with real art when it arrives (README: "Art status"). */
-  const dummies = new Map(), woodMat = new THREE.MeshLambertMaterial({ color: 0x7a5430 }), sackMat = new THREE.MeshLambertMaterial({ color: 0xb89a64 }), baseMat = new THREE.MeshLambertMaterial({ color: 0x6a6660 });
-  const postGeo = new THREE.CylinderGeometry(.05, .06, .85, 8), armGeo = new THREE.BoxGeometry(.62, .07, .07), sackGeo = new THREE.SphereGeometry(.17, 10, 8), baseGeo = new THREE.BoxGeometry(.5, .06, .5);
-  function makeDummy() {
-    const g = new THREE.Group(), base = new THREE.Mesh(baseGeo, baseMat), post = new THREE.Mesh(postGeo, woodMat), arm = new THREE.Mesh(armGeo, woodMat), pivot = new THREE.Group(), sack = new THREE.Mesh(sackGeo, sackMat);
-    base.position.y = .03; post.position.y = .46; arm.position.y = .78; pivot.position.set(.2, .78, 0); sack.position.y = -.3; sack.scale.set(.9, 1.3, .9); pivot.add(sack); g.add(base, post, arm, pivot); g.userData.pivot = pivot; scene.add(g); return g;
-  }
-  function syncDummies(live) {                                    // live: Map(tile index -> the tile)
-    for (const [i, t] of live) { let g = dummies.get(i); if (!g) { g = makeDummy(); g.position.set((i % W) + .5, 0, ((i / W) | 0) + .5); dummies.set(i, g); }
-      const busy = t.occ && t.occ.state === 'train'; g.userData.pivot.rotation.z = busy ? Math.sin(G.time * 11 + i) * .55 : Math.sin(G.time * 1.3 + i) * .04; }
-    for (const [i, g] of dummies) if (!live.has(i)) { scene.remove(g); dummies.delete(i); }
-  }
-
   function updateTiles() {
-    let nGold = 0, nGem = 0, nTag = 0; const templeTiles = [], used = {}, trainTiles = new Map(); for (const k in tileSprites) used[k] = new Set();
+    let nGold = 0, nGem = 0, nTag = 0; const templeTiles = [], used = {}, coops = []; for (const k in tileSprites) used[k] = new Set();
     const fill = Math.min(1, G.gold / Math.max(1, capacity()));
     const sprite = (kind, i, x, y, k = 1, lift = 0, opacity = 1) => {
       used[kind].add(i); let s = tileSprites[kind].get(i); if (!s) { s = makeSprite(SPRITE_OF_KIND[kind] || kind); tileSprites[kind].set(i, s); }
@@ -213,14 +200,14 @@ function start() {
         if (t.t === T.TREASURY && fill > 0.02) sprite('treasure', i, x, y, 0.45 + 0.8 * fill);
         else if (t.t === T.LAIR) sprite('bed', i, x, y);
         else if (t.t === T.LIBRARY) sprite('bookshelf', i, x, y);
-        else if (t.t === T.HATCHERY) sprite('nest', i, x, y, 0.8);
+        else if (t.t === T.HATCHERY) { if (!coops.some(c => Math.abs(c.x - x) < 2 && Math.abs(c.y - y) < 2)) { coops.push({ x, y }); sprite('hatchery', i, x + .5, y + .5, 1, 0); } }      // a coop covers about 2x2 tiles: one per patch, placed over the patch's corner
         else if (t.t === T.TEMPLE) templeTiles.push({ x, y });
         else if (t.t === T.PRISON) sprite('cage', i, x, y, 1, 0, t.occ ? 0.5 : 1);
         else if (t.t === T.TORTURE) sprite('rack', i, x, y, 1, 0, t.occ ? 0.7 : 1);
-        else if (t.t === T.TRAINING) trainTiles.set(i, t);
+        else if (t.t === T.TRAINING) { sprite('training', i, x, y, 1, 0); tileSprites.training.get(i).material.rotation = t.occ && t.occ.state === 'train' ? Math.sin(G.time * 11 + i) * .07 : 0; }      // the stand rocks while somebody hits it
       }
     }
-    syncRooms(templeTiles); syncDummies(trainTiles);
+    syncRooms(templeTiles);
     for (const kind in tileSprites) for (const [i, s] of tileSprites[kind]) if (!used[kind].has(i)) { disposeSprite(s); tileSprites[kind].delete(i); }
     for (const [m, c] of [[goldBits, nGold], [gemBits, nGem], [tags, nTag]]) { m.count = c; m.instanceMatrix.needsUpdate = true; }
     for (const m of [floorMesh, wallDirt, wallBrick]) { m.instanceMatrix.needsUpdate = true; m.instanceColor.needsUpdate = true; }

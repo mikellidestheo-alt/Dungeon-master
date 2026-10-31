@@ -271,12 +271,14 @@ const sleep = (ms) => new Promise(r => setTimeout(r, ms));
       g.tagRect(hx + 5, hy, hx + 8, hy, true);
       const kind = g.HEROES.find(h => h.name === 'Knight'), party = []; for (let i = 0; i < 2; i++) { const h = new g.Hero(9, 14 + i, kind, 1, party); party.push(h); G.heroes.push(h); }
       await new Promise(r => setTimeout(r, 6000)); clearInterval(sample);
-      return { peak, early, played: { ...Sound.stats.played }, state: Sound.ctx.state, mood: g.audioMood(), t: G.time };
+      const mu = Sound.engine.music;
+      return { peak, early, played: { ...Sound.stats.played }, state: Sound.ctx.state, mood: g.audioMood(), t: G.time, track: { is: !!mu.isTrack, secs: mu.buf && Math.round(mu.buf.duration), playing: !!mu.src, loop: !!(mu.src && mu.src.loop) } };
     });
     check('engine output has signal (music + effects)', rt.peak > 0.001, 'peak rms ' + rt.peak.toFixed(4));
     check('effects were actually played (not only requested)', Object.keys(rt.played).length > 3, Object.keys(rt.played).sort().join(' '));
     check('mood reports tension while heroes are alive', rt.mood.tension > 0.3, JSON.stringify(rt.mood));
     check('AudioContext still running', rt.state === 'running');
+    check('the background music is the owner\'s track (beneath_the_sunken_hall.mp3, 2:49), decoded and looping, not the synthesised score', rt.track.is && rt.track.secs > 160 && rt.track.playing && rt.track.loop, JSON.stringify(rt.track));
     await page.context().close();
 
     /* ------------------------------------------------------------ 6. determinism */

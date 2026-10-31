@@ -1,6 +1,7 @@
 'use strict';
 /* =====================================================================================
- * Sound and music, all synthesised with WebAudio: no audio files are needed (or shipped).
+ * Sound and music. The effects are all synthesised with WebAudio (no audio files); the background music is the owner's track
+ * assets/music/beneath_the_sunken_hall.mp3, with the synthesised adaptive score kept as the fallback.
  *
  *   game.js  --  sfx(id, x, y)  -->  Sound.play(id, tileX, tileY)      one-shot effects, quieter and panned by distance
  *            --  Sound.setMood({tension, boss, over})                   drives the music every frame; over = 'victory' | 'defeat' | 'retired'
@@ -280,8 +281,47 @@
     sting(t) { for (const m of [80, 81]) this.k.tone(this.out, 'sawtooth', hz(m), hz(m), t, 1.6, 0.02, 0.6, { lp: 3000 }); }
   }
 
+  /* ---------------------------------------------------------------- the background track
+   * The score the game plays is the owner's recording, assets/music/beneath_the_sunken_hall.mp3 (see the README there), looped seamlessly through the
+   * music bus. It keeps the Music class's small interface (setMood / snap / start / stop / run, `cur` and `target`) so the rest of the game does not
+   * care which one is playing: tension still matters a little (a lowpass opens and the level rises as invaders close in, a boss opens it fully) and
+   * the track dips under the victory / defeat sting. If the file cannot be loaded the synthesised score above takes over, as before. */
+  const TRACK_URL = 'assets/music/beneath_the_sunken_hall.mp3';
+  class TrackMusic {
+    constructor(E) {
+      this.E = E; this.ctx = E.ctx; this.out = E.musicBus; this.target = { tension: 0, boss: 0 }; this.cur = { tension: 0, boss: 0 }; this.over = null; this.lastTick = 0; this.timer = null; this.src = null; this.isTrack = true;
+      this.lp = this.ctx.createBiquadFilter(); this.lp.type = 'lowpass'; this.lp.frequency.value = 7000; this.lp.Q.value = 0.5; this.g = this.ctx.createGain(); this.g.gain.value = 0; this.lp.connect(this.g); this.g.connect(this.out);
+    }
+    async load() {
+      const r = await fetch(TRACK_URL); if (!r.ok) throw new Error('music file ' + r.status);
+      this.buf = await this.ctx.decodeAudioData(await r.arrayBuffer());
+    }
+    play() {                                                          // loop the whole track, fading in over three seconds
+      const src = this.src = this.ctx.createBufferSource(); src.buffer = this.buf; src.loop = true; src.connect(this.lp); src.start();
+      this.g.gain.setValueAtTime(0, this.ctx.currentTime); this.g.gain.linearRampToValueAtTime(this.level(), this.ctx.currentTime + 3);
+    }
+    level() { return this.over ? 0.3 : 0.8 + 0.2 * Math.max(this.cur.tension, this.cur.boss); }
+    start() {
+      this.lastTick = performance.now(); this.timer = setInterval(() => this.tick(), 200);
+      this.load().then(() => { if (this.timer) this.play(); }).catch((err) => { console.warn('Music file unavailable, using the synthesised score:', err); this.stop(); const m = this.E.music = new Music(this.E); m.setMood(this.target); m.start(); });
+    }
+    stop() { clearInterval(this.timer); this.timer = null; if (this.src) { try { this.src.stop(); } catch (e) { /* already stopped */ } this.src = null; } }
+    setMood(m) { this.target.tension = m.tension || 0; this.target.boss = m.boss || 0; this.over = m.over || null; }
+    snap() { this.cur.tension = this.target.tension; this.cur.boss = this.target.boss; this.apply(true); }
+    run() { /* the track plays itself */ }
+    apply(snap) {
+      const now = this.ctx.currentTime, f = 6000 + 14000 * Math.max(this.cur.tension, this.cur.boss), lv = this.level();
+      if (snap) { this.lp.frequency.value = f; this.g.gain.value = lv; } else { this.lp.frequency.setTargetAtTime(f, now, 1.5); if (this.src) this.g.gain.setTargetAtTime(lv, now, this.over ? 0.8 : 2); }
+    }
+    tick() {
+      const now = performance.now(), dt = Math.min(1, (now - this.lastTick) / 1000); this.lastTick = now;
+      const go = (v, to, up, down) => to > v ? Math.min(to, v + up * dt) : Math.max(to, v - down * dt);
+      this.cur.tension = go(this.cur.tension, this.target.tension, 0.35, 0.04); this.cur.boss = go(this.cur.boss, this.target.boss, 0.5, 0.1); this.apply(false);
+    }
+  }
+
   /* ---------------------------------------------------------------- the engine: bus graph for one AudioContext */
-  function createEngine(ctx) {
+  function createEngine(ctx, withTrack) {
     const E = { ctx, k: toolkit(ctx), samples: {}, last: {}, live: [] };
     const master = E.master = ctx.createGain(), comp = ctx.createDynamicsCompressor(), an = E.analyser = ctx.createAnalyser();
     comp.threshold.value = -14; comp.knee.value = 20; comp.ratio.value = 4; comp.attack.value = 0.005; comp.release.value = 0.2; an.fftSize = 1024;
@@ -312,7 +352,7 @@
       else return false;
       return true;
     };
-    E.music = new Music(E);
+    E.music = withTrack ? new TrackMusic(E) : new Music(E);          // the real engine plays the track; the offline renders in the tests use the synthesised score
     return E;
   }
 
@@ -330,7 +370,7 @@
       if (this.engine || this.failed) return;
       try {
         const AC = window.AudioContext || window.webkitAudioContext; if (!AC) throw new Error('WebAudio unsupported');
-        const E = this.engine = createEngine(new AC()); E.ctx.resume(); E.setLevel(this.volume, this.muted); E.setMix(this.sfxVolume, this.musicVolume); E.music.start();
+        const E = this.engine = createEngine(new AC(), true); E.ctx.resume(); E.setLevel(this.volume, this.muted); E.setMix(this.sfxVolume, this.musicVolume); E.music.start();
         document.addEventListener('visibilitychange', () => { if (document.hidden) E.ctx.suspend(); else E.ctx.resume(); });
         this.loadPack(); hud.refresh();
       } catch (err) { this.failed = true; console.warn('Sound unavailable:', err); hud.refresh(); }

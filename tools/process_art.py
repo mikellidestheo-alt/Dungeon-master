@@ -17,8 +17,9 @@ NAMES = {
     'Dungeon_wall': 'wall', 'Gas_trap': 'trap_gas', 'Glowing_dungeon_heart': 'heart', 'Glowing_portal': 'hero_gate',
     'Gold_treasure_pile': 'treasure', 'Iron_prison_cage': 'cage', 'Library_bookshelf': 'bookshelf',
     'Lightning_trap': 'trap_bolt', 'Red_dungeon_portal': 'portal', 'Straw_bed': 'bed', 'Torture_rack': 'rack',
-    'Wooden_iron_dungeon_door': 'door', 'Temple': 'temple',
+    'Wooden_iron_dungeon_door': 'door', 'Temple': 'temple', 'Training_dummy': 'training', 'Hatchery_chicken': 'hatchery',
 }
+SHADOW_PROPS = {'training'}          # props that stand on a painted ground shadow, removed like a character's (the game draws its own)
 
 
 # characters (--set units): they stand on a drop shadow that is removed here; the game draws its own consistent ground shadow
@@ -140,7 +141,7 @@ def main():
         if not fn.lower().endswith(('.jpg', '.jpeg', '.png')): continue
         name = sprite_name(fn, UNIT_NAMES if args.set == 'units' else NAMES)
         if not name: print('skip (no mapping):', fn, file=sys.stderr); continue
-        rgba, bg = cut_background(Image.open(os.path.join(args.src, fn)), args.tol, shadows=(args.set == 'units'), enclosed=name not in NO_ENCLOSED)
+        rgba, bg = cut_background(Image.open(os.path.join(args.src, fn)), args.tol, shadows=(args.set == 'units' or name in SHADOW_PROPS), enclosed=name not in NO_ENCLOSED)
         box = rgba.getchannel('A').point(lambda v: 255 if v > 40 else 0).getbbox()
         rgba = rgba.crop((max(0, box[0] - 2), max(0, box[1] - 2), min(rgba.width, box[2] + 2), min(rgba.height, box[3] + 2)))
         if max(rgba.size) > args.max:

@@ -263,5 +263,15 @@
   "w": 640,
   "h": 506,
   "source": "Temple_complex.jpg"
+ },
+ "hatchery": {
+  "w": 512,
+  "h": 503,
+  "source": "Hatchery_chicken_coop.jpg"
+ },
+ "training": {
+  "w": 378,
+  "h": 512,
+  "source": "Training_dummy_punching_bag.jpg"
  }
 }
