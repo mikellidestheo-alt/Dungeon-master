@@ -273,13 +273,13 @@ Results with 8 seeds each (what the test pins, with margins, is in the file):
 | 1 | The Awakening | 8/8 | 1.8 min | 0 | - | 8/8 (it is the Tutorial) |
 | 2 | Creatures of the Dark | 8/8 | 6.5 | 0 | 8/8 | 2/8 |
 | 3 | Mouths to Feed | 8/8 | 8.3 | 0 | 8/8 | 0/8 |
-| 4 | The Library | 8/8 | 8.0 | 4 | 8/8 | 0/8 |
-| 5 | Doors and Snares | 8/8 | 9.0 | 2 | 8/8 | 0/8 |
-| 6 | The Dungeon Below | 7/8 | 10.4 | 3 | 7/7 wins | 0/8 |
-| 7 | Prayers and Power | 8/8 | 12.4 | 7 | 8/8 | 0/8 |
-| 8 | Two Gates | 6/8 | 14.2 | 9 | 6/6 wins | 0/8 |
-| 9 | The Siege | 5/8 | 17.0 | 18 | 5/5 wins | 0/8 |
-| 10 | The King's Crusade | 5/8 | 21.8 | 10 | 5/5 wins | 0/8 |
+| 4 | The Library | 8/8 | 8.0 | 7 | 8/8 | 0/8 |
+| 5 | Doors and Snares | 8/8 | 9.5 | 7 | 8/8 | 0/8 |
+| 6 | The Dungeon Below | 8/8 | 10.4 | 5 | 8/8 | 0/8 |
+| 7 | Prayers and Power | 8/8 | 13.5 | 4 | 8/8 | 0/8 |
+| 8 | Two Gates | 8/8 | 14.6 | 11 | 8/8 | 0/8 |
+| 9 | The Siege | 5/8 | 16.1 | 14 | 5/5 wins | 0/8 |
+| 10 | The King's Crusade | 3/8 | 23.2 | 16 | 3/3 wins | 0/8 |
 
 The bot is a *fast* player, so a first-time human takes longer: its times add up to about 100 minutes (the Portal is now a short dig from the Heart), so a first-time human needs roughly two hours.
 "Not trivial" means the lazy bot never wins a chapter after the first and never survives chapters 6-10, while the finale costs even the
@@ -296,6 +296,10 @@ almost no mana now (0.3 a second), the second Gate's diggers and the 20 s stagge
 were too easy, so heroes got stronger in chapters 3-7 (`heroMult` 0.9, 1.05, 0.85, 0.85, 1.2 became 1.0, 1.2, 1.3, 1.35, 1.3) and chapter 10 eased from 1.37 to 1.25.
 The curve the test now pins: chapters 1-5 won nearly always (with creatures lost from chapter 4 on), 6 and 7 at least 70%, chapter 8 at least 60%,
 chapter 9 at least 38%, chapter 10 at least 25%, and the finale no easier than chapter 8.
+
+**Third round** (Temple-only mana at about 1.2 a second at best, hero lightning and healing, the double-size King, gold veins and richer gems): the veins make the
+bot richer and the Mages' lightning makes fights costlier, so chapters 8 to 10 were retuned (`heroMult` 1.0, 1.1 and 0.95; the finale is a cliff, 0.9 won 7 of 8 and 1.0
+won 2 of 8, so treat that number with care). Chapter 7's bonus is now "Cast 6 spells" (ten spells would take a quarter of an hour of mana).
 
 What the bots showed, and what changed because of it:
 

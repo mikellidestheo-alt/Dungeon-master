@@ -8,7 +8,7 @@
  *    9. traps: two uses, two of each at a time          10. nobody shoots through a door
  *   11. the hero counter ignores the knocked out        12. full screen is the default
  *   13. knocked-out heroes: 30 s, then prison and the rack   14. 20 creatures (25 in the last three chapters)
- *   15. imps spread over the jobs   16. a good mix of monsters   17. imps drop everything for a wounded enemy   18. mana comes from a Temple
+ *   15. imps spread over the jobs   19. hero magic and the King   20. gold veins, richer gems   16. a good mix of monsters   17. imps drop everything for a wounded enemy   18. mana comes from a Temple
  */
 const { spawn } = require('child_process');
 const path = require('path');
@@ -317,14 +317,56 @@ const sleep = (ms) => new Promise(r => setTimeout(r, ms));
     r = await page.evaluate(() => {
       const g = __game, G = g.G, T = g.T, out = {}; G.creatures.length = 0; G.mana = 0; __t.run(60); out.noTemple = Math.round(G.mana * 10) / 10; out.rate0 = G.manaRate;
       G.gold = 1e5; g.build(T.TEMPLE, 3, 12, 5, 12); G.mana = 0; __t.run(60); out.temple = Math.round(G.mana * 10) / 10; out.rate1 = Math.round(G.manaRate * 100) / 100; out.tiles = G.templeTiles;
+      G.mana = 0; g.build(T.TEMPLE, 6, 12, 10, 12); g.build(T.TEMPLE, 3, 16, 10, 16); G.manaT = 0; g.step(0.05); out.t6 = [G.templeTiles, Math.round(G.manaRate * 100) / 100, Math.round(G.prayFactor * 100) / 100];       // more than 6 tiles add no speed
       G.mana = 800; G.heroes.length = 0; const h = __t.hero('Knight', 8.5, 14.5); h.hp = h.maxHp = 1e6; const f = { fx: h.x, fy: h.y }; G.spellCd = {};
       out.cast1 = g.castSpell('lightning', f); out.cast2 = g.castSpell('lightning', f); out.mana = G.mana; out.max = G.maxMana; out.cost = g.SPELLS.lightning.cost; out.cd = g.SPELLS.lightning.cd;
       G.mana = 800; G.spellCd = {}; G.creatures.length = 0; const c = __t.creature(); c.hp = 10; out.heal1 = g.castSpell('heal', { fx: c.x, fy: c.y }); c.hp = 10; out.heal2 = g.castSpell('heal', { fx: c.x, fy: c.y });
       return out; });
-    check('with no Temple the mana barely moves: about 0.3 a second, 18 in a minute', r.rate0 === 0.3 && r.noTemple >= 15 && r.noTemple <= 22, JSON.stringify([r.rate0, r.noTemple]));
-    check('a 3-tile Temple raises it to 0.66 a second (0.3 + 0.12 a tile), about twice as much', r.tiles === 3 && r.rate1 === 0.66 && r.temple > r.noTemple * 1.8, JSON.stringify([r.tiles, r.rate1, r.temple]));
+    check('with no Temple the mana barely moves: 0.1 a second, 6 in a minute', r.rate0 === 0.1 && r.noTemple >= 5 && r.noTemple <= 8, JSON.stringify([r.rate0, r.noTemple]));
+    check('a 3-tile Temple raises it to 0.34 a second (0.1 + 0.08 a tile), about three times as much', r.tiles === 3 && r.rate1 === 0.34 && r.temple > r.noTemple * 2.5, JSON.stringify([r.tiles, r.rate1, r.temple]));
+    check('a Temple stops adding speed at 6 tiles: with 17 tiles the trickle is the same as with 6 (0.58 a second) and the worshippers\' share is scaled down', r.t6[0] > 6 && r.t6[1] === 0.58 && r.t6[2] < 1, JSON.stringify(r.t6));
     check('Lightning costs 180 and recharges for 8 s: a second cast straight after is refused; the mana pool tops out at 800', r.cast1 && !r.cast2 && r.cost === 180 && r.cd === 8 && r.max === 800 && Math.round(r.mana) === 620, JSON.stringify([r.cast1, r.cast2, r.cost, r.cd, r.max, r.mana]));
     check('Heal costs 100 and recharges for 6 s too, so neither can be spammed', r.heal1 && !r.heal2, JSON.stringify([r.heal1, r.heal2]));
+    await page.context().close();
+
+    /* ------------------------------------------------------------------ 19 */
+    console.log('19. hero magic and the King');
+    page = await open('level=classic&seed=7'); await page.evaluate(SETUP);
+    r = await page.evaluate(() => {
+      const g = __game, G = g.G, out = {}; G.creatures.length = 0; G.heroes.length = 0; const c = __t.creature(1, 9.5, 14.5); c.noFood = true; c.hp = c.maxHp = 500;
+      const m = __t.hero('Mage', 6.5, 14.5); m.hp = m.maxHp = 1e6; m.spellT = [0]; const hp0 = c.hp; g.step(0.05); out.mage = [c.hp < hp0, c.stun > 0.5, G.log.some(x => /hurls lightning/.test(x))];
+      G.heroes.length = 0; G.creatures.length = 0; const pr = __t.hero('Prince', 8.5, 14.5), kn = __t.hero('Knight', 9.5, 14.5); kn.hp = 20; pr.spellT = [0]; g.step(0.05); out.prince = kn.hp > 50;
+      G.heroes.length = 0; const k = __t.hero('King', 5, 14); out.king = { sprite: k.sprite, size: k.size, hp: k.maxHp, spells: k.spells.map(x => x.kind).join(), stun: !!k.stunImmune, boss: !!k.boss, armor: k.armor };
+      const kn2 = __t.hero('Knight', 7.5, 14.5); out.ratio = [k.maxHp / kn2.maxHp, k.dmg / kn2.dmg];
+      const cs = [__t.creature(1, 8, 14), __t.creature(1, 9, 14), __t.creature(1, 9, 13)]; cs.forEach(x => { x.noFood = true; x.hp = x.maxHp = 500; }); k.spellT = [0, 99]; g.step(0.05); out.chain = cs.filter(x => x.hp < 500).length;
+      return out; });
+    check('a Mage hurls lightning at one of your creatures: it is hurt and stunned, and the Log says so once', r.mage[0] && r.mage[1] && r.mage[2], JSON.stringify(r.mage));
+    check('the Prince heals the heroes round him', r.prince, String(r.prince));
+    check('the King is a golden Knight twice the size, stun-proof and armoured, with Lightning and Heal', r.king.sprite === 'knight' && r.king.size === 2 && r.king.spells === 'lightning,heal' && r.king.stun && r.king.boss && r.king.armor >= 0.25, JSON.stringify(r.king));
+    check('he has two and a half times a Knight\'s health and nearly twice its damage (before the wave\'s own scaling)', r.ratio[0] >= 2.5 && r.ratio[1] >= 1.7, JSON.stringify(r.ratio));
+    check('his lightning chains: it hits up to three of your creatures at once', r.chain === 3, String(r.chain));
+    await page.context().close();
+    page = await open('level=crusade&seed=3', '3d');
+    const big = await page.evaluate(() => { const g = __game, G = g.G; const kind = g.HEROES.find(h => h.name === 'King'), party = []; const h = new g.Hero(G.heart.x + 6, G.heart.y, kind, 1, party); party.push(h); G.heroes.push(h); const kn = new g.Hero(G.heart.x + 8, G.heart.y, g.HEROES[0], 1, []); G.heroes.push(kn); G.speed = 0; return [h.size, kn.size === undefined]; });
+    await sleep(900);
+    const hts = await page.evaluate(() => { const T = __three, G = __game.G, h = G.heroes.find(x => x.name === 'King'), k = G.heroes.find(x => x.name === 'Knight'); return [T.unitMeshes.get(h).userData.spr.scale.y, T.unitMeshes.get(k).userData.spr.scale.y]; });
+    check('in 3D the King stands about twice as tall as a Knight', big[0] === 2 && hts[0] >= hts[1] * 1.8, JSON.stringify([big, hts]));
+    await page.context().close();
+
+    /* ------------------------------------------------------------------ 20 */
+    console.log('20. gold veins, and gems pay better');
+    page = await open('level=hatchery&seed=3'); await page.evaluate(SETUP);
+    const veins = await page.evaluate(() => { const g = __game, out = {}; for (const id of ['portal', 'hatchery', 'library', 'traps', 'prison', 'temple', 'gates', 'siege', 'crusade']) { const grid = g.LEVEL_TABLE[id].terrain.grid, w = grid[0].length, h = grid.length, seen = new Set(); let best = 0;
+        for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) { if (!'gB'.includes(grid[y][x]) || seen.has(y * w + x)) continue; const st = [[x, y]]; seen.add(y * w + x); let n = 0; while (st.length) { const [cx, cy] = st.pop(); n++; for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) { const nx = cx + dx, ny = cy + dy; if (nx >= 0 && ny >= 0 && nx < w && ny < h && 'gB'.includes(grid[ny][nx]) && !seen.has(ny * w + nx)) { seen.add(ny * w + nx); st.push([nx, ny]); } } } best = Math.max(best, n); }
+        out[id] = best; }
+      const sb = window.makeSandbox({}); const save = Object.assign({}, g.LV); return { out }; });
+    check('every chapter after the Tutorial has a solid vein of gold in one place (a block of 8 or more seams touching each other; 16 or more once enlarged)', veins.out.portal >= 8 && ['hatchery', 'library', 'traps', 'prison', 'temple', 'gates', 'siege', 'crusade'].every(id => veins.out[id] >= 16), JSON.stringify(veins.out));
+    r = await page.evaluate(() => { const g = __game, G = g.G, T = g.T; const t = G.map[10 * g.W + 10]; t.t = T.GEM; t.hp = g.TERRAIN[T.GEM].maxHealth; t.gold = 1; t.owner = 0; let got = 0, first = null; for (let s = 0; s < 20; s += 0.05) { const v = g.damageTile(10, 10, 0.05, g.VAR.IMP_EFFICIENCY); got += v; if (v && first === null) first = Math.round(s * 10) / 10; } return { got, first, pay: g.VAR.GOLD_MINED_FROM_GEMS }; });
+    check('a gem seam now pays 50 gold about every 8 s of an imp\'s work (it was 25 every 12.5 s)', r.pay === 50 && r.first >= 7 && r.first <= 9.5 && r.got >= 100, JSON.stringify(r));
+    await page.context().close();
+    page = await open('level=sandbox&seed=5');
+    const sbv = await page.evaluate(() => { const g = __game, W = g.W, near = (cx, cy) => { let n = 0; for (let y = cy - 3; y <= cy + 3; y++) for (let x = cx - 3; x <= cx + 3; x++) if (g.G.map[y * W + x].t === g.T.GOLD) n++; return n; }; return [near(32, 20), near(62, 40), near(46, 24)]; });
+    check('the sandbox has gold veins too: knots of gold seams round the vein centres', sbv.every(n => n >= 8), JSON.stringify(sbv));
     await page.context().close();
 
     check('no page errors or warnings in any run', problems.length === 0, problems.slice(0, 3).join(' | '));

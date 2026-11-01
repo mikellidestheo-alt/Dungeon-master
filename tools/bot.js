@@ -160,7 +160,7 @@
       if (strong && g.isAvail('lightning') && G.mana >= 160 && !(G.spellCd.lightning > 0)) g.castSpell('lightning', { fx: strong.x, fy: strong.y });
       const hurt = G.creatures.filter(c => !c.dead && c.hp < c.maxHp * 0.45 && foes.some(x => dist(c, x) < 8));
       if (hurt.length && g.isAvail('heal') && G.mana >= 160 && !(G.spellCd.heal > 0)) g.castSpell('heal', { fx: hurt[0].x, fy: hurt[0].y });
-      if (!foes.length && g.isAvail('haste') && need('spells') > G.stats.spells && G.mana >= 700 && !(G.spellCd.haste > 0)) g.castSpell('haste', { fx: h.x, fy: h.y + 2 });      // a bonus objective: cast spells
+      if (!foes.length && g.isAvail('haste') && need('spells') > G.stats.spells && G.mana >= 300 && !(G.spellCd.haste > 0)) g.castSpell('haste', { fx: h.x, fy: h.y + 2 });      // a bonus objective: cast spells
     }
 
     function think() {

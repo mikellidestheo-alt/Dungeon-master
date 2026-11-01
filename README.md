@@ -55,7 +55,7 @@ completing its objectives (every chapter includes surviving all its waves) and l
 
 **A typical chapter.**
 
-1. **Dig and mine.** Tag the tunnel east and the nearest **gold seam**. Each gold tile is worth 2000 gold; gem seams (blue) never run out and pay 25 gold at a time.
+1. **Dig and mine.** Tag the tunnel east and the nearest **gold seam**. Each gold tile is worth 2000 gold; **gold veins** (solid knots of seams, one or two to a map from chapter 2 on) are the richest places to mine; gem seams (blue) never run out and pay 50 gold about every 8 seconds.
 2. **Bank it.** Build a **Treasury** (50 gold a tile). Your Heart holds 2000 gold on its own and each Treasury tile adds 3000; gold beyond that cannot be carried home.
 3. **Claim the Portal** by digging to it and letting your imps claim the floor. The Portal is a short dig from your Heart (about 12 tiles). A creature arrives about every 25 seconds, up to 20 (25 in the last three chapters), and **which kind** depends on what you have built: Goblins, Spiders and Flies come to a bare Lair, Trolls and Black Knights want a Treasury, Salamanders and Bile Demons a Hatchery, Warlocks and Dark Elves a Library, Vampires and Dark Angels a Temple, the Mistress a Torture Chamber, the Assassin a Prison and the Reaper both. The Monsters tab's *Who will come* view lists them.
 4. **Look after them.** Each creature needs a **Lair** tile to sleep in, **food** (a **Hatchery** raises chickens, they get hungry about every two minutes; the Heart's own larder feeds 3 creatures with a ration eaten at the Heart (it never lays a chicken: **only a Hatchery makes chickens**) and every Hatchery tile feeds 4 more; wounded creatures also rest in the Hatchery, where they heal about five times faster than walking about) and **wages** at every **payday** (every 90 seconds, 60 to 220 gold each; fifteen creatures cost about 1650 a payday). **The size of your Lair and Hatchery caps your army**: you can keep at most `min(15, Lair tiles, 3 + 4 per Hatchery tile)` creatures, the top bar shows `Creatures 5/9 beds` (or *food*, or *Portal*) with a tooltip naming all three limits, and the Portal waits (with a log line) while you are full. Unhappy creatures turn angry and eventually leave. The Task board shows every creature's mood.
@@ -76,7 +76,7 @@ completing its objectives (every chapter includes surviving all its waves) and l
 | V | Doors and Snares | doors and traps; the **Dwarf** disarms and smashes them | |
 | VI | The Dungeon Below | Prison, Torture Chamber; the **Monk** heals | |
 | VII | Prayers and Power | Temple, mana, spells; the **Fairy** flies over traps | |
-| VIII | Two Gates | two entrances (every Gate sends heroes, 20 s apart; the one you have not tunnelled to sends diggers); the **Giant** | |
+| VIII | Two Gates | two entrances (every Gate sends heroes, 20 s apart; the one you have not tunnelled to sends diggers who dig at 70% of an imp's speed); the **Giant** | |
 | IX | The Siege | the **Prince** and the armoured **Stone Knight** | hard |
 | X | The King's Crusade | three Gates; the **King** | the hardest |
 
@@ -115,6 +115,8 @@ What changed after the first full playthrough (each point has a check in `tools/
 * **Defeated heroes** are knocked out for **30 s**: imps carry them to the Prison, then to the Torture Chamber, where they break or are converted. Rescue, capture and haul jobs come before everything else: an imp that is digging, claiming or carrying gold drops it within half a second when somebody is lying knocked out and a cell is free.
 * **Two or three Hero Gates:** tunnel to one and **every Gate sends heroes**. A wave comes out of the Gates one group at a time, **20 s apart** (the group with the boss first), and the next wave follows at least 40 s after the last group. The heroes at a Gate you have **not** tunnelled to **dig their own way in** (every other one digs, the rest follow), so it pays to link it yourself and choose the battlefield. Chapters 8, 9 and 10 and the sandbox with several Gates.
 * **A good mix of monsters:** no kind may exceed a quarter of the Portal's limit (5 of 20, 7 of 25), so the three beginner kinds (Goblin, Spider, Fly) fill at most 15 of 20 places and the rest wait for kinds that want a Library, Temple, Hatchery, Treasury, Prison or Torture Chamber. When every kind that can come is at its limit the Portal says so and waits.
+* **Hero magic:** Mages hurl **Lightning** at one of your creatures every 9 s (it is hurt and stunned for a second), the **Prince** heals the heroes round him, and the **King** is now a golden **double-size Knight**: 400 hp and 20 damage before the wave's strength is added, armoured, stun-proof, and he throws chained lightning and heals his host. The Monk and the Fairy still heal.
+* **Gold and gems:** every chapter after the Tutorial and the sandbox has **gold veins**, solid blocks of seams in one place (as on the original Dungeon Keeper maps). A gem seam now pays 50 gold every 8 s of an imp's work instead of 25 every 12.5 s.
 * **Mana:** see Controls, Mana and spells. **Balance:** chapters 4 to 10 have stronger heroes than before (and the later ones the two-Gate rule), so the steady test player now loses creatures from chapter 4 on, drops the odd run from chapter 6, and wins about 3 runs in 4 at chapter 8 and 5 in 8 at the Siege and the Crusade.
 * **Imps spread out:** of the everyday jobs the one with the fewest imps on it wins, so one digs while the next claims floor and the next mends a door.
 * **Full screen** is the default (see Controls).
@@ -356,8 +358,9 @@ seams, room building, lair assignment, mood/anger, sleep and payday, free-imp sp
   poison cloud) and **Lightning Traps** (200g, burst + stun) are hidden from heroes, fire when stepped on, hold a few
   two charges and then crumble away (two of each kind at a time, so no spamming). With the same 8 creatures and 3 lair tiles, one door plus three traps in the
   tunnel to the Hero Gate turned a lost game into a win in my bot test (9 heroes killed, Heart untouched), even though the Dwarf disarms traps and the Fairy flies over the door.
-* **Mana and spells** (hotkeys `1`–`5`, click to cast; **mana depends on a Temple**: without one it trickles in at 0.3 a second
-  (18 a minute), each Temple tile adds 0.12 a second and creatures praying there add about 0.2 to 1 each; 800 max, and every spell has a cooldown, so
+* **Mana and spells** (hotkeys `1`–`5`, click to cast; **mana depends on a Temple**: without one it trickles in at 0.1 a second
+  (6 a minute), each Temple tile adds 0.08 a second **up to 6 tiles** (bigger Temples add nothing) and the creatures praying there add a little more
+  (about 1.2 a second at the very most, so one Lightning every two or three minutes); 800 max, and every spell has a cooldown, so
   neither Lightning nor Heal can be spammed): **⚡ Lightning** (180, 8 s –  70 damage to the hero under the cursor, 35 chained to
   two nearby ones, with a stun), **✚ Heal** (100, 6 s – +60 hp to creatures and imps in range), **» Speed** (120, 10 s – creatures move
   and recharge 1.6× faster for 12 s), **⚑ Call to Arms** (200, 15 s – creatures drop everything and gather at a flag for 25 s),

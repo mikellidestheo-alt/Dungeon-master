@@ -22,7 +22,8 @@ const POS = levelPos(LV);
 const W = levelSize(LV)[0], H = levelSize(LV)[1], TS = 20;     // map size in tiles, pixels per tile
 const VAR = {                                         // Variable.MiscVariable.MiscType
   DIG_ROCK_HEALTH: 5000, MINE_GOLD_HEALTH: 300, CLAIM_TILE_HEALTH: 825,
-  GOLD_MINED_FROM_GEMS: 25, MAX_GOLD_PER_TREASURY_TILE: 3000,
+  GOLD_MINED_FROM_GEMS: 50, MINE_GEM_HEALTH: 450,       // a gem seam pays 50 gold every 8 s of an imp's work (it was 25 every 12.5 s): three times the income, and it never runs out
+  MAX_GOLD_PER_TREASURY_TILE: 3000,
   MODIFY_ANGER_OF_CREATURE_IN_LAIR_PER_SECOND: -550,
   MINIMUM_IMP_THRESHOLD: 4, TIME_BEFORE_FREE_IMP_GENERATED_SECONDS: 5,
   CREATURES_SUPPORTED_BY_FIRST_PORTAL: 20,                 // the level's rules.maxCreatures overrides it (20 by default, 25 in the last three chapters)
@@ -39,7 +40,7 @@ const VAR = {                                         // Variable.MiscVariable.M
   HEART_HEALTH: 2500,
   WAVES: 5, FIRST_WAVE_DELAY: 75, WAVE_INTERVAL: 110, // hero gate invasions (tuning)
   HEAR_DISTANCE: 14,                                  // Attributes.distanceCanHear: keepers sense heroes on own land
-  MANA_BASE: 0.3, MANA_PER_TEMPLE_TILE: 0.12, PRAYER_MANA_SCALE: 0.7,           // mana: a trickle of 0.3/s without a Temple (a spell every ten minutes), +0.12/s for every Temple tile, and worshippers add 70% of their old prayer rate
+  MANA_BASE: 0.1, MANA_PER_TEMPLE_TILE: 0.08, PRAYER_MANA_SCALE: 0.2, TEMPLE_MAX_TILES: 6,           // mana: 0.1/s without a Temple, +0.08/s for each Temple tile, and each praying creature adds a fifth of its old prayer rate; a Temple stops adding speed at 6 tiles (about 1.2/s at most)
   GATE_STAGGER: 20, MIN_WAVE_GAP: 40,                // with several Hero Gates every wave comes out of ALL of them once one is linked, a group every 20 s, and the last group is followed by at least 40 s of calm
   HERO_DIG_COST: 6, HERO_DIG_SHORTCUT: 0.6, HERO_DIG_SENSE: 20, HERO_DIG_EFF: [0, 45, 55, 70, 85], HERO_DIG_PERIOD: [Infinity, 4, 3, 2, 1],      // a wall tile costs a digger 6 steps of walking (about 3-6 s of digging against 0.6 s a step); it tunnels when that is under 0.6x the way round; creatures within 20 tiles draw it; efficiency % by level (imps are 80); every 4th / 3rd / 2nd / every hero digs by level, and Dwarves always do
   XP_PER_KILL: 1, MAX_LEVEL: 10,                      // CreatureExperienceSystem, reduced: a kill is a trickle, training is the way up (see XP_FOR_LEVEL)
@@ -86,7 +87,7 @@ const G = {
   nextImp: 0, nextSpawn: 20, nextPay: VAR.PAY_DAY_FREQUENCY_SECONDS, scanT: 0, log: [],
   portalOwned: false, heart: { x: POS.heart[0], y: POS.heart[1] }, portal: POS.portal && { x: POS.portal[0], y: POS.portal[1] },
   gates: POS.gates.map(g => ({ x: g[0], y: g[1], open: false })), gate: null,
-  heroes: [], prisoners: [], shots: [], fx: [], doors: [], traps: [], clouds: [], mana: LV.start.mana, maxMana: 800, manaRate: 0.3, templeTiles: 0, spellCd: {}, rally: null, ownedTiles: 0, manaT: 0, research: { current: LV.start.research || null, points: {}, done: {} }, chickens: [], hatchT: 0, hatchTiles: [], trainTiles: [], trainFullAt: -1e9, needs: {}, warnedAt: {}, hatchScan: 0, heartHp: VAR.HEART_HEALTH, heartFlash: 0, gateOpen: false, gateT: 0,
+  heroes: [], prisoners: [], shots: [], fx: [], doors: [], traps: [], clouds: [], mana: LV.start.mana, maxMana: 800, manaRate: 0.1, templeTiles: 0, prayFactor: 1, spellCd: {}, rally: null, ownedTiles: 0, manaT: 0, research: { current: LV.start.research || null, points: {}, done: {} }, chickens: [], hatchT: 0, hatchTiles: [], trainTiles: [], trainFullAt: -1e9, needs: {}, warnedAt: {}, hatchScan: 0, heartHp: VAR.HEART_HEALTH, heartFlash: 0, gateOpen: false, gateT: 0,
   wave: 0, nextWave: Infinity, pending: [], over: null, kills: 0, hand: [], needSince: {}, nextId: 0,
   heardOf: {}, stats: { dug: 0, mined: 0, claimed: 0, spells: 0, trapsPlaced: 0 }, objDone: {}, objProg: {}, guideStep: 0, guideHidden: false,   // counters the objectives read; which objectives are done; where the tutorial guide is
 };
@@ -109,9 +110,9 @@ function buildMap() {
     const t = G.map[idx(x, y)]; t.t = T.PATH; t.hp = owner ? 1000 : 0; t.owner = owner; t.gold = 0; } };
   const room = (cx, cy, id, owner) => { for (let y = cy - 1; y <= cy + 1; y++) for (let x = cx - 1; x <= cx + 1; x++) {
     const t = G.map[idx(x, y)]; t.t = id; t.hp = 1000; t.owner = owner; t.room = cx * 100 + cy; } };
-  if (tl.grid) {                                          // legend: # rock . earth g gold G gem _ floor o your floor h hero land, H P X room centres
+  if (tl.grid) {                                          // legend: # rock . earth g gold B gold vein G gem _ floor o your floor h hero land, H P X room centres
     const CH = { '#': () => fresh(T.ROCK), '.': () => fresh(T.EARTH), g: () => fresh(T.GOLD), G: () => fresh(T.GEM), _: () => fresh(T.PATH, 0, 0), o: () => fresh(T.PATH, 1, 1000), h: () => fresh(T.PATH, HERO_LAND, 1000) };
-    CH.H = CH.P = CH.X = CH._;
+    CH.H = CH.P = CH.X = CH._; CH.B = CH.g;
     tl.grid.forEach((row, y) => { for (let x = 0; x < W; x++) { const mk = CH[row[x]]; if (!mk) console.warn('level grid: unknown character "' + row[x] + '" at ' + x + ',' + y); G.map[idx(x, y)] = (mk || CH['.'])(); } });
   } else {                                                // random terrain: solid earth with a rock border, then blobs of rock, gold and gems (same call order as always, so seeds stay reproducible)
     for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
@@ -122,6 +123,7 @@ function buildMap() {
         if (inb(x, y) && x > 0 && y > 0 && x < W - 1 && y < H - 1 && Math.hypot(x - cx, y - cy) <= r + rand() * 0.9 && G.map[idx(x, y)].t === T.EARTH && !(id === T.ROCK && lanes.some(l => x >= l[0] && x <= l[2] && y >= l[1] && y <= l[3]))) {
           const t = G.map[idx(x, y)]; t.t = id; t.hp = TERRAIN[id].maxHealth; t.gold = TERRAIN[id].goldValue || 0; } } };
     const gen = tl.generate, lanes = gen.lanes || [], scatter = (o, id) => { for (let i = 0; i < o.count; i++) blob(o.x + (rand() * o.xSpan | 0), o.y + (rand() * o.ySpan | 0), o.rMin + (o.rSpan ? (rand() * o.rSpan | 0) : 0), id); };
+    for (const v of gen.veins || []) blob(v.x, v.y, v.r, T.GOLD);                       // veins: a knot of gold seams in one place (laid first, so the rock blobs cannot swallow them)
     scatter(gen.rock, T.ROCK); scatter(gen.gold, T.GOLD);
     for (const gm of gen.gems || []) blob(gm.x, gm.y, gm.r, T.GEM);
     for (const c of tl.caverns || []) carve(...c.rect, OWNER[c.owner]);
@@ -197,7 +199,7 @@ const perApplication = (rate, eff) => Math.round(Math.abs(rate) * eff / 100);
 function goldReleased(total, maxHealth, health) { return maxHealth <= 0 ? total : Math.floor(total * (maxHealth - health) / maxHealth); }
 function damageTile(x, y, dt, eff, quiet) {      // returns gold released; quiet: a hero digging, which is no business of your objectives
   const t = tile(x, y), tr = TERRAIN[t.t];
-  const rate = t.gold > 0 ? VAR.MINE_GOLD_HEALTH : VAR.DIG_ROCK_HEALTH;
+  const rate = tr.imp ? VAR.MINE_GEM_HEALTH : t.gold > 0 ? VAR.MINE_GOLD_HEALTH : VAR.DIG_ROCK_HEALTH;
   const dmg = perApplication(rate, eff) * dt;
   let released = 0, destroyed = false;
   if (t.gold > 0 && !tr.imp) {                   // TileWork.mine: gold comes out in proportion to health lost
@@ -459,6 +461,7 @@ class Creature extends Mover {                    // CreatureMoodSystem / Creatu
     if (this.chicken && this.state !== 'toFood' && this.state !== 'eat') this.releaseChicken();
     if (this.victim && this.state !== 'toRack' && this.state !== 'torture') this.releaseVictim();
     if (this.unconscious) { if (!this.carriedBy) { this.uTime -= dt; if (this.uTime <= 0) { say(this.name + ' #' + this.id + ' bled out.'); kill(this, null); } } return; }
+    if (this.stun > 0) { this.stun -= dt; this.cd = Math.max(0, this.cd - dt); return; }               // stunned by a hero's lightning
     if (this.heals) {                                                     // Dark Angel: patch up wounded creatures nearby
       this.healCd = Math.max(0, (this.healCd || 0) - dt);
       const ally = this.healCd <= 0 && G.creatures.find(c => c !== this && !c.dead && !c.unconscious && c.hp < c.maxHp * 0.7 && dist(this, c) <= 5 && los(this.x, this.y, c.x, c.y));
@@ -513,7 +516,7 @@ class Creature extends Mover {                    // CreatureMoodSystem / Creatu
       if (this.stepMove(dt)) { this.state = 'pray'; this.studyT = VAR.PRAY_SECONDS; this.sndT = 5; sfx('chime', this.x, this.y); }
     } else if (this.state === 'pray') {                                   // Temple: prayer turns into mana and soothes the creature
       this.sndT -= dt; if (this.sndT <= 0) { this.sndT = 5 + this.id % 4; sfx('chime', this.x, this.y); }
-      this.studyT -= dt; this.anger = Math.max(0, this.anger - 40 * dt); G.mana = Math.min(G.maxMana, G.mana + this.pray * (1 + 0.1 * (this.level - 1)) * VAR.PRAYER_MANA_SCALE * dt);
+      this.studyT -= dt; this.anger = Math.max(0, this.anger - 40 * dt); G.mana = Math.min(G.maxMana, G.mana + this.pray * (1 + 0.1 * (this.level - 1)) * VAR.PRAYER_MANA_SCALE * G.prayFactor * dt);
       if (this.studyT <= 0 || this.energy < 35 || this.hunger >= VAR.HUNGRY_AT) { this.releaseDesk(); this.state = 'idle'; this.wait = 1; this.nextTrain = true; }
     } else if (this.state === 'toDesk') {
       if (!G.research.current) { this.releaseDesk(); this.state = 'idle'; this.path = null; }
@@ -726,17 +729,18 @@ function updateShots(dt) {
 const HEROES = [
   { name: 'Knight', letter: 'K', color: '#e8e8f0', hp: 150, dmg: 11, range: 1.2, cdMax: 1.1, ranged: 0, speed: 1.7, sprite: 'knight' },
   { name: 'Archer', letter: 'A', color: '#9fe08f', hp: 70,  dmg: 9,  range: 6,   cdMax: 1.2, ranged: 1, speed: 1.9, sprite: 'archer' },
-  { name: 'Mage',   letter: 'M', color: '#8fb8ff', hp: 60,  dmg: 16, range: 5,   cdMax: 1.8, ranged: 1, speed: 1.6, sprite: 'mage' },
+  { name: 'Mage',   letter: 'M', color: '#8fb8ff', hp: 60,  dmg: 16, range: 5,   cdMax: 1.8, ranged: 1, speed: 1.6, sprite: 'mage', spells: [{ kind: 'lightning', cd: 9, mult: 2.2, range: 6 }] },       // hurls a stunning bolt of lightning at one of your creatures every 9 s
   { name: 'Thief',  letter: 'T', color: '#5a6578', hp: 55,  dmg: 9,  range: 1.2, cdMax: 0.8, ranged: 0, speed: 2.4, sprite: 'thief' },
   { name: 'Guard',  letter: 'G', color: '#4a6ac0', hp: 230, dmg: 9,  range: 1.2, cdMax: 1.3, ranged: 0, speed: 1.4, sprite: 'guard' },
   { name: 'Monk',   letter: 'H', color: '#c8a060', hp: 70,  dmg: 5,  range: 4.5, cdMax: 1.4, ranged: 1, speed: 1.7, sprite: 'monk', heals: true },   // heals wounded allies
-  { name: 'Prince', letter: 'P', color: '#e8c050', hp: 300, dmg: 15, range: 1.2, cdMax: 1.0, ranged: 0, speed: 1.6, sprite: 'prince', fearless: true, boss: true },   // leads the last wave
+  { name: 'Prince', letter: 'P', color: '#e8c050', hp: 300, dmg: 15, range: 1.2, cdMax: 1.0, ranged: 0, speed: 1.6, sprite: 'prince', fearless: true, boss: true, spells: [{ kind: 'heal', cd: 14, amt: 45, r: 4.5 }] },   // leads the waves before the last; heals the heroes round him
   // added with the last unused character art, each countering something different
   { name: 'Dwarf',        letter: 'D', color: '#c07838', hp: 120, dmg: 10, range: 1.2, cdMax: 1.0, ranged: 0, speed: 1.5, sprite: 'dwarf', disarms: true, digs: true, doorBreaker: 2.5 },                  // sets off nothing: it disarms traps; chews through doors
   { name: 'Giant',        letter: 'N', color: '#7a5a40', hp: 250, dmg: 20, range: 1.3, cdMax: 2.0, ranged: 0, speed: 1.1, sprite: 'giant', stunImmune: true, doorBreaker: 3, fearless: true },       // slow, huge, shrugs off lightning stuns
   { name: 'Stone Knight', letter: 'S', color: '#8a9080', hp: 190, dmg: 12, range: 1.2, cdMax: 1.3, ranged: 0, speed: 1.2, sprite: 'stone_knight', armor: 0.25, gasImmune: true },            // a statue: no breathing, thick skin
   { name: 'Fairy',        letter: 'F', color: '#70e0c0', hp: 45,  dmg: 4,  range: 4,   cdMax: 1.1, ranged: 1, speed: 2.2, sprite: 'fairy', flying: true, heals: true, healAmt: 16, healEvery: 2 },  // flies over doors and floor traps
-  { name: 'King',         letter: 'Y', color: '#f0d060', hp: 330, dmg: 16, range: 1.2, cdMax: 1.0, ranged: 0, speed: 1.5, sprite: 'king', fearless: true, boss: true, armor: 0.1 },                // leads the final wave
+  { name: 'King',         letter: 'Y', color: '#f0d060', hp: 400, dmg: 20, range: 1.7, cdMax: 1.2, ranged: 0, speed: 1.4, sprite: 'knight', size: 2, glow: [1.4, 1.15, 0.5], fearless: true, boss: true, armor: 0.25, stunImmune: true, doorBreaker: 3,
+    spells: [{ kind: 'lightning', cd: 7, mult: 1.5, range: 6, chain: 2 }, { kind: 'heal', cd: 12, amt: 70, r: 5 }] },       // a golden Knight twice the size of the others: very strong, stun-proof, armoured, and he throws lightning (and chains it) and heals his host
 ];
 // the invasion is scripted so the new types debut in a sensible order (wave 1 .. 5)
 const WAVE_PLAN = WV.plan || [];                                                  // one list of hero names per wave, from the level
@@ -779,6 +783,10 @@ class Hero extends Mover {
       const ally = this.healCd <= 0 && G.heroes.find(h => h !== this && !h.dead && !h.unconscious && h.hp < h.maxHp * 0.7 && dist(this, h) <= 5 && los(this.x, this.y, h.x, h.y));
       if (ally) { const amt = this.healAmt || 22; ally.hp = Math.min(ally.maxHp, ally.hp + amt); this.healCd = this.healEvery || 2.5; G.fx.push({ x: ally.x, y: ally.y - 0.4, txt: '+' + amt, life: 0.7, color: '#8fffa0' }); G.fx.push({ x: ally.x, y: ally.y, ring: true, r: 0.9, color: '#8fffa0', life: 0.5, max: 0.5 }); }
     }
+    if (this.spells && !this.waiting && this.state !== 'flee') {                                    // hero magic: each spell recharges on its own
+      this.spellT = this.spellT || this.spells.map(sp => sp.cd * 0.5);
+      this.spells.forEach((sp, i) => { this.spellT[i] -= dt; if (this.spellT[i] <= 0) this.spellT[i] = castHeroSpell(this, sp) ? sp.cd : 0.5; });
+    }
     if (fightBrain(this, dt)) return;
     if (this.waiting) return;                                                                         // waves.waiting: stands on the pad until the Gate is linked
     if (dist(this, heartTarget) <= this.range + 1.5 && los(this.x, this.y, heartTarget.x, heartTarget.y) && (!this.ranged || shotClear(this.x, this.y, heartTarget.x, heartTarget.y))) {   // the objective: KILL_PLAYER
@@ -802,12 +810,12 @@ function makeParty(n, gates, waiting) {
     const tunnel = !waiting && !gt.open;                             // a Gate you have not tunnelled to still sends its heroes, and they dig their own way in: every other one digs (flyers cannot), the rest follow the leader
     const base = DIG > 0 && !kind.boss && !kind.flying && (!!kind.digs || slot % VAR.HERO_DIG_PERIOD[DIG] === 0);
     h.digger = tunnel ? base || (!kind.boss && !kind.flying && slot % 2 === 0) : base;
-    if (tunnel) h.digLevel = Math.max(DIG, 2);
+    if (tunnel) h.digLevel = Math.max(DIG, 3);
     party.push(h); groups[gi].push(h);
   });
   gates.forEach((gt, gi) => {                                         // a group with nobody able to dig (a lone boss) makes its first walker dig, so no group is stuck behind the rock
     const party = parties[gi]; if (waiting || gt.open || !party.length || party.some(h => h.digger)) return;
-    const c = party.find(h => !h.flying) || party[0]; c.digger = true; c.digLevel = Math.max(DIG, 2);
+    const c = party.find(h => !h.flying) || party[0]; c.digger = true; c.digLevel = Math.max(DIG, 3);
   });
   gates.forEach((gt, gi) => {                                         // the group holding the first hero (the boss, on a boss wave) comes at once, the others 20 s apart
     const delay = waiting ? 0 : VAR.GATE_STAGGER * ((gi - n % gates.length + gates.length) % gates.length);
@@ -831,6 +839,22 @@ function spawnWave() {
   if (window.Sound) Sound.stinger(kinds[0].boss ? 'boss' : 'wave');
   G.wave++; G.nextWave = G.wave < VAR.WAVES ? G.time + VAR.GATE_STAGGER * (gates.length - 1) + Math.max(VAR.MIN_WAVE_GAP, waveInterval(n)) : Infinity;
   say('⚔ ' + waveText() + ': ' + kinds.length + ' heroes pour out of ' + (gates.length > 1 ? 'the ' + gates.length + ' Hero Gates, ' + VAR.GATE_STAGGER + ' s apart (a Gate you have not tunnelled to sends diggers)' : 'the Hero Gate') + (kinds[0].boss ? ', led by the ' + kinds[0].name + '!' : '!'));
+}
+/* Hero magic. A hero kind may list `spells` (see HEROES): Lightning strikes the nearest of your creatures in range (with a clear shot, not through a door),
+ * stuns it for a second and, for a chaining caster (the King), arcs to two more; Heal mends the wounded heroes round the caster. Each spell has its own recharge. */
+function castHeroSpell(h, sp) {
+  if (sp.kind === 'lightning') {
+    const near = G.creatures.filter(c => alive(c) && dist(h, c) <= sp.range && los(h.x, h.y, c.x, c.y) && shotClear(h.x, h.y, c.x, c.y)).sort((a, b) => dist(h, a) - dist(h, b)); if (!near.length) return false;
+    const first = near[0], hits = [first].concat(G.creatures.filter(c => c !== first && alive(c) && dist(c, first) <= 3.5).slice(0, sp.chain || 0));
+    hits.forEach((c, i) => { G.fx.push({ x: c.x, y: c.y, bolt: true, life: 0.35 }); hurt(c, h.dmg * sp.mult * (i ? 0.5 : 1), h, 'magic_hit'); c.stun = Math.max(c.stun || 0, i ? 0.6 : 1.1); });
+    h.face = Math.atan2(first.y - h.y, first.x - h.x); sfx('lightning', first.x, first.y); if (!h.saidSpell) { h.saidSpell = true; say('⚡ A hero ' + h.name + ' hurls lightning at your creatures!'); } return true;
+  }
+  if (sp.kind === 'heal') {
+    const hurtOnes = G.heroes.filter(a => !a.dead && !a.unconscious && a.hp < a.maxHp * 0.8 && dist(h, a) <= sp.r); if (!hurtOnes.length) return false;
+    for (const a of hurtOnes) { a.hp = Math.min(a.maxHp, a.hp + sp.amt); G.fx.push({ x: a.x, y: a.y - 0.4, txt: '+' + sp.amt, life: 0.7, color: '#8fffa0' }); }
+    G.fx.push({ x: h.x, y: h.y, ring: true, r: sp.r, color: '#8fffa0', life: 0.6, max: 0.6 }); sfx('heal', h.x, h.y); return true;
+  }
+  return false;
 }
 function heroLogic(dt) {
   if (!G.gates.length) return;
@@ -1042,7 +1066,7 @@ function updateHatchery(dt) {
   for (const c of G.chickens) c.update(dt);
   G.chickens = G.chickens.filter(c => !c.dead);
 }
-const prayRate = () => G.creatures.reduce((s, c) => s + (c.state === 'pray' ? c.pray * (1 + 0.1 * (c.level - 1)) * VAR.PRAYER_MANA_SCALE : 0), 0);
+const prayRate = () => G.creatures.reduce((s, c) => s + (c.state === 'pray' ? c.pray * (1 + 0.1 * (c.level - 1)) * VAR.PRAYER_MANA_SCALE * G.prayFactor : 0), 0);
 const manaIncome = () => G.manaRate + prayRate();            // mana a second right now: the trickle, the Temple's tiles and the creatures praying in it
 
 /* ===================================================================================== knock-out, prison & torture
@@ -1119,7 +1143,7 @@ const SPELLS = {
 const SPELL_ORDER = ['lightning', 'heal', 'haste', 'rally', 'imp'];
 const SPELL_SND = { lightning: 'lightning', heal: 'heal', haste: 'haste', rally: 'rally', imp: 'imp_spawn' };
 function updateMana(dt) {
-  G.manaT -= dt; if (G.manaT <= 0) { G.manaT = 1; G.ownedTiles = 0; G.templeTiles = 0; for (const t of G.map) if (t.owner === 1 && !TERRAIN[t.t].solid) { G.ownedTiles++; if (t.t === T.TEMPLE) G.templeTiles++; } G.manaRate = VAR.MANA_BASE + VAR.MANA_PER_TEMPLE_TILE * G.templeTiles; }
+  G.manaT -= dt; if (G.manaT <= 0) { G.manaT = 1; G.ownedTiles = 0; G.templeTiles = 0; for (const t of G.map) if (t.owner === 1 && !TERRAIN[t.t].solid) { G.ownedTiles++; if (t.t === T.TEMPLE) G.templeTiles++; } G.manaRate = VAR.MANA_BASE + VAR.MANA_PER_TEMPLE_TILE * Math.min(G.templeTiles, VAR.TEMPLE_MAX_TILES); G.prayFactor = G.templeTiles > VAR.TEMPLE_MAX_TILES ? VAR.TEMPLE_MAX_TILES / G.templeTiles : 1; }
   G.mana = Math.min(G.maxMana, G.mana + G.manaRate * dt);
   for (const k in G.spellCd) G.spellCd[k] = Math.max(0, G.spellCd[k] - dt);
 }
@@ -1514,7 +1538,7 @@ function renderHud() {
   const lim = armyLimit(); $('hCreatures').textContent = G.creatures.length; $('hMax').textContent = lim.cap; $('hLimit').textContent = lim.by;
   $('hCreaturesBox').title = limitText(lim) + ' Build Lair tiles for beds and Hatchery tiles for food.'; $('hCreaturesBox').classList.toggle('full', G.creatures.length >= lim.cap);
   $('hPay').textContent = Math.max(0, Math.ceil(G.nextPay)); $('hTime').textContent = Math.floor(G.time);
-  $('hMana').textContent = Math.floor(G.mana) + '/' + G.maxMana; $('hMana').parentElement.title = 'Mana +' + manaIncome().toFixed(1) + ' a second: ' + VAR.MANA_BASE + ' trickle, +' + VAR.MANA_PER_TEMPLE_TILE + ' for each of your ' + G.templeTiles + ' Temple tiles, plus creatures praying in it. Without a Temple mana almost stops.';
+  $('hMana').textContent = Math.floor(G.mana) + '/' + G.maxMana; $('hMana').parentElement.title = 'Mana +' + manaIncome().toFixed(1) + ' a second: ' + VAR.MANA_BASE + ' trickle, +' + VAR.MANA_PER_TEMPLE_TILE + ' for each of your ' + G.templeTiles + ' Temple tiles (no more beyond ' + VAR.TEMPLE_MAX_TILES + '), plus creatures praying in it. Without a Temple mana almost stops.';
   for (const id of SPELL_ORDER) $('b_' + id).style.opacity = G.mana >= SPELLS[id].cost && !(G.spellCd[id] > 0) ? 1 : 0.45;
   for (const id in RESEARCH) { const b = $('b_' + id); if (!isAvail(id)) { b.style.opacity = 0.3; b.title = 'Locked — research it in a Library'; } else { b.title = ''; if (!SPELLS[id]) b.style.opacity = ''; } }
   renderResearch(); renderObjectives(); renderGuide(); renderEnd(); syncHandCursor(); renderRoster(); renderTip();

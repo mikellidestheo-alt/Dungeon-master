@@ -14,7 +14,7 @@
  *   objectives                list of { type, ...params, text?, optional? }: the level is won when every non-optional one is done (default: beat every wave)
  *   guide                     list of { text, when?, at?, tool? }: tutorial hints shown one at a time
  *
- * Grid legend:  # rock   . earth   g gold seam   G gem seam   _ bare floor   o your floor   h hero land
+ * Grid legend:  # rock   . earth   g gold seam   B gold vein (a solid block of seams)   G gem seam   _ bare floor   o your floor   h hero land
  *               H Dungeon Heart centre   P Portal centre   X Hero Gate centre   (each marker becomes a 3x3 room)
  */
 window.DEFAULT_LEVEL = 'classic';
@@ -127,7 +127,7 @@ window.enlargeGrid = function (grid, salt) {
   const rnd = (x, y, k) => { let v = Math.imul(x + 1, 374761393) ^ Math.imul(y + 1, 668265263) ^ Math.imul(k + 1 + hs, 2246822519); v = Math.imul(v ^ (v >>> 13), 1274126177); return ((v ^ (v >>> 16)) >>> 0) / 4294967296; };
   const cells = Array.from({ length: 2 * h }, () => new Array(2 * w));
   for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
-    const c = grid[y][x], q = (c === 'g' || c === 'G') ? [c, '.', '.', c === 'g' ? 'g' : '.'] : FLOOR[c] ? [c, FLOOR[c], FLOOR[c], FLOOR[c]] : [c, c, c, c];
+    const c = grid[y][x], q = c === 'B' ? ['g', 'g', 'g', 'g'] : (c === 'g' || c === 'G') ? [c, '.', '.', c === 'g' ? 'g' : '.'] : FLOOR[c] ? [c, FLOOR[c], FLOOR[c], FLOOR[c]] : [c, c, c, c];       // B: a solid block of gold (a vein), four seams to a cell
     cells[2 * y][2 * x] = q[0]; cells[2 * y][2 * x + 1] = q[1]; cells[2 * y + 1][2 * x] = q[2]; cells[2 * y + 1][2 * x + 1] = q[3];
   }
   const H = 2 * h, W = 2 * w, field = (x, y, r) => { for (let j = -r; j <= r; j++) for (let i = -r; i <= r; i++) { const row = cells[y + j]; if (!row || row[x + i] !== '.') return false; } return true; };
@@ -190,7 +190,7 @@ window.makeSandbox = function (params) {
   for (const [x, y] of gates) caverns.push({ rect: [x - 3, y - 3, x + 3, y + 3], owner: 'hero' });
   const base = { terrain: { size: M.size, caverns, generate: {
       rock: { count: 44, x: 4, xSpan: gw - 8, y: 2, ySpan: gh - 4, rMin: 1, rSpan: 2 }, gold: { count: 46, x: 12, xSpan: gw - 24, y: 2, ySpan: gh - 4, rMin: 1, rSpan: 0 },
-      gems: [{ x: 30, y: 12, r: 1 }, { x: 58, y: 46, r: 1 }, { x: 44, y: 30, r: 1 }, { x: 20, y: 44, r: 1 }, { x: 66, y: 12, r: 1 }], lanes } },
+      gems: [{ x: 30, y: 12, r: 1 }, { x: 58, y: 46, r: 1 }, { x: 44, y: 30, r: 1 }, { x: 20, y: 44, r: 1 }, { x: 66, y: 12, r: 1 }], veins: [{ x: 32, y: 20, r: 2 }, { x: 62, y: 40, r: 2 }, { x: 30, y: 42, r: 2 }, { x: 60, y: 16, r: 2 }, { x: 46, y: 24, r: 2 }], lanes }   /* veins: rich knots of gold, like the original Dungeon Keeper maps */ },
     heart: M.heart, portal: M.portal, gates, start: { pretag: [[M.heart[0] + 4, M.heart[1]], [M.heart[0] + 5, M.heart[1]], [M.heart[0] + 6, M.heart[1]], [M.heart[0] + 7, M.heart[1]]] } };
   const lv = {
     id: 'sandbox', name: endless ? 'Endless Siege' : 'Sandbox', seed: Number.isFinite(seed) ? seed : 7, sandbox: { diff, endless, gates: ng },

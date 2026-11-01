@@ -274,7 +274,7 @@ function start() {
         else f = meta.idle[0] + Math.floor(G.time * (u.state === 'sleep' ? 1.5 : 3.5) + ph * 4) % 4;
       }
       d.tex.repeat.x = (d.flip ? -1 : 1) / N; d.tex.offset.x = d.flip ? (f + 1) / N : f / N;
-      const hgt = (USIZE[name] || 1.2) * (u.state === 'sleep' ? .88 : 1);
+      const hgt = (USIZE[name] || 1.2) * (u.size || 1) * (u.state === 'sleep' ? .88 : 1);
       const bw = strip ? meta.bw : srcTex.image.width, bh = strip ? meta.bh : srcTex.image.height, upp = hgt / bh, wid = bw * upp;       // wid = the character's own width on screen
       const qw = strip ? meta.fw * upp : wid, qh = strip ? meta.fh * upp : hgt;                                                    // the quad is the whole padded frame
       const fly = u.flying && !lying ? 0.42 + Math.sin(G.time * 6 + d.phase * 6) * .07 : 0;                                         // flyers hover above their shadow
@@ -292,7 +292,7 @@ function start() {
       const c = d.spr.material.color;
       if (u.flash > 0) c.setScalar(2.4); else if (u.isImp && u.state === 'flee') c.setRGB(1.4, .85, .7);
       else if (u.haste > 0) c.setRGB(.7, .9, 1.9); else if (u.state === 'research' || u.state === 'pray') c.setRGB(1.3, 1.15, .75);
-      else if (u.tint) c.setRGB(1.1, .75, 1.35); else if (u.state === 'sleep') c.setRGB(.6, .6, .85); else c.setScalar(1);
+      else if (u.glow) c.setRGB(u.glow[0], u.glow[1], u.glow[2]); else if (u.tint) c.setRGB(1.1, .75, 1.35); else if (u.state === 'sleep') c.setRGB(.6, .6, .85); else c.setScalar(1);
       d.shadow.scale.set(Math.max(.5, wid * .75), Math.max(.5, wid * .75) * .85, Math.max(.5, wid * .75)); d.shadow.visible = !lying && !held;
       if (d.ring) { d.ring.position.y = d.spr.position.y * 0 + .03; d.ring.scale.setScalar(Math.max(.7, wid * .75)); d.ring.visible = !lying; }
       d.bar.position.y = lying ? .6 : hgt + .1 + hop; const showBar = u.hp < u.maxHp; d.bar.visible = showBar; if (showBar) d.bar.userData.fg.scale.x = .5 * Math.max(0.001, u.hp / u.maxHp);
@@ -481,5 +481,5 @@ function start() {
     heartLight.intensity = 2.0 + Math.sin(G.time * 4) * .5; portalLight.intensity = G.portalOwned ? 1.6 : 0;
     renderer.render(scene, camera);
   };
-  window.__three = { scene, camera, renderer, cam, SPR, TEXS, doorObjs };
+  window.__three = { scene, camera, renderer, cam, SPR, TEXS, doorObjs, unitMeshes };
 }

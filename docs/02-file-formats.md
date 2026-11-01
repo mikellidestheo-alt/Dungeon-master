@@ -120,7 +120,7 @@ Values observed in OpenKeeper comments (campaign defaults):
 | `CONVERT_ROOM_HEALTH` / `ATTACK_ROOM_HEALTH` | -4000 / -1500 | |
 | `MAX_GOLD_PER_TREASURY_TILE` | 3000 | |
 | `MAX_GOLD_PILE_OUTSIDE_TREASURY` | 2000 | |
-| `GOLD_MINED_FROM_GEMS` | 25 | |
+| `GOLD_MINED_FROM_GEMS` | 25 | (the prototype pays 50 and takes `MINE_GEM_HEALTH` 450 instead of 300 per second of work: about 8 s a payout) |
 | `PAY_DAY_FREQUENCY_SECONDS` / `TIME_BEFORE_FIRST_PAY_DAY_SECONDS` | 600 / 600 | |
 | `MODIFY_HEALTH_OF_CREATURE_IN_LAIR_PER_SECOND` | +100 | |
 | `MODIFY_ANGER_OF_CREATURE_IN_LAIR_PER_SECOND` | -550 | |
