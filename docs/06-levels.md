@@ -246,8 +246,11 @@ Things every chapter shares:
   extra, kills, banked gold.
 - **Guides** introduce the chapter's new thing as it comes up; the Tutorial's has eleven steps with markers and pulsing buttons and
   carries you from the first dig to the Knight. `?guide=0` turns them off.
-- In chapters 9 and 10 you need only **one** Gate linked to start the clock: link one and fight on a single front, or open more and
-  every wave is split between them.
+- On every level with several Gates (chapters 8-10, the sandbox) you need only **one** Gate linked to start the clock, and from then on **every** Gate
+  sends heroes: each wave comes out of all of them one group at a time, `VAR.GATE_STAGGER` 20 s apart (the group holding the boss first), and the next wave
+  follows at least `VAR.MIN_WAVE_GAP` 40 s after the last group. The heroes at a Gate nobody has tunnelled to are **diggers** (every other one digs at level 2 or
+  better, a lone boss's group makes one walker dig, flyers follow): they tunnel through earth and gold towards your creatures and Heart, and when their
+  tunnel meets your dungeon the Gate counts as linked (the Log warns you). Link it yourself and you choose where they meet you.
 - `lesson`, `classic` and `tiny` stay in `levels.js` as fixtures; they are not part of the campaign (the sandbox has its own, larger map).
 
 ## Balance
@@ -269,16 +272,16 @@ Results with 8 seeds each (what the test pins, with margins, is in the file):
 |---|---|---|---|---|---|---|
 | 1 | The Awakening | 8/8 | 1.8 min | 0 | - | 8/8 (it is the Tutorial) |
 | 2 | Creatures of the Dark | 8/8 | 6.5 | 0 | 8/8 | 2/8 |
-| 3 | Mouths to Feed | 8/8 | 7.9 | 0 | 8/8 | 0/8 |
-| 4 | The Library | 8/8 | 7.8 | 1 | 8/8 | 0/8 |
-| 5 | Doors and Snares | 8/8 | 8.7 | 0 | 8/8 | 0/8 |
-| 6 | The Dungeon Below | 8/8 | 10.2 | 1 | 8/8 | 0/8 |
-| 7 | Prayers and Power | 8/8 | 10.6 | 1 | 8/8 | 0/8 |
-| 8 | Two Gates | 8/8 | 11.7 | 1 | 8/8 | 0/8 |
-| 9 | The Siege | 6/8 | 13.2 | 10 | 6/6 wins | 0/8 |
-| 10 | The King's Crusade | 5/8 | 14.7 | 16 | 5/5 wins | 0/8 |
+| 3 | Mouths to Feed | 8/8 | 8.3 | 0 | 8/8 | 0/8 |
+| 4 | The Library | 8/8 | 8.0 | 4 | 8/8 | 0/8 |
+| 5 | Doors and Snares | 8/8 | 9.0 | 2 | 8/8 | 0/8 |
+| 6 | The Dungeon Below | 7/8 | 10.4 | 3 | 7/7 wins | 0/8 |
+| 7 | Prayers and Power | 8/8 | 12.4 | 7 | 8/8 | 0/8 |
+| 8 | Two Gates | 6/8 | 14.2 | 9 | 6/6 wins | 0/8 |
+| 9 | The Siege | 5/8 | 17.0 | 18 | 5/5 wins | 0/8 |
+| 10 | The King's Crusade | 5/8 | 21.8 | 10 | 5/5 wins | 0/8 |
 
-The bot is a *fast* player, so a first-time human takes longer: its times add up to about 93 minutes (the Portal is now a short dig from the Heart), so a first-time human needs roughly two hours.
+The bot is a *fast* player, so a first-time human takes longer: its times add up to about 100 minutes (the Portal is now a short dig from the Heart), so a first-time human needs roughly two hours.
 "Not trivial" means the lazy bot never wins a chapter after the first and never survives chapters 6-10, while the finale costs even the
 careful bot about 11 creatures and more than half its runs. Chapters 1-8 are meant to be cleared cleanly by a prepared player: they teach, and
 the pressure arrives in 9 and 10.
@@ -287,6 +290,12 @@ the pressure arrives in 9 and 10.
 the Hatchery healing, 20-25 creatures) the steady bot finished every chapter 1 to 5 minutes sooner and the finale became easy (chapter 10 won 8 of 8
 times with 4 creatures lost), so chapters 9 and 10 got stronger heroes (`heroMult` 1.0 to 1.2 and 1.08 to 1.37) and the length windows in
 `tools/test_bots.js` were lowered to match. The bot builds up to four traps (two of each kind) and chapter 5's bonus is now "Set 4 traps".
+
+**Second playtest round** (every Gate sends heroes, a Temple for mana, spell costs and cooldowns up, a cap per kind of monster): a Temple-less dungeon has
+almost no mana now (0.3 a second), the second Gate's diggers and the 20 s stagger make chapters 8-10 longer and harder, and the chapters before them
+were too easy, so heroes got stronger in chapters 3-7 (`heroMult` 0.9, 1.05, 0.85, 0.85, 1.2 became 1.0, 1.2, 1.3, 1.35, 1.3) and chapter 10 eased from 1.37 to 1.25.
+The curve the test now pins: chapters 1-5 won nearly always (with creatures lost from chapter 4 on), 6 and 7 at least 70%, chapter 8 at least 60%,
+chapter 9 at least 38%, chapter 10 at least 25%, and the finale no easier than chapter 8.
 
 What the bots showed, and what changed because of it:
 

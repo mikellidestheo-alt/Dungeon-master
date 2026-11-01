@@ -50,7 +50,7 @@ const ROOMS = ['treasury', 'lair', 'library', 'hatchery', 'temple', 'prison', 't
     await page.click('#tab_build'); v = await visible(page);
     check('clicking the open tab again closes it', v.length === 8 && !v.includes('b_treasury'), v.join());
     await page.click('#tab_spells'); v = await visible(page);
-    check('Spells: the five spells, with costs and hotkeys on the buttons', SPELLS.every(id => v.includes('b_' + id)) && !v.includes('b_treasury') && await page.evaluate(() => /120 \[1\]/.test(document.getElementById('b_lightning').textContent) && /100 \[5\]/.test(document.getElementById('b_imp').textContent)), v.join());
+    check('Spells: the five spells, with costs and hotkeys on the buttons', SPELLS.every(id => v.includes('b_' + id)) && !v.includes('b_treasury') && await page.evaluate(() => /180 \[1\]/.test(document.getElementById('b_lightning').textContent) && /120 \[5\]/.test(document.getElementById('b_imp').textContent)), v.join());
     check('Spells fits the slot', await fits(page));
     await page.click('#tab_monsters'); v = await visible(page);
     check('Monsters replaces Spells: the Hand is there, the spells are not', v.includes('b_hand') && !v.includes('b_lightning') && await page.evaluate(() => document.getElementById('tab_monsters').classList.contains('open') && !document.getElementById('tab_spells').classList.contains('open')), v.join());

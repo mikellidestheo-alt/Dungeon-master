@@ -39,6 +39,8 @@ const VAR = {                                         // Variable.MiscVariable.M
   HEART_HEALTH: 2500,
   WAVES: 5, FIRST_WAVE_DELAY: 75, WAVE_INTERVAL: 110, // hero gate invasions (tuning)
   HEAR_DISTANCE: 14,                                  // Attributes.distanceCanHear: keepers sense heroes on own land
+  MANA_BASE: 0.3, MANA_PER_TEMPLE_TILE: 0.12, PRAYER_MANA_SCALE: 0.7,           // mana: a trickle of 0.3/s without a Temple (a spell every ten minutes), +0.12/s for every Temple tile, and worshippers add 70% of their old prayer rate
+  GATE_STAGGER: 20, MIN_WAVE_GAP: 40,                // with several Hero Gates every wave comes out of ALL of them once one is linked, a group every 20 s, and the last group is followed by at least 40 s of calm
   HERO_DIG_COST: 6, HERO_DIG_SHORTCUT: 0.6, HERO_DIG_SENSE: 20, HERO_DIG_EFF: [0, 45, 55, 70, 85], HERO_DIG_PERIOD: [Infinity, 4, 3, 2, 1],      // a wall tile costs a digger 6 steps of walking (about 3-6 s of digging against 0.6 s a step); it tunnels when that is under 0.6x the way round; creatures within 20 tiles draw it; efficiency % by level (imps are 80); every 4th / 3rd / 2nd / every hero digs by level, and Dwarves always do
   XP_PER_KILL: 1, MAX_LEVEL: 10,                      // CreatureExperienceSystem, reduced: a kill is a trickle, training is the way up (see XP_FOR_LEVEL)
   XP_FOR_LEVEL: [50, 65, 80, 100, 125, 155, 190, 230, 280],     // XP to go from level n to n+1 (index n-1); 1275 in all: at about 30 XP a minute of steady training a creature gains a level every 1.7 minutes at first, 9 minutes at the end
@@ -84,8 +86,8 @@ const G = {
   nextImp: 0, nextSpawn: 20, nextPay: VAR.PAY_DAY_FREQUENCY_SECONDS, scanT: 0, log: [],
   portalOwned: false, heart: { x: POS.heart[0], y: POS.heart[1] }, portal: POS.portal && { x: POS.portal[0], y: POS.portal[1] },
   gates: POS.gates.map(g => ({ x: g[0], y: g[1], open: false })), gate: null,
-  heroes: [], prisoners: [], shots: [], fx: [], doors: [], traps: [], clouds: [], mana: LV.start.mana, maxMana: 1000, manaRate: 3, spellCd: {}, rally: null, ownedTiles: 0, manaT: 0, research: { current: LV.start.research || null, points: {}, done: {} }, chickens: [], hatchT: 0, hatchTiles: [], trainTiles: [], trainFullAt: -1e9, needs: {}, warnedAt: {}, hatchScan: 0, heartHp: VAR.HEART_HEALTH, heartFlash: 0, gateOpen: false, gateT: 0,
-  wave: 0, nextWave: Infinity, over: null, kills: 0, hand: [], needSince: {}, nextId: 0,
+  heroes: [], prisoners: [], shots: [], fx: [], doors: [], traps: [], clouds: [], mana: LV.start.mana, maxMana: 800, manaRate: 0.3, templeTiles: 0, spellCd: {}, rally: null, ownedTiles: 0, manaT: 0, research: { current: LV.start.research || null, points: {}, done: {} }, chickens: [], hatchT: 0, hatchTiles: [], trainTiles: [], trainFullAt: -1e9, needs: {}, warnedAt: {}, hatchScan: 0, heartHp: VAR.HEART_HEALTH, heartFlash: 0, gateOpen: false, gateT: 0,
+  wave: 0, nextWave: Infinity, pending: [], over: null, kills: 0, hand: [], needSince: {}, nextId: 0,
   heardOf: {}, stats: { dug: 0, mined: 0, claimed: 0, spells: 0, trapsPlaced: 0 }, objDone: {}, objProg: {}, guideStep: 0, guideHidden: false,   // counters the objectives read; which objectives are done; where the tutorial guide is
 };
 Object.defineProperty(G, 'held', { get() { return this.hand[this.hand.length - 1] || null; }, set(v) { if (!v) this.hand = []; else if (!this.hand.includes(v)) this.hand.push(v); } });      // G.held: the creature on top of the hand (the one a click drops next)
@@ -297,6 +299,7 @@ class Imp extends Mover {                        // CreatureState.IDLE -> findSt
     this.think -= dt;
     if (this.state === 'idle') {
       if (this.think > 0) return; this.think = 0.4;
+      if (this.urgentOpen() && this.findWork()) return;                  // somebody is lying knocked out: carry them first, gold can wait
       if (this.gold > 0 && this.deliver()) return;                       // isTooMuchGold -> dropGoldToTreasury
       if (this.gold >= VAR.IMP_MAX_GOLD && !this.hasRoomFor()) {         // treasury full: surplus is dumped so imps keep working
         this.gold = 0; if (!G.warnFull) { G.warnFull = 1; say('Treasury full — imps are dumping surplus gold. Build more Treasury!'); } }
@@ -306,10 +309,12 @@ class Imp extends Mover {                        // CreatureState.IDLE -> findSt
     } else if (this.state === 'toTask') {
       if (!this.task || !G.tasks.has(this.task.key)) return this.drop();
       if (this.task.body && (this.task.body.carriedBy || this.task.body.dead)) return this.drop();
+      if (this.preempted(dt)) return;
       if (this.stepMove(dt)) this.state = 'work';
     } else if (this.state === 'work') {
       const k = this.task; if (!k || !G.tasks.has(k.key)) return this.drop();
       if (k.body && (k.body.carriedBy || k.body.dead)) return this.drop();
+      if (this.preempted(dt)) return;
       if (k.type === 'DIG') {
         if (this.gold >= VAR.IMP_MAX_GOLD && !this.hasRoomFor()) return this.drop();
         this.digT = (this.digT || 0) - dt;
@@ -340,6 +345,10 @@ class Imp extends Mover {                        // CreatureState.IDLE -> findSt
       }
     }
   }
+  preempted(dt) {                                                         // an imp on an everyday job drops it the moment a rescue / capture / haul is waiting (checked twice a second)
+    this.urgentT = (this.urgentT || 0) - dt; if (this.urgentT > 0) return false; this.urgentT = 0.4;
+    if (this.task && !TASK[this.task.type].urgent && !this.task.body && this.urgentOpen()) { this.drop(); this.think = 0; return true; } return false;
+  }
   hasRoomFor() { return capacity() > G.gold; }
   deliver() {
     if (!this.hasRoomFor()) return false;
@@ -349,13 +358,17 @@ class Imp extends Mover {                        // CreatureState.IDLE -> findSt
     if (!best) return false; const p = findPath(this.tx, this.ty, best.x, best.y); if (!p) return false;
     this.state = 'deliver'; this.go(p); if (!p.length) this.state = 'deliver'; return true;
   }
+  taskOpen(task) {                                                        // may this imp take the task right now?
+    const def = TASK[task.type]; if (task.who.size >= def.max) return false;
+    if (task.body && (task.body.carriedBy || (task.type === 'CAPTURE' && !freeSlot(T.PRISON, task.body)) || (task.type === 'HAUL' && !freeSlot(T.TORTURE, task.body)))) return false;
+    return !(task.type === 'DIG' && this.gold >= VAR.IMP_MAX_GOLD && !this.hasRoomFor());
+  }
+  urgentOpen() { for (const task of G.tasks.values()) if (TASK[task.type].urgent && this.taskOpen(task)) return true; return false; }      // a knocked-out creature or hero is waiting for a carrier
   findWork() {                                                            // TaskManager: workers pull tasks
     const cands = [], load = {};                                           // load: how many other imps are already on each kind of job
     for (const i of G.imps) if (i !== this && i.task) load[i.task.type] = (load[i.task.type] || 0) + 1;
     for (const task of G.tasks.values()) {
-      const def = TASK[task.type]; if (task.who.size >= def.max) continue;
-      if (task.body && (task.body.carriedBy || (task.type === 'CAPTURE' && !freeSlot(T.PRISON, task.body)) || (task.type === 'HAUL' && !freeSlot(T.TORTURE, task.body)))) continue;
-      if (task.type === 'DIG' && this.gold >= VAR.IMP_MAX_GOLD && !this.hasRoomFor()) continue;
+      const def = TASK[task.type]; if (!this.taskOpen(task)) continue;
       // Rescue / capture / haul come first. Of the everyday jobs, the one with the fewest imps on it wins (so with one imp digging, the next claims floor
       // and the next repairs a door), priority only breaks ties; within a job, a tile nobody is at yet beats one that already has company.
       const score = (def.urgent ? 10000 : -1000 * (load[task.type] || 0)) + def.prio * 100 - task.who.size * 30 - (Math.abs(task.x - this.tx) + Math.abs(task.y - this.ty));
@@ -411,8 +424,13 @@ const unmetNeeds = (k, have = ownedRooms()) => k.needs.filter(([room, n]) => (ha
 const arrivalsOpen = () => LV.rules.arrivals === 'any';              // a level can switch the rule off
 const roomName = (room) => TERRAIN[ROOM_TOOLS[room]].name;
 const needText = (needs) => needs.map(([room, n]) => 'a ' + roomName(room) + ' of ' + n + ' tile' + (n > 1 ? 's' : '')).join(' and ');
-function pickKind() {                              // portal arrivals, weighted so the common kinds show up more; only kinds whose rooms you have built
-  const have = ownedRooms(), pool = KINDS.filter(k => arrivalsOpen() || !unmetNeeds(k, have).length);
+/* A good mix: no kind may be more than a quarter of the Portal's limit (5 of 20, 7 of 25). The three beginner kinds (Goblin, Spider, Fly: no room needed)
+ * therefore fill at most 15 of 20 places, and the rest are kept for kinds that want a Library, Temple, Hatchery and so on. */
+const kindCap = () => Math.max(2, Math.ceil(VAR.CREATURES_SUPPORTED_BY_FIRST_PORTAL / 4));
+const kindCount = (k) => G.creatures.filter(c => !c.dead && c.name === k.name).length;
+function pickKind() {                              // portal arrivals, weighted so the common kinds show up more; only kinds whose rooms you have built and whose cap is not reached (null: nobody can come)
+  const have = ownedRooms(), cap = kindCap(), pool = KINDS.filter(k => (arrivalsOpen() || !unmetNeeds(k, have).length) && kindCount(k) < cap);
+  if (!pool.length) return null;
   let r = rand() * pool.reduce((s, k) => s + k.weight, 0);
   for (const k of pool) { r -= k.weight; if (r <= 0) return k; }
   return pool[0];
@@ -495,7 +513,7 @@ class Creature extends Mover {                    // CreatureMoodSystem / Creatu
       if (this.stepMove(dt)) { this.state = 'pray'; this.studyT = VAR.PRAY_SECONDS; this.sndT = 5; sfx('chime', this.x, this.y); }
     } else if (this.state === 'pray') {                                   // Temple: prayer turns into mana and soothes the creature
       this.sndT -= dt; if (this.sndT <= 0) { this.sndT = 5 + this.id % 4; sfx('chime', this.x, this.y); }
-      this.studyT -= dt; this.anger = Math.max(0, this.anger - 40 * dt); G.mana = Math.min(G.maxMana, G.mana + this.pray * (1 + 0.1 * (this.level - 1)) * dt);
+      this.studyT -= dt; this.anger = Math.max(0, this.anger - 40 * dt); G.mana = Math.min(G.maxMana, G.mana + this.pray * (1 + 0.1 * (this.level - 1)) * VAR.PRAYER_MANA_SCALE * dt);
       if (this.studyT <= 0 || this.energy < 35 || this.hunger >= VAR.HUNGRY_AT) { this.releaseDesk(); this.state = 'idle'; this.wait = 1; this.nextTrain = true; }
     } else if (this.state === 'toDesk') {
       if (!G.research.current) { this.releaseDesk(); this.state = 'idle'; this.path = null; }
@@ -749,7 +767,8 @@ class Hero extends Mover {
     const d = this.digAt; if (!diggable(d.x, d.y)) { this.digAt = null; this.think = 0; return false; }
     this.face = Math.atan2(d.y + .5 - this.y, d.x + .5 - this.x); this.digSnd = (this.digSnd || 0) - dt; if (this.digSnd <= 0) { this.digSnd = 0.6; sfx(tile(d.x, d.y).gold > 0 ? 'mine' : 'dig', d.x + .5, d.y + .5); }
     if (!G.warnDig) { G.warnDig = 1; say('Heroes are tunnelling through the earth towards you!'); }
-    damageTile(d.x, d.y, dt, VAR.HERO_DIG_EFF[DIG], true); return true;
+    if (this.homeGate && !this.homeGate.open) this.homeGate.dug = true;           // this Gate is being reached by the heroes' own tunnel, not yours
+    damageTile(d.x, d.y, dt, VAR.HERO_DIG_EFF[this.digLevel === undefined ? DIG : this.digLevel], true); return true;
   }
   update(dt) {
     if (this.dead) return; this.flash = Math.max(0, this.flash - dt);
@@ -775,23 +794,43 @@ class Hero extends Mover {
 /* Builds wave n's party and deals it out between the given Hero Gates (starting from a different gate each wave so the boss does not always arrive
  * at the same one; each gate's group has its own leader). `waiting` parks them on the pad, idle, until their Gate is linked (waves.waiting). */
 function makeParty(n, gates, waiting) {
-  const scale = (1 + LV.waves.scale * n) * (LV.waves.heroMult || 1), kinds = waveNames(n).map(nm => HEROES.find(h => h.name === nm)), parties = gates.map(() => []);
+  const scale = (1 + LV.waves.scale * n) * (LV.waves.heroMult || 1), kinds = waveNames(n).map(nm => HEROES.find(h => h.name === nm)), parties = gates.map(() => []), groups = gates.map(() => []);
   kinds.forEach((kind, j) => {
     const gi = (j + n) % gates.length, gt = gates[gi], party = parties[gi], slot = party.length;
     // a waiting party fills the pad from the front (the side facing the camera) so the Gate's big sprite does not hide it
-    const ox = slot % 3, oy = (slot / 3) | 0, h = new Hero(waiting ? gt.x + 1 - ox : gt.x - 1 + ox, waiting ? gt.y + 1 - oy : gt.y - 1 + oy, kind, scale, party); h.homeGate = gt; h.waiting = !!waiting; h.digger = DIG > 0 && !kind.boss && !kind.flying && (!!kind.digs || slot % VAR.HERO_DIG_PERIOD[DIG] === 0); party.push(h); G.heroes.push(h);
+    const ox = slot % 3, oy = (slot / 3) | 0, h = new Hero(waiting ? gt.x + 1 - ox : gt.x - 1 + ox, waiting ? gt.y + 1 - oy : gt.y - 1 + oy, kind, scale, party); h.homeGate = gt; h.waiting = !!waiting;
+    const tunnel = !waiting && !gt.open;                             // a Gate you have not tunnelled to still sends its heroes, and they dig their own way in: every other one digs (flyers cannot), the rest follow the leader
+    const base = DIG > 0 && !kind.boss && !kind.flying && (!!kind.digs || slot % VAR.HERO_DIG_PERIOD[DIG] === 0);
+    h.digger = tunnel ? base || (!kind.boss && !kind.flying && slot % 2 === 0) : base;
+    if (tunnel) h.digLevel = Math.max(DIG, 2);
+    party.push(h); groups[gi].push(h);
+  });
+  gates.forEach((gt, gi) => {                                         // a group with nobody able to dig (a lone boss) makes its first walker dig, so no group is stuck behind the rock
+    const party = parties[gi]; if (waiting || gt.open || !party.length || party.some(h => h.digger)) return;
+    const c = party.find(h => !h.flying) || party[0]; c.digger = true; c.digLevel = Math.max(DIG, 2);
+  });
+  gates.forEach((gt, gi) => {                                         // the group holding the first hero (the boss, on a boss wave) comes at once, the others 20 s apart
+    const delay = waiting ? 0 : VAR.GATE_STAGGER * ((gi - n % gates.length + gates.length) % gates.length);
+    if (!groups[gi].length) return;
+    if (delay <= 0) G.heroes.push(...groups[gi]); else G.pending.push({ at: G.time + delay, gate: gt, heroes: groups[gi] });
   });
   return kinds;
+}
+function releasePending() {                                           // later groups step out of their Gates
+  if (!G.pending.length) return;
+  for (const p of G.pending) if (G.time >= p.at) { G.heroes.push(...p.heroes); p.done = true; const gi = G.gates.indexOf(p.gate) + 1;
+    say('⚔ ' + p.heroes.length + ' more hero' + (p.heroes.length > 1 ? 'es' : '') + ' step out of Hero Gate ' + gi + (p.gate.open ? '.' : ' and start to tunnel towards your dungeon!')); if (window.Sound) Sound.stinger('wave'); }
+  G.pending = G.pending.filter(p => !p.done);
 }
 function spawnWave() {
   const n = G.wave;
   /* The wave comes out of every linked Hero Gate: its heroes are dealt out between them (the wave is no bigger, it is split). If the
    * level flags the invasion as open without any gate linked (tests), the first gate is used. */
-  let gates = G.gates.filter(g => g.open); if (!gates.length) gates = [G.gate];
+  let gates = G.gates.length > 1 ? G.gates.slice() : G.gates.filter(g => g.open); if (!gates.length) gates = [G.gate];       // several Gates: all of them send heroes once the first is linked
   const kinds = makeParty(n, gates, false);
   if (window.Sound) Sound.stinger(kinds[0].boss ? 'boss' : 'wave');
-  G.wave++; G.nextWave = G.wave < VAR.WAVES ? G.time + waveInterval(n) : Infinity;
-  say('⚔ ' + waveText() + ': ' + kinds.length + ' heroes pour out of ' + (gates.length > 1 ? 'the ' + gates.length + ' Hero Gates' : 'the Hero Gate') + (kinds[0].boss ? ', led by the ' + kinds[0].name + '!' : '!'));
+  G.wave++; G.nextWave = G.wave < VAR.WAVES ? G.time + VAR.GATE_STAGGER * (gates.length - 1) + Math.max(VAR.MIN_WAVE_GAP, waveInterval(n)) : Infinity;
+  say('⚔ ' + waveText() + ': ' + kinds.length + ' heroes pour out of ' + (gates.length > 1 ? 'the ' + gates.length + ' Hero Gates, ' + VAR.GATE_STAGGER + ' s apart (a Gate you have not tunnelled to sends diggers)' : 'the Hero Gate') + (kinds[0].boss ? ', led by the ' + kinds[0].name + '!' : '!'));
 }
 function heroLogic(dt) {
   if (!G.gates.length) return;
@@ -809,7 +848,7 @@ function heroLogic(dt) {
             say('⚔ The Hero Gate is linked to your dungeon! ' + freed.length + ' hero' + (freed.length > 1 ? 'es' : '') + ' attack' + (freed.length > 1 ? '' : 's') + ' at once!'); }
           else { G.nextWave = G.time + VAR.FIRST_WAVE_DELAY;                                                                    // the first link starts the invasion clock
             say('The Hero Gate is linked to your dungeon! Heroes will invade in ' + VAR.FIRST_WAVE_DELAY + 's.'); } }
-        else say('Hero Gate ' + (i + 1) + ' is linked too: heroes will now arrive there as well.');
+        else say(gt.dug ? '⚠ Heroes have tunnelled from Hero Gate ' + (i + 1) + ' into your dungeon: they now have a way in!' : 'Hero Gate ' + (i + 1) + ' is linked too: heroes will now arrive there on open ground.');
       });
     }
   }
@@ -824,7 +863,7 @@ function heroLogic(dt) {
  * list of steps shown one at a time; a step moves on when its `when` condition is met (or when the player presses "Got it"). */
 const roomCount = (room) => ownedRooms()[ROOM_TOOLS[room]] || 0;
 const COND = {
-  survive:   { needs: 'waves',  f: () => [G.wave >= VAR.WAVES && !activeHeroes().length ? 1 : 0, 1], label: () => 'Defeat every wave of invaders' },
+  survive:   { needs: 'waves',  f: () => [G.wave >= VAR.WAVES && !activeHeroes().length && !G.pending.length ? 1 : 0, 1], label: () => 'Defeat every wave of invaders' },
   portal:    { needs: 'portal', f: () => [G.portalOwned ? 1 : 0, 1], label: () => 'Claim the Portal' },
   gate:      { needs: 'gate',   f: (c) => [G.gates.filter(g => g.open).length, c.n || 1], label: (c) => (c.n || 1) > 1 ? 'Link tunnels to ' + c.n + ' Hero Gates' : 'Link a tunnel to the Hero Gate' },
   wave:      { needs: 'waves',  params: ['n'], f: (c) => [G.wave, c.n], label: (c) => 'Withstand ' + c.n + ' wave' + (c.n > 1 ? 's' : '') },
@@ -861,7 +900,7 @@ function updateObjectives() {
 }
 /* The end of a run: freezes the result, judges the stars, and saves it (progress.js). `?nosave=1` skips saving (bots, experiments). */
 const SB = LV.sandbox || null;                       // the sandbox's options ({ diff, endless }) when this is the generated sandbox level
-const wavesSurvived = () => Math.max(0, G.wave - (activeHeroes().length ? 1 : 0));       // waves whose heroes are all beaten: the wave you are fighting does not count yet
+const wavesSurvived = () => Math.max(0, G.wave - (activeHeroes().length || G.pending.length ? 1 : 0));       // waves whose heroes are all beaten: the wave you are fighting does not count yet
 function finishGame(outcome) {                         // 'victory', 'defeat', or 'retired' (endless: you stopped and banked the score; G.over is then 'defeat')
   G.over = outcome === 'victory' ? 'victory' : 'defeat'; G.overAt = G.time;
   const bonus = OBJECTIVES.map((o, i) => o.optional ? i : -1).filter(i => i >= 0), r = { outcome, time: Math.round(G.time), kills: G.kills, heart: Math.max(0, G.heartHp) / VAR.HEART_HEALTH,
@@ -1003,7 +1042,8 @@ function updateHatchery(dt) {
   for (const c of G.chickens) c.update(dt);
   G.chickens = G.chickens.filter(c => !c.dead);
 }
-const prayRate = () => G.creatures.reduce((s, c) => s + (c.state === 'pray' ? c.pray * (1 + 0.1 * (c.level - 1)) : 0), 0);
+const prayRate = () => G.creatures.reduce((s, c) => s + (c.state === 'pray' ? c.pray * (1 + 0.1 * (c.level - 1)) * VAR.PRAYER_MANA_SCALE : 0), 0);
+const manaIncome = () => G.manaRate + prayRate();            // mana a second right now: the trickle, the Temple's tiles and the creatures praying in it
 
 /* ===================================================================================== knock-out, prison & torture
  * In OpenKeeper a creature that loses its last hit points in a fight falls unconscious (CREATURE_DYING_STATE_DURATION_SECONDS,
@@ -1070,16 +1110,16 @@ function release(b, how) {
  * ManaCalculatorLogic: mana flows in from your territory (OpenKeeper adds prayer in the Temple); KeeperSpellCastValidator
  * checks cost, cooldown and a valid target before PlayerSpellbookSystem lets a spell fire. All five spells start researched. */
 const SPELLS = {
-  lightning: { name: 'Lightning',    icon: '⚡', cost: 120, cd: 4,  r: 1.5, color: '#fff6a0' },
-  heal:      { name: 'Heal',         icon: '✚',  cost: 80,  cd: 3,  r: 3.2, color: '#6fe08a' },
-  haste:     { name: 'Speed',        icon: '»',  cost: 90,  cd: 6,  r: 3.2, color: '#6aa0ff' },
-  rally:     { name: 'Call to Arms', icon: '⚑',  cost: 150, cd: 10, r: 0.8, color: '#ffa040' },
-  imp:       { name: 'Create Imp',   icon: '✦',  cost: 100, cd: 2,  r: 0.5, color: '#ff6a6a' },
+  lightning: { name: 'Lightning',    icon: '⚡', cost: 180, cd: 8,  r: 1.5, color: '#fff6a0' },
+  heal:      { name: 'Heal',         icon: '✚',  cost: 100, cd: 6,  r: 3.2, color: '#6fe08a' },
+  haste:     { name: 'Speed',        icon: '»',  cost: 120, cd: 10,  r: 3.2, color: '#6aa0ff' },
+  rally:     { name: 'Call to Arms', icon: '⚑',  cost: 200, cd: 15, r: 0.8, color: '#ffa040' },
+  imp:       { name: 'Create Imp',   icon: '✦',  cost: 120, cd: 3,  r: 0.5, color: '#ff6a6a' },
 };
 const SPELL_ORDER = ['lightning', 'heal', 'haste', 'rally', 'imp'];
 const SPELL_SND = { lightning: 'lightning', heal: 'heal', haste: 'haste', rally: 'rally', imp: 'imp_spawn' };
 function updateMana(dt) {
-  G.manaT -= dt; if (G.manaT <= 0) { G.manaT = 1; G.ownedTiles = 0; for (const t of G.map) if (t.owner === 1 && !TERRAIN[t.t].solid) G.ownedTiles++; G.manaRate = 3 + 0.04 * G.ownedTiles; }
+  G.manaT -= dt; if (G.manaT <= 0) { G.manaT = 1; G.ownedTiles = 0; G.templeTiles = 0; for (const t of G.map) if (t.owner === 1 && !TERRAIN[t.t].solid) { G.ownedTiles++; if (t.t === T.TEMPLE) G.templeTiles++; } G.manaRate = VAR.MANA_BASE + VAR.MANA_PER_TEMPLE_TILE * G.templeTiles; }
   G.mana = Math.min(G.maxMana, G.mana + G.manaRate * dt);
   for (const k in G.spellCd) G.spellCd[k] = Math.max(0, G.spellCd[k] - dt);
 }
@@ -1153,12 +1193,14 @@ function step(dt) {
     if (G.creatures.length >= lim.cap) {                               // the Portal waits: say so once, until somebody can be taken in again
       if (!G.fullSaid) { G.fullSaid = true; say(lim.by === 'Portal' ? 'The Portal draws no more than ' + lim.portal + ' creatures.' : 'Your dungeon is full (' + (lim.by === 'beds' ? 'every bed is taken' : 'there is food for no more') + '): build more ' + (lim.by === 'beds' ? 'Lair' : 'Hatchery') + ' tiles.'); }
     } else {
-      G.fullSaid = false; G.nextSpawn = 25; const k = pickKind(); sfx('portal', G.portal.x + .5, G.portal.y + .5); G.creatures.push(new Creature(G.portal.x, G.portal.y, k)); say('A ' + k.name + ' enters through the portal.');
-      if (k.needs.length && !G.heardOf[k.name]) { G.heardOf[k.name] = 1; say('A ' + k.name + ' has heard of your ' + k.needs.map(([room]) => roomName(room)).join(' and ') + '.'); }       // the first of each kind that needed a room says why it came
+      G.fullSaid = false; const k = pickKind();
+      if (!k) { G.nextSpawn = 10; if (!G.mixSaid) { G.mixSaid = true; say('Every kind the Portal can draw is at its limit of ' + kindCap() + ': build rooms that other kinds want (Library, Temple, Hatchery, Treasury, Prison, Torture Chamber).'); } }
+      else { G.nextSpawn = 25; G.mixSaid = false; sfx('portal', G.portal.x + .5, G.portal.y + .5); G.creatures.push(new Creature(G.portal.x, G.portal.y, k)); say('A ' + k.name + ' enters through the portal.');
+      if (k.needs.length && !G.heardOf[k.name]) { G.heardOf[k.name] = 1; say('A ' + k.name + ' has heard of your ' + k.needs.map(([room]) => roomName(room)).join(' and ') + '.'); } }       // the first of each kind that needed a room says why it came
     }
   }
   G.creatures = G.creatures.filter(c => c.dead ? false : c.update(dt) !== 'leave');
-  for (const h of G.heroes) h.update(dt);
+  releasePending(); for (const h of G.heroes) h.update(dt);
   updateMana(dt); updateHatchery(dt); for (const c of G.creatures) if (c.haste > 0) c.haste -= dt;
   updateTraps(dt); updateJail(dt); updateShots(dt); heroLogic(dt);
   G.heroes = G.heroes.filter(h => !h.dead); G.creatures = G.creatures.filter(c => !c.dead); G.imps = G.imps.filter(i => !i.dead);
@@ -1472,7 +1514,7 @@ function renderHud() {
   const lim = armyLimit(); $('hCreatures').textContent = G.creatures.length; $('hMax').textContent = lim.cap; $('hLimit').textContent = lim.by;
   $('hCreaturesBox').title = limitText(lim) + ' Build Lair tiles for beds and Hatchery tiles for food.'; $('hCreaturesBox').classList.toggle('full', G.creatures.length >= lim.cap);
   $('hPay').textContent = Math.max(0, Math.ceil(G.nextPay)); $('hTime').textContent = Math.floor(G.time);
-  $('hMana').textContent = Math.floor(G.mana) + '/' + G.maxMana;
+  $('hMana').textContent = Math.floor(G.mana) + '/' + G.maxMana; $('hMana').parentElement.title = 'Mana +' + manaIncome().toFixed(1) + ' a second: ' + VAR.MANA_BASE + ' trickle, +' + VAR.MANA_PER_TEMPLE_TILE + ' for each of your ' + G.templeTiles + ' Temple tiles, plus creatures praying in it. Without a Temple mana almost stops.';
   for (const id of SPELL_ORDER) $('b_' + id).style.opacity = G.mana >= SPELLS[id].cost && !(G.spellCd[id] > 0) ? 1 : 0.45;
   for (const id in RESEARCH) { const b = $('b_' + id); if (!isAvail(id)) { b.style.opacity = 0.3; b.title = 'Locked — research it in a Library'; } else { b.title = ''; if (!SPELLS[id]) b.style.opacity = ''; } }
   renderResearch(); renderObjectives(); renderGuide(); renderEnd(); syncHandCursor(); renderRoster(); renderTip();
@@ -1483,7 +1525,7 @@ function renderHud() {
   let dig = 0, claim = 0, busy = 0, upkeep = 0; for (const t of G.tasks.values()) { if (t.type === 'DIG') dig++; else if (t.type === 'CLAIM') claim++; else upkeep++; if (t.who.size) busy++; }
   const mood = G.creatures.map(c => c.name + ' #' + c.id + ' Lv' + c.level + ' ' + Math.ceil(c.hp) + '/' + c.maxHp + 'hp: ' + c.mood + (c.lair || c.noLair ? '' : ' (no bed)')).join('<br>');
   $('tasks').innerHTML = 'Dig tiles <b>' + dig + '</b> · Claim tiles <b>' + claim + '</b> · Repairs <b>' + upkeep + '</b> · in progress <b>' + busy + '</b><br>' +
-    'Chickens <b>' + G.chickens.length + '</b> · hungry <b>' + G.creatures.filter(c => !c.noFood && c.hunger >= VAR.HUNGRY_AT).length + '</b> · praying <b>' + G.creatures.filter(c => c.state === 'pray').length + '</b> (+' + prayRate().toFixed(1) + ' mana/s)<br>Prisoners <b>' + G.prisoners.length + '</b> · knocked out <b>' + G.creatures.concat(G.heroes).filter(u => u.unconscious).length + '</b><br>Idle imps <b>' + G.imps.filter(i => i.state === 'idle').length + '</b>/' + G.imps.length + '<br><span style="color:var(--dim)">' + (mood || 'No creatures yet — dig east and claim the purple portal.') + '</span>';
+    'Chickens <b>' + G.chickens.length + '</b> · hungry <b>' + G.creatures.filter(c => !c.noFood && c.hunger >= VAR.HUNGRY_AT).length + '</b> · praying <b>' + G.creatures.filter(c => c.state === 'pray').length + '</b> (+' + prayRate().toFixed(1) + ' mana/s) · mana +' + manaIncome().toFixed(1) + '/s' + (G.templeTiles ? '' : ' (no Temple)') + '<br>Prisoners <b>' + G.prisoners.length + '</b> · knocked out <b>' + G.creatures.concat(G.heroes).filter(u => u.unconscious).length + '</b><br>Idle imps <b>' + G.imps.filter(i => i.state === 'idle').length + '</b>/' + G.imps.length + '<br><span style="color:var(--dim)">' + (mood || 'No creatures yet — dig east and claim the purple portal.') + '</span>';
 }
 
 /* Research panel: one button per item, click to choose what the Library studies next. */

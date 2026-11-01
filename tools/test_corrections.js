@@ -8,7 +8,7 @@
  *    9. traps: two uses, two of each at a time          10. nobody shoots through a door
  *   11. the hero counter ignores the knocked out        12. full screen is the default
  *   13. knocked-out heroes: 30 s, then prison and the rack   14. 20 creatures (25 in the last three chapters)
- *   15. imps spread over the jobs
+ *   15. imps spread over the jobs   16. a good mix of monsters   17. imps drop everything for a wounded enemy   18. mana comes from a Temple
  */
 const { spawn } = require('child_process');
 const path = require('path');
@@ -275,6 +275,56 @@ const sleep = (ms) => new Promise(r => setTimeout(r, ms));
       for (let s = 0; s < 1; s += 0.05) g.step(0.05);
       const kinds = G.imps.map(i => i.task ? i.task.type : i.state).sort(); return { kinds, dig: [...G.tasks.values()].filter(t => t.type === 'DIG').length, claim: [...G.tasks.values()].filter(t => t.type === 'CLAIM').length }; });
     check('with digging and claiming both waiting, three imps do not all pile onto the digging', r.dig > 0 && r.claim > 0 && new Set(r.kinds).size >= 2 && r.kinds.filter(k => k === 'DIG').length < 3 && r.kinds.includes('CLAIM'), JSON.stringify(r));
+    await page.context().close();
+
+    /* ------------------------------------------------------------------ 16 */
+    console.log('16. a good mix of monsters');
+    page = await open('level=classic&seed=7&unlock=1'); await page.evaluate(SETUP);
+    r = await page.evaluate(() => {
+      const g = __game, G = g.G, T = g.T, out = {}; G.creatures.length = 0; const cap = Math.ceil(g.VAR.CREATURES_SUPPORTED_BY_FIRST_PORTAL / 4); out.cap = cap;
+      const draws = (n = 300) => { const seen = {}; for (let i = 0; i < n; i++) { const k = g.pickKind(); const name = k ? k.name : 'none'; seen[name] = 1; } return Object.keys(seen).sort().join(); };
+      out.bare = draws();                                              // nobody there yet: the three beginner kinds
+      for (const name of ['Goblin', 'Spider', 'Fly']) for (let i = 0; i < cap; i++) G.creatures.push(new g.Creature(6, 13, g.KINDS.find(k => k.name === name)));
+      out.full = draws();                                              // 5 of each: none of them may come again, and nobody else has a room yet
+      G.gold = 1e5; g.build(T.LIBRARY, 3, 12, 5, 12); out.library = draws();
+      G.creatures.length = 0; for (let i = 0; i < cap; i++) G.creatures.push(new g.Creature(6, 13, g.KINDS[0])); out.goblins = draws();
+      return out; });
+    check('no kind may be more than a quarter of the Portal\'s limit: 5 of 20', r.cap === 5, JSON.stringify(r.cap));
+    check('with only beginner kinds possible and all three at 5, nobody else can come: 15 of 20 places is the most a bare dungeon fills', r.bare === 'Fly,Goblin,Spider' && r.full === 'none', JSON.stringify([r.bare, r.full]));
+    check('a Library then opens the places that were held back (Warlock, Dark Elf)', r.library === 'Dark Elf,Warlock', r.library);
+    check('five Goblins in, the Goblin stops coming and the other kinds go on', !/Goblin/.test(r.goblins) && /Fly/.test(r.goblins) && /Spider/.test(r.goblins), r.goblins);
+    r = await page.evaluate(() => { const g = __game, G = g.G; G.creatures.length = 0; for (const name of ['Goblin', 'Spider', 'Fly']) for (let i = 0; i < 5; i++) { const c = new g.Creature(6, 13, g.KINDS.find(k => k.name === name)); c.noLair = true; c.noFood = true; G.creatures.push(c); }
+      G.portalOwned = true; G.nextSpawn = 0; G.mixSaid = false; g.LV.rules.food = false; g.build(g.T.LAIR, 2, 11, 10, 17); G.map.forEach(t => { if (t.t === g.T.LIBRARY) { t.t = g.T.PATH; } }); __t.run(3); return { n: G.creatures.length, log: G.log.some(m => /at its limit of 5/.test(m)) }; });
+    check('the Portal says so when every kind it can draw is at its limit, and draws nobody', r.n === 15 && r.log, JSON.stringify(r));
+    await page.context().close();
+
+    /* ------------------------------------------------------------------ 17 */
+    console.log('17. imps drop everything for a wounded enemy');
+    page = await open('level=classic&seed=7&unlock=1'); await page.evaluate(SETUP);
+    r = await page.evaluate(() => {
+      const g = __game, G = g.G, T = g.T; G.gold = 1e5; G.creatures.length = 0; G.heroes.length = 0; g.build(T.PRISON, 3, 12, 3, 13); G.dirty = true;
+      g.tagRect(11, 14, 12, 14, true); g.tagRect(11, 12, 12, 12, true); g.scanTasks(); while (G.imps.length < 3) G.imps.push(new g.Imp(9, 14));
+      for (let s = 0; s < 6; s += 0.05) g.step(0.05);
+      const working = G.imps.filter(i => i.task && (i.task.type === 'DIG' || i.task.type === 'CLAIM')).length;
+      const h = __t.hero('Knight', 8.5, 14.5), c = __t.creature(1, 8.5, 13.5); c.dmg = 1e5; c.noFood = true; g.strike(c, h); let took = null; for (let s = 0; s < 3; s += 0.05) { g.step(0.05); c.hunger = 0; if (took === null && G.imps.some(i => (i.task && i.task.type === 'CAPTURE') || i.carryType === 'CAPTURE')) took = Math.round(s * 10) / 10; }
+      return { working, took, ko: h.unconscious }; });
+    check('imps busy digging and claiming leave it at once the moment an enemy is knocked out: one has the CAPTURE job within about a second', r.working >= 2 && r.ko && r.took !== null && r.took <= 1.2, JSON.stringify(r));
+    await page.context().close();
+
+    /* ------------------------------------------------------------------ 18 */
+    console.log('18. mana comes from a Temple, and is slow');
+    page = await open('level=classic&seed=7&unlock=1'); await page.evaluate(SETUP);
+    r = await page.evaluate(() => {
+      const g = __game, G = g.G, T = g.T, out = {}; G.creatures.length = 0; G.mana = 0; __t.run(60); out.noTemple = Math.round(G.mana * 10) / 10; out.rate0 = G.manaRate;
+      G.gold = 1e5; g.build(T.TEMPLE, 3, 12, 5, 12); G.mana = 0; __t.run(60); out.temple = Math.round(G.mana * 10) / 10; out.rate1 = Math.round(G.manaRate * 100) / 100; out.tiles = G.templeTiles;
+      G.mana = 800; G.heroes.length = 0; const h = __t.hero('Knight', 8.5, 14.5); h.hp = h.maxHp = 1e6; const f = { fx: h.x, fy: h.y }; G.spellCd = {};
+      out.cast1 = g.castSpell('lightning', f); out.cast2 = g.castSpell('lightning', f); out.mana = G.mana; out.max = G.maxMana; out.cost = g.SPELLS.lightning.cost; out.cd = g.SPELLS.lightning.cd;
+      G.mana = 800; G.spellCd = {}; G.creatures.length = 0; const c = __t.creature(); c.hp = 10; out.heal1 = g.castSpell('heal', { fx: c.x, fy: c.y }); c.hp = 10; out.heal2 = g.castSpell('heal', { fx: c.x, fy: c.y });
+      return out; });
+    check('with no Temple the mana barely moves: about 0.3 a second, 18 in a minute', r.rate0 === 0.3 && r.noTemple >= 15 && r.noTemple <= 22, JSON.stringify([r.rate0, r.noTemple]));
+    check('a 3-tile Temple raises it to 0.66 a second (0.3 + 0.12 a tile), about twice as much', r.tiles === 3 && r.rate1 === 0.66 && r.temple > r.noTemple * 1.8, JSON.stringify([r.tiles, r.rate1, r.temple]));
+    check('Lightning costs 180 and recharges for 8 s: a second cast straight after is refused; the mana pool tops out at 800', r.cast1 && !r.cast2 && r.cost === 180 && r.cd === 8 && r.max === 800 && Math.round(r.mana) === 620, JSON.stringify([r.cast1, r.cast2, r.cost, r.cd, r.max, r.mana]));
+    check('Heal costs 100 and recharges for 6 s too, so neither can be spammed', r.heal1 && !r.heal2, JSON.stringify([r.heal1, r.heal2]));
     await page.context().close();
 
     check('no page errors or warnings in any run', problems.length === 0, problems.slice(0, 3).join(' | '));

@@ -76,7 +76,7 @@ completing its objectives (every chapter includes surviving all its waves) and l
 | V | Doors and Snares | doors and traps; the **Dwarf** disarms and smashes them | |
 | VI | The Dungeon Below | Prison, Torture Chamber; the **Monk** heals | |
 | VII | Prayers and Power | Temple, mana, spells; the **Fairy** flies over traps | |
-| VIII | Two Gates | two entrances (each wave is split between linked Gates); the **Giant** | |
+| VIII | Two Gates | two entrances (every Gate sends heroes, 20 s apart; the one you have not tunnelled to sends diggers); the **Giant** | |
 | IX | The Siege | the **Prince** and the armoured **Stone Knight** | hard |
 | X | The King's Crusade | three Gates; the **King** | the hardest |
 
@@ -112,7 +112,10 @@ What changed after the first full playthrough (each point has a check in `tools/
 * **Traps fire twice and crumble away**, two of each kind at a time. Imps no longer re-arm them.
 * **Ranged units cannot shoot through a closed door** (any side). An archer or Dark Elf must stand in the doorway, or smash the door.
 * **The hero counter** counts heroes still fighting; knocked-out ones show as *+n down*, and a wave whose heroes are all down counts as beaten.
-* **Defeated heroes** are knocked out for **30 s**: imps carry them to the Prison, then to the Torture Chamber, where they break or are converted (rescue, capture and haul jobs now come before digging).
+* **Defeated heroes** are knocked out for **30 s**: imps carry them to the Prison, then to the Torture Chamber, where they break or are converted. Rescue, capture and haul jobs come before everything else: an imp that is digging, claiming or carrying gold drops it within half a second when somebody is lying knocked out and a cell is free.
+* **Two or three Hero Gates:** tunnel to one and **every Gate sends heroes**. A wave comes out of the Gates one group at a time, **20 s apart** (the group with the boss first), and the next wave follows at least 40 s after the last group. The heroes at a Gate you have **not** tunnelled to **dig their own way in** (every other one digs, the rest follow), so it pays to link it yourself and choose the battlefield. Chapters 8, 9 and 10 and the sandbox with several Gates.
+* **A good mix of monsters:** no kind may exceed a quarter of the Portal's limit (5 of 20, 7 of 25), so the three beginner kinds (Goblin, Spider, Fly) fill at most 15 of 20 places and the rest wait for kinds that want a Library, Temple, Hatchery, Treasury, Prison or Torture Chamber. When every kind that can come is at its limit the Portal says so and waits.
+* **Mana:** see Controls, Mana and spells. **Balance:** chapters 4 to 10 have stronger heroes than before (and the later ones the two-Gate rule), so the steady test player now loses creatures from chapter 4 on, drops the odd run from chapter 6, and wins about 3 runs in 4 at chapter 8 and 5 in 8 at the Siege and the Crusade.
 * **Imps spread out:** of the everyday jobs the one with the fewest imps on it wins, so one digs while the next claims floor and the next mends a door.
 * **Full screen** is the default (see Controls).
 * Chapters 9 and 10 got stronger heroes (x1.2, x1.37) to keep them hard with the shorter walk, doors that stop archers, and bigger armies; the bot test windows were shortened to match (`docs/06-levels.md`, "Balance").
@@ -183,13 +186,13 @@ Tick as you go; write down anything surprising in the template at the end.
 - [ ] **Spells:** every spell works and refuses politely (no mana, cooling down, no target). Hotkeys `1` to `5`.
 - [ ] **Mouse modes:** with nothing chosen, left-drag tags walls and a left-click on a creature or imp picks it up (a gold ring shows which one), the next click drops it, dropping into rock is refused. Right-click cancels any chosen tool, in both views; right-click while carrying drops it nearby. Right-click sells a door or trap. Does it ever pick up an imp when you only meant to tag a wall? Is the ring easy to see?
 - [ ] **Hand:** the ✋ Hand tool still picks up and drops creatures and imps.
-- [ ] **Gates:** the countdown starts at the first link; with two or more Gates each wave is split; fleeing heroes escape through their own Gate; *gates 1/2* in the bar.
+- [ ] **Gates:** the countdown starts at the first link; with two or more Gates every Gate sends heroes, 20 s apart, and the unlinked one digs its way in; fleeing heroes escape through their own Gate; *gates 1/2* in the bar.
 - [ ] **Speed:** 3x and 8x stay smooth in a big fight; Pause really pauses (including the end of a wave).
 
 **5. Sandbox, endless and saves**
 
 - [ ] Every control on the sandbox page changes the summary; *Begin* opens exactly that game; Retry reopens the same one (same seed).
-- [ ] Hero Gates in the sandbox: pick 1 to 6; each extra Gate is in a new place round the edge (the hint under the buttons names them); tunnel to several and every wave is split between them. Is the 88 x 60 map big enough? Too big to cross?
+- [ ] Hero Gates in the sandbox: pick 1 to 6; each extra Gate is in a new place round the edge (the hint under the buttons names them); once one is linked every Gate sends heroes, 20 s apart. Is the 88 x 60 map big enough? Too big to cross?
 - [ ] Digging heroes: in a chapter from IV on, watch a hero stop at a wall and dig towards your creatures (the log says so once; the swing animation plays). Do the waves feel too fast now (35-90 s before the first, 50-75 s between)? Can you answer a tunnel (creatures, traps near your Heart)?
 - [ ] Endless: waves never stop, the gap shrinks, a boss leads waves 5, 10, 15, 20. *Retire* banks the score; *Overrun* when the Heart falls; the best per difficulty is saved and shown on the sandbox page.
 - [ ] Stars and best times are saved across a reload; chapters unlock in order; *Erase saved progress* resets all of it.
@@ -353,11 +356,12 @@ seams, room building, lair assignment, mood/anger, sleep and payday, free-imp sp
   poison cloud) and **Lightning Traps** (200g, burst + stun) are hidden from heroes, fire when stepped on, hold a few
   two charges and then crumble away (two of each kind at a time, so no spamming). With the same 8 creatures and 3 lair tiles, one door plus three traps in the
   tunnel to the Hero Gate turned a lost game into a win in my bot test (9 heroes killed, Heart untouched), even though the Dwarf disarms traps and the Fairy flies over the door.
-* **Mana and spells** (hotkeys `1`–`5`, click to cast; mana comes from your claimed floor, about 5.7/s at the start,
-  1000 max, and every spell has a cooldown): **⚡ Lightning** (120 – 70 damage to the hero under the cursor, 35 chained to
-  two nearby ones, with a stun), **✚ Heal** (80 – +60 hp to creatures and imps in range), **» Speed** (90 – creatures move
-  and recharge 1.6× faster for 12 s), **⚑ Call to Arms** (150 – creatures drop everything and gather at a flag for 25 s),
-  **✦ Create Imp** (100 – on claimed floor). A failed cast costs nothing. In my bot tests spells turned a lost game into a
+* **Mana and spells** (hotkeys `1`–`5`, click to cast; **mana depends on a Temple**: without one it trickles in at 0.3 a second
+  (18 a minute), each Temple tile adds 0.12 a second and creatures praying there add about 0.2 to 1 each; 800 max, and every spell has a cooldown, so
+  neither Lightning nor Heal can be spammed): **⚡ Lightning** (180, 8 s –  70 damage to the hero under the cursor, 35 chained to
+  two nearby ones, with a stun), **✚ Heal** (100, 6 s – +60 hp to creatures and imps in range), **» Speed** (120, 10 s – creatures move
+  and recharge 1.6× faster for 12 s), **⚑ Call to Arms** (200, 15 s – creatures drop everything and gather at a flag for 25 s),
+  **✦ Create Imp** (120, 3 s – on claimed floor). A failed cast costs nothing. In my bot tests spells turned a lost game into a
   win with a solid defence of 9 lair tiles (15 heroes killed, Heart untouched), but could not save the weakest one (3 lair tiles).
 * **Knock-out, Prison and Torture Chamber:** a unit that loses its last hit points to an enemy attacker is knocked out
   instead of killed (traps and spells, which have no attacker, still kill). Imps rush to carry your own fallen creatures

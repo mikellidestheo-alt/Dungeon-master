@@ -4,14 +4,16 @@
  *   #   chapter                 new                    map      waves  hero x  prep  gap   dig  Gates  start unlock
  *   1   The Awakening           dig, mine, claim, build  30x17     1     0.50    -    110    0    1     nothing   (its Knight waits on the Gate pad: no countdown)
  *   2   Creatures of the Dark   the Portal               36x20     3     0.70    90    75    0    1     nothing
- *   3   Mouths to Feed          Hatchery                 76x44     4     0.90    75    70    0    1     nothing
- *   4   The Library             research                 80x44     4     1.05    60    65    1    1     nothing (you research Gas Trap, Heal)
- *   5   Doors and Snares        doors, traps; Dwarf, Training  84x48  5  0.85    55    60    1    1     Gas and Lightning traps
- *   6   The Dungeon Below       Prison, Torture; Monk    88x48     6     0.85    55    60    2    1     + Prison, Torture Chamber
- *   7   Prayers and Power       Temple, spells; Fairy    92x52     6     1.20    50    60    2    1     + Temple and every spell
+ *   3   Mouths to Feed          Hatchery                 76x44     4     1.00    75    70    0    1     nothing
+ *   4   The Library             research                 80x44     4     1.20    60    65    1    1     nothing (you research Gas Trap, Heal)
+ *   5   Doors and Snares        doors, traps; Dwarf, Training  84x48  5  1.30    55    60    1    1     Gas and Lightning traps
+ *   6   The Dungeon Below       Prison, Torture; Monk    88x48     6     1.35    55    60    2    1     + Prison, Torture Chamber
+ *   7   Prayers and Power       Temple, spells; Fairy    92x52     6     1.30    50    60    2    1     + Temple and every spell
  *   8   Two Gates               two entrances; Giant     96x56     7     1.00    45    55    3    2     everything
- *   9   The Siege               Prince, Stone Knight    100x60     8     1.00    40    55    3    2     everything   (waves.scale 0.11)
- *   10  The King's Crusade      the King; three Gates   104x64    10     1.08    35    50    4    3     everything
+ *   9   The Siege               Prince, Stone Knight    100x60     8     1.20    40    55    3    2     everything   (waves.scale 0.11)
+ *   10  The King's Crusade      the King; three Gates   104x64    10     1.25    35    50    4    3     everything
+ *
+ * From chapter 8 on every Gate sends heroes once one is linked (20 s apart; the unlinked ones dig their own way in), so "gap" is counted from the last group.
  *
  * Chapters 3-10 are drawn at half size and enlarged to twice the width and height by enlargeGrid (levels.js); "map" is the size you play on.
  * "dig" is waves.dig: how many heroes tunnel through the earth towards your creatures (0 none ... 4 every hero; docs/06-levels.md "Heroes that dig").
@@ -151,7 +153,7 @@
       '######################################'
     ] },
     start: { gold: 1000, mana: 300, imps: 3, unlock: 'none', research: null, pretag: [], welcome: 'Hungry creatures are angry creatures. Build a Hatchery.' },
-    waves: { prep: 75, interval: 70, scale: 0.07, heroMult: 0.9, dig: 0, plan: W('K A', 'K A T', 'G K A A', 'K T A G A') },
+    waves: { prep: 75, interval: 70, scale: 0.07, heroMult: 1.0, dig: 0, plan: W('K A', 'K A T', 'G K A A', 'K T A G A') },
     rules: { heartHp: 2800 },
     objectives: [
       { type: 'portal', text: 'Claim the Portal' },
@@ -200,7 +202,7 @@
       '########################################'
     ] },
     start: { gold: 1000, mana: 400, imps: 3, unlock: 'none', research: null, pretag: [], welcome: 'Build a Library, then pick what to study in the Research panel.' },
-    waves: { prep: 60, interval: 65, scale: 0.08, heroMult: 1.05, dig: 1, plan: W('K A M T', 'G K A T M', 'K M M A T G', 'G G K M A T A') },
+    waves: { prep: 60, interval: 65, scale: 0.08, heroMult: 1.2, dig: 1, plan: W('K A M T', 'G K A T M', 'K M M A T G', 'G G K M A T A') },
     rules: { heartHp: 2700 },
     objectives: [
       { type: 'portal', text: 'Claim the Portal' },
@@ -217,7 +219,7 @@
       { text: 'Claim the Portal and raise a few creatures. Thinkers (Warlocks study best) will sit at Library desks.', tool: 'dig', when: { type: 'portal' } },
       { text: 'Choose <b>Library</b> and drag over four floor tiles. Each tile holds a desk, and three tiles draw Warlocks and Dark Elves to your Portal.', tool: 'library', when: { type: 'room', room: 'library', n: 4 } },
       { text: 'Open the <b>Research</b> panel below the view and click <b>Gas Trap</b>. Creatures studying at desks add progress; the bar fills as they work.', when: { type: 'research', item: 'gas' } },
-      { text: 'Now click <b>Heal</b> in the Research panel. Spells cost mana, which rises with your territory.', when: { type: 'research', item: 'heal' } },
+      { text: 'Now click <b>Heal</b> in the Research panel. Spells cost mana, which comes mostly from a Temple (build one in chapter 7).', when: { type: 'research', item: 'heal' } },
       { text: 'Well studied. Some heroes <b>dig through the earth</b> towards your creatures from this chapter on, so keep your army near your Heart as well as in the tunnel. Tunnel to the Hero Gate in the south when your army is ready.', when: { type: 'gate' } },
     ],
   };
@@ -253,7 +255,7 @@
       '##########################################'
     ] },
     start: { gold: 1200, mana: 400, imps: 3, unlock: TRAPS, research: null, pretag: [], welcome: 'Doors and traps are ready. The gaps in the rock ridges are your choke points.' },
-    waves: { prep: 55, interval: 60, scale: 0.09, heroMult: 0.85, dig: 1, plan: W('K A T D', 'D K A T A', 'G D K A M T', 'D D G M A T K', 'D G K M A T A G') },
+    waves: { prep: 55, interval: 60, scale: 0.09, heroMult: 1.3, dig: 1, plan: W('K A T D', 'D K A T A', 'G D K A M T', 'D D G M A T K', 'D G K M A T A G') },
     rules: { heartHp: 2500 },
     objectives: [
       { type: 'portal', text: 'Claim the Portal' },
@@ -306,7 +308,7 @@
       '############################################'
     ] },
     start: { gold: 1500, mana: 400, imps: 3, unlock: [...TRAPS, 'prison', 'torture'], research: null, pretag: [], welcome: 'The Prison and Torture Chamber are ready. Heroes who fall can be taken alive.' },
-    waves: { prep: 55, interval: 60, scale: 0.09, heroMult: 0.85, dig: 2, plan: W('K H A T', 'G K H A T M', 'D K H M A T G', 'G G H K M A T D', 'D G K H H M A T K', 'G D K H M A T D K') },
+    waves: { prep: 55, interval: 60, scale: 0.09, heroMult: 1.35, dig: 2, plan: W('K H A T', 'G K H A T M', 'D K H M A T G', 'G G H K M A T D', 'D G K H H M A T K', 'G D K H M A T D K') },
     rules: { heartHp: 2500 },
     objectives: [
       { type: 'portal', text: 'Claim the Portal' },
@@ -359,7 +361,7 @@
       '##############################################'
     ] },
     start: { gold: 1500, mana: 500, imps: 3, unlock: [...TRAPS, ...ROOMS, ...SPELLS], research: null, pretag: [], welcome: 'Every spell is ready. Build a Temple to refill your mana.' },
-    waves: { prep: 50, interval: 60, scale: 0.12, heroMult: 1.2, dig: 2, plan: W('K F A T', 'G K F M A D', 'D K F A T G H', 'G D F F K M A T', 'G G D F K M A T H', 'D G K F F M A T A') },
+    waves: { prep: 50, interval: 60, scale: 0.12, heroMult: 1.3, dig: 2, plan: W('K F A T', 'G K F M A D', 'D K F A T G H', 'G D F F K M A T', 'G G D F K M A T H', 'D G K F F M A T A') },
     rules: { heartHp: 2500 },
     objectives: [
       { type: 'portal', text: 'Claim the Portal' },
@@ -382,7 +384,7 @@
 
   L.gates = {
     id: 'gates', name: 'Two Gates', seed: 108, tagline: 'Heroes from two directions. Beware the Giant.',
-    briefing: 'There are two Hero Gates now, north and south. Tunnel to both and every wave is split between them, striking you from two sides; tunnel to one and the whole host comes the same way. The Giant has joined the invaders: slow, enormous and immune to stuns.',
+    briefing: 'There are two Hero Gates now, north and south. The moment you tunnel to one, BOTH send heroes: each wave comes out of both Gates, one group first and the other 20 seconds later, and the heroes at the Gate you have not tunnelled to dig their own way in. Tunnel to both and you choose where they meet you. The Giant has joined the invaders: slow, enormous and immune to stuns.',
     stars: { heart: 0.5 },
     terrain: { grid: [
       '################################################',
@@ -427,14 +429,14 @@
     ],
     guide: [
       { text: 'Claim the Portal in the east and raise a bigger army: there are two ways in this time.', tool: 'dig', when: { type: 'portal' } },
-      { text: 'A Hero Gate lies in the <b>south</b> and another in the <b>north</b>. The countdown starts when the first is linked. Linked Gates share each wave; a Gate you never link sends nobody.', when: { type: 'gate' } },
+      { text: 'A Hero Gate lies in the <b>south</b> and another in the <b>north</b>. The countdown starts when the first is linked, and then <b>both</b> Gates send heroes, 20 seconds apart: the one you have not tunnelled to sends diggers, who tunnel through the earth towards you.', when: { type: 'gate' } },
       { text: 'Both Gates are open to you now: defend both tunnels. The <b>Giant</b> is stun-proof and smashes doors; traps and a crowd of creatures stop him.', when: { type: 'gate', n: 2 } },
     ],
   };
 
   L.siege = {
     id: 'siege', name: 'The Siege', seed: 109, tagline: 'Eight waves. The Prince himself leads them.',
-    briefing: 'The kingdom sends its best: eight waves, with the Stone Knight, who is armoured and cannot breathe gas, and the Prince, who fears nothing. Two Gates lie open to you. Choose where to meet them and hold the line.',
+    briefing: 'The kingdom sends its best: eight waves, with the Stone Knight, who is armoured and cannot breathe gas, and the Prince, who fears nothing. Two Gates will send heroes, one group 20 seconds after the other. Choose where to meet them and hold the line.',
     stars: { heart: 0.5 },
     terrain: { grid: [
       '##################################################',
@@ -481,13 +483,13 @@
     ],
     guide: [
       { text: 'Eight waves are coming. Raise a strong army before you open a Gate: nothing starts until you tunnel to one.', tool: 'dig', when: { type: 'portal' } },
-      { text: 'Link one Gate and the whole host comes that way, link both and each wave splits. The <b>Stone Knight</b> shrugs off gas and a quarter of every blow; the <b>Prince</b> leads waves 5 and 8.', when: { type: 'gate' } },
+      { text: 'Link one Gate and both send heroes (the heroes at the other dig their way in, 20 seconds behind); link both and you choose where they meet you. The <b>Stone Knight</b> shrugs off gas and a quarter of every blow; the <b>Prince</b> leads waves 5 and 8.', when: { type: 'gate' } },
     ],
   };
 
   L.crusade = {
     id: 'crusade', name: "The King's Crusade", seed: 110, tagline: 'Ten waves. Three Gates. The King.',
-    briefing: 'The King himself has taken up the sword. Ten waves of the kingdom\'s finest will march on your Heart through three Hero Gates, with the Prince at their head and the King last of all. Open one Gate or all three, but be ready: this is the last stand of your dungeon.',
+    briefing: 'The King himself has taken up the sword. Ten waves of the kingdom\'s finest will march on your Heart through three Hero Gates, with the Prince at their head and the King last of all. Tunnel to one Gate and all three will send heroes, but be ready: this is the last stand of your dungeon.',
     stars: { heart: 0.5 },
     terrain: { grid: [
       '####################################################',
@@ -524,7 +526,7 @@
       '####################################################'
     ] },
     start: { gold: 2500, mana: 600, imps: 4, unlock: 'all', research: null, pretag: [], welcome: 'The King is coming. Three Gates, ten waves, and everything researched.' },
-    waves: { prep: 35, interval: 50, scale: 0.07, heroMult: 1.37, dig: 4,
+    waves: { prep: 35, interval: 50, scale: 0.07, heroMult: 1.25, dig: 4,
       plan: W('K A T', 'G K H A', 'S K H A M T', 'P G K H A M T', 'S G D H F M A', 'N G K H F M A T', 'P S G H F M A T', 'S G D H F M A T', 'S G D H F M A T', 'Y P S G N H F M A') },
     rules: { heartHp: 2500, maxCreatures: 25 },
     objectives: [
@@ -536,7 +538,7 @@
     ],
     guide: [
       { text: 'This is the last stand. Take your time: no hero moves until you tunnel to a Gate, and once you do the clock runs fast.', tool: 'dig', when: { type: 'portal' } },
-      { text: 'Three Gates: south-west, north and south-east. Link only one to fight on a single front; link more and each wave is split. The <b>King</b> leads wave 10.', when: { type: 'gate' } },
+      { text: 'Three Gates: south-west, north and south-east. Link one and all three send heroes, 20 seconds apart (the others dig their own tunnels); link more and you choose the fronts. The <b>King</b> leads wave 10.', when: { type: 'gate' } },
     ],
     victory: 'The King has fallen and the kingdom kneels. The dungeon is yours, Keeper.',
   };

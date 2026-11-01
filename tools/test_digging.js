@@ -64,7 +64,7 @@ const sleep = (ms) => new Promise(r => setTimeout(r, ms));
     check('hard (2): every 3rd hero digs (slots 0, 3, 6), plus the Dwarf', w2 === 'K+ A- D+ M+ T- G- M+ F- P-', w2);
     check('Dungeon Master (3): every 2nd hero digs (slots 0, 2, 4, 6), bosses and flyers never', w3 === 'K+ A- D+ M- T+ G- M+ F- P-', w3);
     page = await open('level=crusade&seed=3');
-    const w4 = await page.evaluate(() => { const g = __game, G = g.G; G.gates.forEach(x => x.open = true); G.gateOpen = true; G.wave = 0; G.nextWave = 1e9; g.LV.waves.plan[0] = ['Knight', 'Archer', 'Dwarf', 'Mage', 'Thief', 'Guard', 'Monk', 'Fairy', 'Prince']; g.spawnWave(); return G.heroes.map(h => h.name[0] + (h.digger ? '+' : '-')).join(' '); });
+    const w4 = await page.evaluate(() => { const g = __game, G = g.G; G.gates.forEach(x => x.open = true); G.gateOpen = true; G.wave = 0; G.nextWave = 1e9; g.LV.waves.plan[0] = ['Knight', 'Archer', 'Dwarf', 'Mage', 'Thief', 'Guard', 'Monk', 'Fairy', 'Prince']; g.spawnWave(); return G.heroes.concat(G.pending.flatMap(p => p.heroes)).map(h => h.name[0] + (h.digger ? '+' : '-')).join(' '); });       // the groups of the other Gates step out 20 s later (G.pending)
     check('the finale (4): every hero digs except the Fairy (flies) and the Prince (boss), whichever of the three Gates he comes out of', w4.split(' ').length === 9 && w4.split(' ').every(x => (x[0] === 'F' || x[0] === 'P') ? x[1] === '-' : x[1] === '+'), w4);
     await page.close();
 
